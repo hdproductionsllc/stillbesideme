@@ -16,8 +16,11 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-xl);
-  position: relative;
   gap: var(--space-lg);
+  /* Stick to viewport while form scrolls */
+  position: sticky;
+  top: 57px;
+  height: calc(100vh - 57px);
   /* Subtle wall texture */
   background:
     radial-gradient(ellipse at 50% 40%, rgba(60, 50, 40, 0.3) 0%, transparent 70%),
@@ -27,7 +30,6 @@
 .form-pane {
   flex: 0 0 42%;
   background: var(--color-surface);
-  overflow-y: auto;
   padding: var(--space-2xl) var(--space-xl);
   border-left: 1px solid var(--color-border);
 }
@@ -690,6 +692,7 @@
     flex: none;
     position: sticky;
     top: 0;
+    height: auto;
     z-index: 10;
     padding: var(--space-md);
     max-height: 50vh;

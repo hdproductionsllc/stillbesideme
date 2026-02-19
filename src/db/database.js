@@ -12,11 +12,28 @@ const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 
 let db = null;
 
-/** Save the in-memory database to disk */
+/** Save the in-memory database to disk (debounced, async) */
+let _saveTimer = null;
+let _saving = false;
+
 function save() {
   if (!db) return;
-  const data = db.export();
-  fs.writeFileSync(DB_PATH, Buffer.from(data));
+
+  // Debounce: coalesce rapid writes into a single disk flush
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(async () => {
+    _saveTimer = null;
+    if (_saving || !db) return;
+    _saving = true;
+    try {
+      const data = db.export();
+      await fs.promises.writeFile(DB_PATH, Buffer.from(data));
+    } catch (err) {
+      console.error('Database save error:', err);
+    } finally {
+      _saving = false;
+    }
+  }, 100);
 }
 
 /** Thin wrapper that provides a clean API and auto-saves on writes */

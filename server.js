@@ -34,7 +34,9 @@ async function start() {
       retries: 0,
       logFn: () => {}          // suppress noisy logs
     }),
-    secret: process.env.SESSION_SECRET || 'still-beside-me-dev-secret',
+    secret: process.env.SESSION_SECRET || (process.env.NODE_ENV === 'production'
+      ? (() => { throw new Error('SESSION_SECRET must be set in production'); })()
+      : 'still-beside-me-dev-secret'),
     resave: false,
     saveUninitialized: true,
     cookie: {
