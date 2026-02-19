@@ -18,6 +18,7 @@
   let regenerationCount = 0;
   let currentStyle = 'classic-dark';
   let currentLayout = 'side-by-side';
+  let orderType = 'self'; // 'self' or 'gift'
 
   // ── Initialization ─────────────────────────────────────────
 
@@ -60,11 +61,34 @@
   function buildGuidedForm() {
     formPane.innerHTML = '';
 
-    // Intro
-    const intro = document.createElement('div');
-    intro.className = 'form-intro';
-    intro.innerHTML = 'Getting to know your pet<span>Each detail helps us write their tribute</span>';
-    formPane.appendChild(intro);
+    // Order type toggle (gift vs self)
+    const toggleWrap = document.createElement('div');
+    toggleWrap.innerHTML = `
+      <div class="form-intro">Who is this tribute for?<span>This helps us personalize the experience</span></div>
+      <div class="order-type-toggle" id="order-type-toggle">
+        <button class="order-type-option${orderType === 'self' ? ' active' : ''}" data-type="self">My pet</button>
+        <button class="order-type-option${orderType === 'gift' ? ' active' : ''}" data-type="gift">Someone else's pet</button>
+      </div>
+      <p class="order-type-hint" id="order-type-hint">${orderType === 'gift' ? 'You\'re creating a meaningful gift — we\'ll guide you through it.' : 'Each detail helps us write their tribute.'}</p>
+    `;
+    formPane.appendChild(toggleWrap);
+
+    // Wire toggle
+    toggleWrap.querySelectorAll('.order-type-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        orderType = btn.dataset.type;
+        toggleWrap.querySelectorAll('.order-type-option').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const hint = document.getElementById('order-type-hint');
+        if (hint) {
+          hint.textContent = orderType === 'gift'
+            ? 'You\'re creating a meaningful gift — we\'ll guide you through it.'
+            : 'Each detail helps us write their tribute.';
+        }
+        updateFormLabelsForOrderType();
+        saveState();
+      });
+    });
 
     // 1. Photo upload
     const photoSection = createSection('Share their photo');
@@ -221,11 +245,27 @@
 
     const existingMsg = wrapper.querySelector('.quality-message');
     if (existingMsg) existingMsg.remove();
-    if (quality && (quality.tier === 'usable' || quality.tier === 'low')) {
-      const msg = document.createElement('p');
-      msg.className = 'quality-message';
-      msg.textContent = quality.message;
-      wrapper.appendChild(msg);
+    const existingAssurance = wrapper.querySelector('.photo-assurance');
+    if (existingAssurance) existingAssurance.remove();
+
+    if (quality) {
+      if (quality.tier === 'low') {
+        const msg = document.createElement('p');
+        msg.className = 'quality-message';
+        msg.textContent = 'This photo is lower resolution, but don\'t worry — our team will upscale and enhance it for the best possible print.';
+        wrapper.appendChild(msg);
+      } else if (quality.tier === 'usable') {
+        const msg = document.createElement('p');
+        msg.className = 'quality-message';
+        msg.textContent = 'Good enough to work with. We\'ll upscale and optimize it for a sharp, lasting print.';
+        wrapper.appendChild(msg);
+      }
+
+      // Always show the professional review assurance
+      const assurance = document.createElement('p');
+      assurance.className = 'photo-assurance';
+      assurance.innerHTML = '&#10003; Every photo is reviewed and enhanced by a professional photographer before printing';
+      wrapper.appendChild(assurance);
     }
   }
 
@@ -612,6 +652,53 @@
     return section;
   }
 
+  // ── Order Type Label Updates ─────────────────────────────────
+
+  function updateFormLabelsForOrderType() {
+    // Adjust key labels based on gift vs self
+    const labelMap = {
+      'gift': {
+        'petName': 'What was their pet\'s name?',
+        'petNicknames': 'Any nicknames you know?',
+        'petType': 'What kind of pet?',
+        'personality': 'What made this pet special?',
+        'favoriteMemory': 'A memory you\'ve heard about',
+        'favoriteThing': 'A favorite toy or treat you know of?',
+        'familyName': 'Who is this gift for?'
+      },
+      'self': {
+        'petName': 'What did you call them?',
+        'petNicknames': 'Any nicknames?',
+        'petType': 'What kind of companion?',
+        'personality': 'What made them special?',
+        'favoriteMemory': 'A favorite memory',
+        'favoriteThing': 'Their favorite toy or treat?',
+        'familyName': 'Who will miss them most?'
+      }
+    };
+
+    const labels = labelMap[orderType] || labelMap['self'];
+    for (const [fieldId, labelText] of Object.entries(labels)) {
+      const labelEl = document.querySelector(`label[for="field-${fieldId}"]`);
+      if (labelEl) {
+        // Preserve the optional tag if it exists
+        const optTag = labelEl.querySelector('span');
+        labelEl.textContent = labelText;
+        if (optTag) labelEl.appendChild(optTag);
+      }
+    }
+
+    // Update sublabels for gift mode
+    if (orderType === 'gift') {
+      const personalitySub = document.querySelector('#field-personality')?.parentElement?.querySelector('.sublabel');
+      if (personalitySub) personalitySub.textContent = 'Anything you know about what made them unique';
+      const memorySub = document.querySelector('#field-favoriteMemory')?.parentElement?.querySelector('.sublabel');
+      if (memorySub) memorySub.textContent = 'Something the family shared with you, or your own memory of the pet';
+      const familySub = document.querySelector('#field-familyName')?.parentElement?.querySelector('.sublabel');
+      if (familySub) familySub.textContent = 'Their name or family name — this appears on the tribute';
+    }
+  }
+
   // ── Layout Selector ──────────────────────────────────────────
 
   function buildLayoutSelector() {
@@ -686,6 +773,7 @@
         fields: PreviewRenderer.getFields(),
         style: currentStyle,
         layout: currentLayout,
+        orderType,
         selectedProduct: document.querySelector('.product-option.selected .product-option-label')?.textContent,
         regenerationCount,
         timestamp: Date.now()
@@ -749,6 +837,20 @@
         layoutOpts.forEach(o => {
           o.classList.toggle('active', o.dataset.layout === state.layout);
         });
+      }
+
+      // Restore order type
+      if (state.orderType && state.orderType !== orderType) {
+        orderType = state.orderType;
+        const toggleBtns = document.querySelectorAll('.order-type-option');
+        toggleBtns.forEach(b => b.classList.toggle('active', b.dataset.type === orderType));
+        const hint = document.getElementById('order-type-hint');
+        if (hint) {
+          hint.textContent = orderType === 'gift'
+            ? 'You\'re creating a meaningful gift — we\'ll guide you through it.'
+            : 'Each detail helps us write their tribute.';
+        }
+        updateFormLabelsForOrderType();
       }
 
       // Restore regen count

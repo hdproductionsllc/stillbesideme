@@ -406,6 +406,15 @@
   font-style: italic;
 }
 
+.photo-assurance {
+  font-size: 0.8rem;
+  color: var(--color-warm);
+  margin-top: var(--space-sm);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 /* ============================================================
    FORM FIELDS — Guided emotional flow
    ============================================================ */
@@ -430,7 +439,7 @@
   font-weight: 300;
   color: var(--color-primary);
   text-align: center;
-  padding: var(--space-md) 0 var(--space-2xl);
+  padding: var(--space-md) 0 var(--space-lg);
   line-height: 1.4;
 }
 
@@ -439,6 +448,53 @@
   font-size: 1rem;
   display: block;
   margin-top: var(--space-sm);
+}
+
+/* --- Gift / Self toggle --- */
+.order-type-toggle {
+  display: flex;
+  gap: 0;
+  margin-bottom: var(--space-2xl);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.order-type-option {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  background: var(--color-bg);
+  border: none;
+  transition: all 0.2s;
+}
+
+.order-type-option:first-child {
+  border-right: 1px solid var(--color-border);
+}
+
+.order-type-option.active {
+  background: var(--color-warm);
+  color: #fff;
+}
+
+.order-type-option:not(.active):hover {
+  background: rgba(196, 168, 130, 0.08);
+  color: var(--color-primary);
+}
+
+.order-type-hint {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  margin-top: calc(-1 * var(--space-lg));
+  margin-bottom: var(--space-xl);
+  font-style: italic;
 }
 
 .field-group {
