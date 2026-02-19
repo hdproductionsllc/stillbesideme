@@ -29,6 +29,7 @@
     setPhoto,
     setField,
     setStyle,
+    setLayout,
     getFields: () => ({ ...fields }),
     render
   };
@@ -109,6 +110,23 @@
   function setStyle(variant) {
     styleColors = variant;
     queueRender();
+  }
+
+  function setLayout(layoutKey) {
+    const panels = document.getElementById('preview-panels');
+    if (!panels) return;
+
+    if (layoutKey === 'stacked') {
+      panels.classList.add('layout-stacked');
+    } else {
+      panels.classList.remove('layout-stacked');
+    }
+
+    // Canvases need to re-measure after the CSS layout change
+    requestAnimationFrame(() => {
+      sizeCanvases();
+      queueRender();
+    });
   }
 
   // ── Canvas Sizing ──────────────────────────────────────────

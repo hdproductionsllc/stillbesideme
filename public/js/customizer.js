@@ -17,6 +17,7 @@
   let poems = [];
   let regenerationCount = 0;
   let currentStyle = 'classic-dark';
+  let currentLayout = 'side-by-side';
 
   // ── Initialization ─────────────────────────────────────────
 
@@ -41,7 +42,8 @@
       // Build the guided form
       buildGuidedForm();
 
-      // Build style selector
+      // Build layout & style selectors
+      buildLayoutSelector();
       buildStyleSelector();
 
       // Restore saved state
@@ -610,6 +612,25 @@
     return section;
   }
 
+  // ── Layout Selector ──────────────────────────────────────────
+
+  function buildLayoutSelector() {
+    const container = document.getElementById('layout-selector');
+    if (!container) return;
+
+    container.querySelectorAll('.layout-option').forEach(opt => {
+      opt.addEventListener('click', () => {
+        const layout = opt.dataset.layout;
+        currentLayout = layout;
+        PreviewRenderer.setLayout(layout);
+
+        container.querySelectorAll('.layout-option').forEach(o => o.classList.remove('active'));
+        opt.classList.add('active');
+        saveState();
+      });
+    });
+  }
+
   // ── Style Variant Selector ───────────────────────────────────
 
   function buildStyleSelector() {
@@ -664,6 +685,7 @@
         templateId: TEMPLATE_ID,
         fields: PreviewRenderer.getFields(),
         style: currentStyle,
+        layout: currentLayout,
         selectedProduct: document.querySelector('.product-option.selected .product-option-label')?.textContent,
         regenerationCount,
         timestamp: Date.now()
@@ -716,6 +738,16 @@
         const thumbs = document.querySelectorAll('.style-thumb');
         thumbs.forEach(t => {
           t.classList.toggle('active', t.dataset.style === state.style);
+        });
+      }
+
+      // Restore layout
+      if (state.layout && state.layout !== currentLayout) {
+        currentLayout = state.layout;
+        PreviewRenderer.setLayout(state.layout);
+        const layoutOpts = document.querySelectorAll('.layout-option');
+        layoutOpts.forEach(o => {
+          o.classList.toggle('active', o.dataset.layout === state.layout);
         });
       }
 
