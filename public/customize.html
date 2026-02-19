@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Their Tribute — Still Beside Me</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Source+Sans+3:wght@400;600&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/store.css">
+  <link rel="stylesheet" href="/css/customizer.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="container">
+      <a href="/" class="site-logo">Still Beside Me</a>
+      <nav class="site-nav">
+        <a href="/">Back to Store</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Customizer -->
+  <main class="customizer">
+
+    <!-- Preview Pane (60% desktop, sticky top mobile) -->
+    <div class="preview-pane">
+      <div class="frame-preview theme-classic-dark" id="frame-preview">
+        <div class="frame-border">
+          <div class="mat-board">
+            <div class="preview-panels" id="preview-panels">
+              <div class="panel panel-photo" id="panel-photo">
+                <canvas id="photo-canvas"></canvas>
+              </div>
+              <div class="panel panel-tribute" id="panel-tribute">
+                <canvas id="tribute-canvas"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Style variant selector -->
+      <div class="style-selector" id="style-selector"></div>
+    </div>
+
+    <!-- Form Pane (40% desktop, scrollable below on mobile) -->
+    <div class="form-pane" id="form-pane">
+      <!-- Populated dynamically by customizer.js -->
+    </div>
+
+  </main>
+
+  <script src="/js/preview.js"></script>
+  <script src="/js/customizer.js"></script>
+</body>
+</html>

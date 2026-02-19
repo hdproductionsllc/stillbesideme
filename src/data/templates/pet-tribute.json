@@ -1,0 +1,121 @@
+{
+  "id": "pet-tribute",
+  "name": "Pet Tribute",
+  "collection": "pet-memorial",
+  "description": "A personalized AI tribute poem, matted and framed with your pet's photo — museum-quality and one of a kind.",
+  "category": "pet",
+  "poemSupport": "ai",
+
+  "canvas": {
+    "width": 4800,
+    "height": 6000,
+    "dpi": 300,
+    "background": "#1a1a1a"
+  },
+
+  "layouts": {
+    "side-by-side": {
+      "label": "Photo Left, Tribute Right",
+      "photo": { "x": 0, "y": 0, "width": 2400, "height": 6000 },
+      "tribute": { "x": 2400, "y": 0, "width": 2400, "height": 6000 }
+    },
+    "stacked": {
+      "label": "Photo Top, Tribute Bottom",
+      "photo": { "x": 0, "y": 0, "width": 4800, "height": 3000 },
+      "tribute": { "x": 0, "y": 3000, "width": 4800, "height": 3000 }
+    }
+  },
+
+  "styleVariants": {
+    "classic-dark": {
+      "label": "Classic Dark",
+      "description": "Dark wood frame, near-black mat, cream and gold text — timeless and premium",
+      "frame": {
+        "gradient": "linear-gradient(145deg, #2c2018, #3a2a1c 15%, #1e1610 40%, #2a1e14 70%, #1a120c)",
+        "shadow": "0 4px 24px rgba(0,0,0,0.5)"
+      },
+      "mat": { "color": "#1a1a1a" },
+      "tribute": {
+        "background": "#1a1a1a",
+        "name": "#FAF8F5",
+        "dates": "#9B9590",
+        "divider": "#C4A882",
+        "poem": "#C4A882",
+        "nickname": "#9B9590",
+        "family": "#9B9590"
+      },
+      "photo": {
+        "borderColor": "#C4A882"
+      }
+    },
+    "warm-natural": {
+      "label": "Warm Natural",
+      "description": "Natural oak frame, warm cream mat, dark text — modern and warm",
+      "frame": {
+        "gradient": "linear-gradient(145deg, #b8956a, #c9a87c 15%, #a0804f 40%, #c4a06d 70%, #96783f)",
+        "shadow": "0 4px 24px rgba(0,0,0,0.3)"
+      },
+      "mat": { "color": "#F5EDE0" },
+      "tribute": {
+        "background": "#F5EDE0",
+        "name": "#2C2420",
+        "dates": "#6B5D52",
+        "divider": "#C4A882",
+        "poem": "#4A3F36",
+        "nickname": "#6B5D52",
+        "family": "#6B5D52"
+      },
+      "photo": {
+        "borderColor": "#C4A882"
+      }
+    },
+    "soft-light": {
+      "label": "Soft Light",
+      "description": "White frame, white mat, muted text — gentle and contemporary",
+      "frame": {
+        "gradient": "linear-gradient(145deg, #e8e4e0, #f0ece8 15%, #d8d4d0 40%, #ece8e4 70%, #d0ccc8)",
+        "shadow": "0 4px 24px rgba(0,0,0,0.15)"
+      },
+      "mat": { "color": "#FFFFFF" },
+      "tribute": {
+        "background": "#FFFFFF",
+        "name": "#3a3a3a",
+        "dates": "#8a8a8a",
+        "divider": "#c0b8a8",
+        "poem": "#5a5a5a",
+        "nickname": "#8a8a8a",
+        "family": "#8a8a8a"
+      },
+      "photo": {
+        "borderColor": "#c0b8a8"
+      }
+    }
+  },
+
+  "defaultStyle": "classic-dark",
+  "defaultLayout": "side-by-side",
+
+  "photoSlots": [
+    { "id": "main", "label": "Share their photo", "sublabel": "The one that captures who they really were", "required": true }
+  ],
+
+  "memoryFields": [
+    { "id": "petName", "label": "What did you call them?", "type": "text", "required": true, "maxLength": 40, "displayOn": "tribute" },
+    { "id": "petNicknames", "label": "Any nicknames?", "sublabel": "The silly ones count too", "type": "text", "required": false, "maxLength": 80, "placeholder": "Mr. Wigglebutt, Buddy Bear, The Senator", "displayOn": "tribute", "feedsPoem": true },
+    { "id": "petType", "label": "What kind of companion?", "type": "select", "options": ["Dog", "Cat", "Bird", "Horse", "Rabbit", "Other"], "required": true, "feedsPoem": true },
+    { "id": "breed", "label": "Breed", "type": "text", "required": false, "maxLength": 40, "feedsPoem": true },
+    { "id": "birthDate", "label": "When were they born?", "sublabel": "Year or full date", "type": "text", "required": false, "maxLength": 20, "placeholder": "2014", "displayOn": "tribute" },
+    { "id": "passDate", "label": "When did they cross the rainbow bridge?", "sublabel": "Year or full date", "type": "text", "required": false, "maxLength": 20, "placeholder": "2024", "displayOn": "tribute" },
+    { "id": "personality", "label": "What made them special?", "sublabel": "The thing that made them uniquely yours", "type": "textarea", "required": false, "maxLength": 200, "feedsPoem": true },
+    { "id": "favoriteMemory", "label": "A favorite memory", "sublabel": "The one that makes you smile through tears", "type": "textarea", "required": false, "maxLength": 300, "feedsPoem": true },
+    { "id": "favoriteThing", "label": "Their favorite toy or treat?", "sublabel": "The thing they couldn't live without", "type": "text", "required": false, "maxLength": 60, "feedsPoem": true },
+    { "id": "familyName", "label": "Who will miss them most?", "sublabel": "Your family name or your name", "type": "text", "required": false, "maxLength": 80, "placeholder": "The Hamilton family", "displayOn": "tribute" },
+    { "id": "poemText", "label": "Tribute poem", "type": "poem-selector" }
+  ],
+
+  "printProducts": [
+    { "sku": "framed-8x10", "label": "Framed 8×10\"", "price": 4995 },
+    { "sku": "framed-12x16", "label": "Framed 12×16\"", "price": 7995, "default": true, "badge": "Most Popular" },
+    { "sku": "framed-16x20", "label": "Framed 16×20\"", "price": 9995 }
+  ]
+}
