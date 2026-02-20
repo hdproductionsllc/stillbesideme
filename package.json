@@ -1,7 +1,7 @@
 {
   "name": "still-beside-me",
   "version": "1.0.0",
-  "description": "Personalized memorial wall art store — Keep them beside you.",
+  "description": "Personalized memorial wall art store – Keep them beside you.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

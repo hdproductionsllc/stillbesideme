@@ -1,5 +1,5 @@
 /**
- * Store.js — Scroll animations and storefront interactions.
+ * Store.js – Scroll animations and storefront interactions.
  */
 
 (function () {

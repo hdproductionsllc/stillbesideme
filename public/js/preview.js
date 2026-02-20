@@ -1,22 +1,92 @@
 /**
- * Preview.js — 2-panel tribute renderer.
+ * Preview.js – Dynamic multi-panel tribute renderer.
  *
- * Renders a photo panel and tribute text panel side by side (or stacked)
- * on separate canvases. The CSS frame/mat wraps around both panels.
+ * Manages an arbitrary number of panels (photo, tribute, text) laid out
+ * via CSS Grid.  The host container (#preview-panels) receives inline
+ * grid-template-columns / rows / areas plus aspect-ratio from a LAYOUTS
+ * table.  Each panel owns a <canvas> that is sized to its grid cell.
  *
  * Photo panel: Pet photo with cover-fit and smart crop positioning.
  * Tribute panel: Name, dates, divider, poem, nickname, family attribution.
+ * Text panel: User-entered custom message text.
+ *
+ * Design principle: the poem is the product. When space is tight we
+ * compress margins and spacing first. The poem font only shrinks as a
+ * last resort, and never below 82%.
  */
 
 (function () {
   'use strict';
 
+  // ── Layout Definitions ────────────────────────────────────
+  //
+  // Each layout specifies CSS Grid tracks and named areas.
+  // `columns` / `rows` are arrays of fr values.
+  // `areas` is a 2-D array of grid-area names (row-major).
+
+  const LAYOUTS = {
+    // 2-panel
+    'side-by-side': {
+      panels: 2,
+      columns: [1, 1],
+      rows: [1],
+      areas: [['photo', 'tribute']],
+      aspectRatio: '5/3.2'
+    },
+    'stacked': {
+      panels: 2,
+      columns: [1],
+      rows: [1, 1],
+      areas: [['photo'], ['tribute']],
+      aspectRatio: '4/5'
+    },
+    // 3-panel hero
+    'hero-left': {
+      panels: 3,
+      columns: [1.15, 1],
+      rows: [1, 1],
+      areas: [['photo', 'panel2'], ['photo', 'tribute']],
+      aspectRatio: '5/3.8'
+    },
+    'hero-top': {
+      panels: 3,
+      columns: [1, 1],
+      rows: [1.3, 1],
+      areas: [['photo', 'photo'], ['panel2', 'tribute']],
+      aspectRatio: '4/5'
+    },
+    // 3-panel photos+tribute
+    'photos-left': {
+      panels: 3,
+      columns: [1, 1.15],
+      rows: [1, 1],
+      areas: [['photo', 'tribute'], ['panel2', 'tribute']],
+      aspectRatio: '5/3.8'
+    },
+    'tribute-top': {
+      panels: 3,
+      columns: [1, 1],
+      rows: [1, 1.3],
+      areas: [['tribute', 'tribute'], ['photo', 'panel2']],
+      aspectRatio: '4/5'
+    }
+  };
+
   // ── State ──────────────────────────────────────────────────
 
-  let photoCanvas, photoCtx;
-  let tributeCanvas, tributeCtx;
+  let container = null;       // #preview-panels DOM element
   let template = null;
-  let photo = null;          // { image, position }
+  let currentLayout = 'side-by-side';
+
+  // panels Map: areaName -> { canvas, ctx, type, panelEl }
+  const panels = new Map();
+
+  // photos object: panelId -> { image, position, zoom, panX, panY }
+  const photos = {};
+
+  // Custom fr ratios (user-dragged dividers): layoutKey -> { columns: [...], rows: [...] }
+  const customRatios = {};
+
   let fields = {};           // fieldId → value
   let styleColors = null;    // current style variant colors
   let fontsLoaded = false;
@@ -27,23 +97,29 @@
   window.PreviewRenderer = {
     init,
     setPhoto,
+    setPhotoCrop,
+    getPhotoCrop,
+    getPhotoCanvas,
     setField,
     setStyle,
     setLayout,
     getFields: () => ({ ...fields }),
-    render
+    render,
+    getCurrentFrValues,
+    setCustomRatios,
+    resetCustomRatios,
+    getCustomRatios: () => JSON.parse(JSON.stringify(customRatios)),
+    getPanels: () => panels,
+    getLayouts: () => LAYOUTS,
+    getCurrentLayout: () => currentLayout,
+    getContainer: () => container
   };
 
   // ── Initialization ─────────────────────────────────────────
 
-  function init(photoCanvasId, tributeCanvasId, tmpl) {
-    photoCanvas = document.getElementById(photoCanvasId);
-    tributeCanvas = document.getElementById(tributeCanvasId);
-
-    if (!photoCanvas || !tributeCanvas) return;
-
-    photoCtx = photoCanvas.getContext('2d');
-    tributeCtx = tributeCanvas.getContext('2d');
+  function init(containerId, tmpl) {
+    container = document.getElementById(containerId);
+    if (!container) return;
 
     template = tmpl;
 
@@ -58,6 +134,9 @@
         if (mf.default) fields[mf.id] = mf.default;
       }
     }
+
+    // Build initial panels
+    buildPanels(currentLayout);
 
     loadFonts().then(() => {
       fontsLoaded = true;
@@ -81,25 +160,149 @@
           loads.push(document.fonts.load(`${w} 48px "${f}"`));
         }
       }
-      // Also load italic
-      loads.push(document.fonts.load(`italic 300 48px "Cormorant Garamond"`));
-      loads.push(document.fonts.load(`italic 400 48px "Cormorant Garamond"`));
+      loads.push(document.fonts.load('italic 300 48px "Cormorant Garamond"'));
+      loads.push(document.fonts.load('italic 400 48px "Cormorant Garamond"'));
       await Promise.all(loads);
     } catch (e) {
       // Some weights may not exist
     }
   }
 
+  // ── Panel Building ─────────────────────────────────────────
+
+  function buildPanels(layoutKey) {
+    const layout = LAYOUTS[layoutKey];
+    if (!layout) return;
+
+    currentLayout = layoutKey;
+
+    // Determine which area names this layout uses
+    const areaNames = new Set();
+    for (const row of layout.areas) {
+      for (const name of row) {
+        areaNames.add(name);
+      }
+    }
+
+    // Remove panels that aren't in this layout
+    for (const [name, panel] of panels) {
+      if (!areaNames.has(name)) {
+        panel.panelEl.remove();
+        panels.delete(name);
+      }
+    }
+
+    // Create panels that don't exist yet
+    for (const name of areaNames) {
+      if (!panels.has(name)) {
+        const type = panelTypeForArea(name);
+        const panelEl = document.createElement('div');
+        panelEl.className = `panel panel-${name}`;
+        panelEl.id = `panel-${name}`;
+
+        const canvas = document.createElement('canvas');
+        canvas.id = `canvas-${name}`;
+        panelEl.appendChild(canvas);
+
+        container.appendChild(panelEl);
+        const ctx = canvas.getContext('2d');
+        panels.set(name, { canvas, ctx, type, panelEl });
+      }
+    }
+
+    // Apply CSS Grid inline styles
+    applyGridStyles(layoutKey);
+  }
+
+  function panelTypeForArea(areaName) {
+    if (areaName === 'tribute') return 'tribute';
+    if (areaName === 'photo') return 'photo';
+    // panel2 defaults to photo but can be text
+    return 'photo';
+  }
+
+  function applyGridStyles(layoutKey) {
+    const layout = LAYOUTS[layoutKey];
+    if (!layout || !container) return;
+
+    const ratios = customRatios[layoutKey];
+    const cols = ratios ? ratios.columns : layout.columns;
+    const rows = ratios ? ratios.rows : layout.rows;
+
+    container.style.gridTemplateColumns = cols.map(v => v + 'fr').join(' ');
+    container.style.gridTemplateRows = rows.map(v => v + 'fr').join(' ');
+    container.style.gridTemplateAreas = layout.areas.map(
+      row => '"' + row.join(' ') + '"'
+    ).join(' ');
+    container.style.aspectRatio = layout.aspectRatio;
+  }
+
   // ── Data Setters ───────────────────────────────────────────
 
-  function setPhoto(imageUrl, position) {
+  function setPhoto(panelIdOrUrl, urlOrPosition, maybePosition) {
+    // Backward compat: setPhoto(url, position) maps to panelId 'photo'
+    let panelId, imageUrl, position;
+    if (maybePosition !== undefined) {
+      panelId = panelIdOrUrl;
+      imageUrl = urlOrPosition;
+      position = maybePosition;
+    } else {
+      panelId = 'photo';
+      imageUrl = panelIdOrUrl;
+      position = urlOrPosition;
+    }
+
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      photo = { image: img, position: position || '50% 50%' };
+      const existing = photos[panelId];
+      photos[panelId] = {
+        image: img,
+        position: position || '50% 50%',
+        zoom: existing ? existing.zoom : 1,
+        panX: existing ? existing.panX : 0.5,
+        panY: existing ? existing.panY : 0.5
+      };
       queueRender();
     };
     img.src = imageUrl;
+  }
+
+  function setPhotoCrop(panelIdOrZoom, zoomOrPanX, panXOrPanY, maybePanY) {
+    // Backward compat: setPhotoCrop(zoom, panX, panY) maps to panelId 'photo'
+    let panelId, zoom, panX, panY;
+    if (maybePanY !== undefined) {
+      panelId = panelIdOrZoom;
+      zoom = zoomOrPanX;
+      panX = panXOrPanY;
+      panY = maybePanY;
+    } else {
+      panelId = 'photo';
+      zoom = panelIdOrZoom;
+      panX = zoomOrPanX;
+      panY = panXOrPanY;
+    }
+
+    if (!photos[panelId]) {
+      photos[panelId] = { image: null, position: '50% 50%', zoom: 1, panX: 0.5, panY: 0.5 };
+    }
+    photos[panelId].zoom = Math.max(1, Math.min(3, zoom));
+    photos[panelId].panX = Math.max(0, Math.min(1, panX));
+    photos[panelId].panY = Math.max(0, Math.min(1, panY));
+    queueRender();
+  }
+
+  function getPhotoCrop(panelId) {
+    panelId = panelId || 'photo';
+    const p = photos[panelId];
+    if (!p) return { zoom: 1, panX: 0.5, panY: 0.5 };
+    return { zoom: p.zoom || 1, panX: p.panX || 0.5, panY: p.panY || 0.5 };
+  }
+
+  function getPhotoCanvas(panelId) {
+    panelId = panelId || 'photo';
+    const panel = panels.get(panelId);
+    return panel ? panel.canvas : null;
   }
 
   function setField(fieldId, value) {
@@ -113,16 +316,41 @@
   }
 
   function setLayout(layoutKey) {
-    const panels = document.getElementById('preview-panels');
-    if (!panels) return;
+    if (!LAYOUTS[layoutKey]) return;
+    buildPanels(layoutKey);
 
-    if (layoutKey === 'stacked') {
-      panels.classList.add('layout-stacked');
-    } else {
-      panels.classList.remove('layout-stacked');
+    requestAnimationFrame(() => {
+      sizeCanvases();
+      queueRender();
+    });
+  }
+
+  // ── Custom Ratio API (for divider drag) ────────────────────
+
+  function getCurrentFrValues() {
+    const layout = LAYOUTS[currentLayout];
+    if (!layout) return null;
+    const ratios = customRatios[currentLayout];
+    return {
+      columns: ratios ? [...ratios.columns] : [...layout.columns],
+      rows: ratios ? [...ratios.rows] : [...layout.rows]
+    };
+  }
+
+  function setCustomRatios(layoutKey, cols, rows) {
+    customRatios[layoutKey] = { columns: [...cols], rows: [...rows] };
+    if (layoutKey === currentLayout) {
+      applyGridStyles(currentLayout);
+      requestAnimationFrame(() => {
+        sizeCanvases();
+        queueRender();
+      });
     }
+  }
 
-    // Canvases need to re-measure after the CSS layout change
+  function resetCustomRatios(layoutKey) {
+    delete customRatios[layoutKey || currentLayout];
+    applyGridStyles(currentLayout);
     requestAnimationFrame(() => {
       sizeCanvases();
       queueRender();
@@ -132,27 +360,18 @@
   // ── Canvas Sizing ──────────────────────────────────────────
 
   function sizeCanvases() {
-    if (!photoCanvas || !tributeCanvas) return;
-
     const dpr = window.devicePixelRatio || 1;
 
-    // Photo panel
-    const photoPanel = photoCanvas.parentElement;
-    const pw = photoPanel.clientWidth;
-    const ph = photoPanel.clientHeight;
-    photoCanvas.width = Math.round(pw * dpr);
-    photoCanvas.height = Math.round(ph * dpr);
-    photoCanvas.style.width = pw + 'px';
-    photoCanvas.style.height = ph + 'px';
-
-    // Tribute panel
-    const tributePanel = tributeCanvas.parentElement;
-    const tw = tributePanel.clientWidth;
-    const th = tributePanel.clientHeight;
-    tributeCanvas.width = Math.round(tw * dpr);
-    tributeCanvas.height = Math.round(th * dpr);
-    tributeCanvas.style.width = tw + 'px';
-    tributeCanvas.style.height = th + 'px';
+    for (const [, panel] of panels) {
+      const el = panel.panelEl;
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (w === 0 || h === 0) continue;
+      panel.canvas.width = Math.round(w * dpr);
+      panel.canvas.height = Math.round(h * dpr);
+      panel.canvas.style.width = w + 'px';
+      panel.canvas.style.height = h + 'px';
+    }
   }
 
   // ── Render Loop ────────────────────────────────────────────
@@ -167,31 +386,41 @@
   }
 
   function render() {
-    if (!photoCanvas || !tributeCanvas) return;
-    renderPhotoPanel();
-    renderTributePanel();
+    for (const [name, panel] of panels) {
+      switch (panel.type) {
+        case 'photo':
+          renderPhotoPanel(panel.ctx, panel.canvas, name);
+          break;
+        case 'tribute':
+          renderTributePanel(panel.ctx, panel.canvas);
+          break;
+        case 'text':
+          renderTextPanel(panel.ctx, panel.canvas, name);
+          break;
+      }
+    }
   }
 
   // ── Photo Panel ────────────────────────────────────────────
 
-  function renderPhotoPanel() {
-    const ctx = photoCtx;
-    const w = photoCanvas.width;
-    const h = photoCanvas.height;
+  function renderPhotoPanel(ctx, canvas, panelId) {
+    const w = canvas.width;
+    const h = canvas.height;
+    if (w === 0 || h === 0) return;
 
-    // Background
     const bg = styleColors?.tribute?.background || '#1a1a1a';
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, w, h);
 
-    if (photo && photo.image) {
-      drawCoverImage(ctx, photo.image, photo.position, 0, 0, w, h);
+    const photoData = photos[panelId];
+    if (photoData && photoData.image) {
+      drawCoverImage(ctx, photoData.image, photoData, 0, 0, w, h);
     } else {
-      renderPhotoPlaceholder(ctx, w, h);
+      renderPhotoPlaceholder(ctx, w, h, panelId);
     }
   }
 
-  function renderPhotoPlaceholder(ctx, w, h) {
+  function renderPhotoPlaceholder(ctx, w, h, panelId) {
     ctx.fillStyle = 'rgba(255,255,255,0.03)';
     ctx.fillRect(0, 0, w, h);
 
@@ -202,7 +431,6 @@
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
     ctx.lineWidth = iconSize * 0.06;
 
-    // Camera icon
     ctx.beginPath();
     roundedRect(ctx, cx - iconSize, cy - iconSize * 0.7, iconSize * 2, iconSize * 1.4, iconSize * 0.15);
     ctx.stroke();
@@ -210,23 +438,21 @@
     ctx.arc(cx, cy, iconSize * 0.4, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Label
     ctx.fillStyle = 'rgba(255,255,255,0.15)';
     ctx.font = `400 ${Math.round(iconSize * 0.3)}px "Source Sans 3", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText('Upload their photo', cx, cy + iconSize * 1.1);
+    const label = panelId === 'photo' ? 'Upload their photo' : 'Upload second photo';
+    ctx.fillText(label, cx, cy + iconSize * 1.1);
   }
 
   // ── Tribute Panel ──────────────────────────────────────────
 
-  function renderTributePanel() {
-    const ctx = tributeCtx;
-    const w = tributeCanvas.width;
-    const h = tributeCanvas.height;
-    const dpr = window.devicePixelRatio || 1;
+  function renderTributePanel(ctx, canvas) {
+    const w = canvas.width;
+    const h = canvas.height;
+    if (w === 0 || h === 0) return;
 
-    // Colors from style variant
     const colors = {
       bg: styleColors?.tribute?.background || '#1a1a1a',
       name: styleColors?.tribute?.name || '#FAF8F5',
@@ -237,150 +463,258 @@
       family: styleColors?.tribute?.family || '#9B9590'
     };
 
-    // Background — radial gradient for parchment feel
+    // Background
     ctx.fillStyle = colors.bg;
     ctx.fillRect(0, 0, w, h);
-
-    // Add subtle warmth to the center
-    const gradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, h * 0.6);
-    gradient.addColorStop(0, 'rgba(196, 168, 130, 0.04)');
-    gradient.addColorStop(1, 'rgba(196, 168, 130, 0)');
-    ctx.fillStyle = gradient;
+    const grad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, h * 0.6);
+    grad.addColorStop(0, 'rgba(196, 168, 130, 0.04)');
+    grad.addColorStop(1, 'rgba(196, 168, 130, 0)');
+    ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
 
-    // Scale factor for responsive sizing
-    const scale = w / 400; // base at 400px wide
-
-    // Centering x
+    const scale = w / 400;
     const cx = w / 2;
-    let y = h * 0.12; // Start from 12% down
-    const padX = w * 0.1;
-    const maxTextWidth = w - padX * 2;
+    const maxTextWidth = w * 0.76;
 
-    // Pet Name
-    const petName = fields.petName || '';
-    if (petName) {
-      ctx.font = `500 ${Math.round(32 * scale)}px "Cormorant Garamond", serif`;
-      ctx.fillStyle = colors.name;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillText(petName, cx, y, maxTextWidth);
-      y += 38 * scale;
-    }
+    // ── Content (read from tributeMapping or fall back to pet defaults) ──
 
-    // Dates
-    const birthDate = fields.birthDate || '';
-    const passDate = fields.passDate || '';
+    const tm = (template && template.tributeMapping) || {};
+    const nameField = tm.name || 'petName';
+    const nickField = tm.nickname || 'petNicknames';
+    const famField = tm.familyName || 'familyName';
+    const famPrefix = tm.familyPrefix || 'Beloved companion of';
+    const birthField = tm.birthDate || 'birthDate';
+    const passField = tm.passDate || 'passDate';
+    const poemField = tm.poemText || 'poemText';
+
+    const petName = fields[nameField] || '';
+    const nickname = fields[nickField] || '';
+    const familyName = fields[famField] || '';
+    const poemText = fields[poemField] || '';
+    const birthDate = fields[birthField] || '';
+    const passDate = fields[passField] || '';
     let dateStr = '';
-    if (birthDate && passDate) {
-      dateStr = `${birthDate} — ${passDate}`;
-    } else if (birthDate) {
-      dateStr = birthDate;
-    } else if (passDate) {
-      dateStr = passDate;
-    }
-    if (dateStr) {
-      ctx.font = `400 ${Math.round(12 * scale)}px "Source Sans 3", sans-serif`;
-      ctx.fillStyle = colors.dates;
-      ctx.textAlign = 'center';
-      ctx.letterSpacing = '0.08em';
-      ctx.fillText(dateStr, cx, y, maxTextWidth);
-      y += 22 * scale;
+    if (birthDate && passDate) dateStr = birthDate + ' \u2013 ' + passDate;
+    else if (birthDate) dateStr = birthDate;
+    else if (passDate) dateStr = passDate;
+
+    const hasHeader = !!(petName || dateStr);
+    const hasFooter = !!(nickname || familyName);
+
+    // ── Font sizes ──
+
+    const nameSize = Math.round(30 * scale);
+    const dateSize = Math.round(10.5 * scale);
+    const nickSize = Math.round(10 * scale);
+    const famSize = Math.round(9 * scale);
+    const poemBaseSize = 13 * scale;
+
+    // ── Measure fixed element heights ──
+
+    var headerH = (petName ? nameSize * 1.2 : 0)
+                + (dateStr ? dateSize * 1.6 : 0)
+                + (hasHeader ? 6 * scale : 0);
+
+    var footerH = (hasFooter ? 6 * scale : 0)
+                + (nickname ? nickSize * 1.6 : 0)
+                + (familyName ? famSize * 1.5 : 0);
+
+    // ── Measure poem at a given font size ──
+
+    function measurePoem(fontSize) {
+      var lh = fontSize * 1.55;
+      var blankH = lh * 0.5;
+      ctx.font = '300 ' + Math.round(fontSize) + 'px "Cormorant Garamond", serif';
+      var lines = wrapText(ctx, poemText, maxTextWidth * 0.92);
+      var total = 0;
+      for (var i = 0; i < lines.length; i++) {
+        total += lines[i] === '' ? blankH : lh;
+      }
+      return { lines: lines, lineH: lh, blankH: blankH, totalH: total, fontSize: fontSize };
     }
 
-    // Divider 1
-    if (petName || dateStr) {
-      y += 8 * scale;
-      ctx.beginPath();
-      ctx.moveTo(cx - 25 * scale, y);
-      ctx.lineTo(cx + 25 * scale, y);
-      ctx.strokeStyle = colors.divider;
-      ctx.lineWidth = 1 * scale;
-      ctx.globalAlpha = 0.5;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      y += 16 * scale;
-    }
+    // ── Adaptive layout ──
 
-    // Poem
-    const poemText = fields.poemText || '';
+    var tiers = [
+      { marginPct: 0.09, pad: 14 * scale },
+      { marginPct: 0.06, pad: 10 * scale },
+      { marginPct: 0.04, pad: 6 * scale },
+      { marginPct: 0.025, pad: 3 * scale }
+    ];
+
+    var margin, pad, poem;
+
     if (poemText) {
-      ctx.font = `300 ${Math.round(11.5 * scale)}px "Cormorant Garamond", serif`;
+      var fullPoem = measurePoem(poemBaseSize);
+      var fitted = false;
+
+      for (var t = 0; t < tiers.length; t++) {
+        var m = h * tiers[t].marginPct;
+        var total = m + headerH + tiers[t].pad + fullPoem.totalH + tiers[t].pad + footerH + m;
+        if (total <= h) {
+          margin = m;
+          pad = tiers[t].pad;
+          poem = fullPoem;
+          fitted = true;
+          break;
+        }
+      }
+
+      if (!fitted) {
+        var last = tiers[tiers.length - 1];
+        margin = h * last.marginPct;
+        pad = last.pad;
+        var available = h - margin * 2 - headerH - pad * 2 - footerH;
+
+        poem = fullPoem;
+        for (var pct = 98; pct >= 82; pct -= 2) {
+          var p = measurePoem(poemBaseSize * pct / 100);
+          poem = p;
+          if (p.totalH <= available) break;
+        }
+      }
+    } else {
+      margin = h * tiers[0].marginPct;
+      pad = tiers[0].pad;
+      poem = { lines: [], lineH: 0, blankH: 0, totalH: 0, fontSize: poemBaseSize };
+    }
+
+    // ── Draw ──
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    var y = margin;
+
+    // Header
+    if (petName) {
+      ctx.font = '500 ' + nameSize + 'px "Cormorant Garamond", serif';
+      ctx.fillStyle = colors.name;
+      ctx.fillText(petName, cx, y, maxTextWidth);
+      y += nameSize * 1.2;
+    }
+
+    if (dateStr) {
+      ctx.font = '300 ' + dateSize + 'px "Cormorant Garamond", serif';
+      ctx.fillStyle = colors.dates;
+      ctx.fillText(dateStr, cx, y, maxTextWidth);
+      y += dateSize * 1.6;
+    }
+
+    if (hasHeader) {
+      drawDivider(ctx, cx, y + 2 * scale, 28 * scale, colors.divider, scale);
+      y += 6 * scale + pad;
+    }
+
+    // Poem – vertically centered between header and footer
+    if (poem.lines.length > 0) {
+      var footerTop = h - margin - footerH;
+      var zoneH = footerTop - pad - y;
+      var startY = y + Math.max(0, (zoneH - poem.totalH) / 2);
+
+      ctx.font = '300 ' + Math.round(poem.fontSize) + 'px "Cormorant Garamond", serif';
       ctx.fillStyle = colors.poem;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
 
-      const poemLines = wrapText(ctx, poemText, maxTextWidth * 0.92);
-      const poemLineHeight = 16 * scale;
-
-      // Calculate space needed for poem + bottom elements
-      const poemHeight = poemLines.length * poemLineHeight;
-      const bottomSpace = 60 * scale; // nickname + family + divider
-      const availableForPoem = h - y - bottomSpace;
-
-      // If poem is taller than available space, shrink font
-      let actualPoemLineHeight = poemLineHeight;
-      let actualPoemLines = poemLines;
-      if (poemHeight > availableForPoem && availableForPoem > 0) {
-        const shrinkFactor = Math.max(0.65, availableForPoem / poemHeight);
-        const newSize = Math.round(11.5 * scale * shrinkFactor);
-        actualPoemLineHeight = poemLineHeight * shrinkFactor;
-        ctx.font = `300 ${newSize}px "Cormorant Garamond", serif`;
-        actualPoemLines = wrapText(ctx, poemText, maxTextWidth * 0.92);
+      var py = startY;
+      for (var i = 0; i < poem.lines.length; i++) {
+        if (poem.lines[i] === '') {
+          py += poem.blankH;
+        } else {
+          ctx.fillText(poem.lines[i], cx, py, maxTextWidth);
+          py += poem.lineH;
+        }
       }
-
-      for (let i = 0; i < actualPoemLines.length; i++) {
-        ctx.fillText(actualPoemLines[i], cx, y + i * actualPoemLineHeight, maxTextWidth);
-      }
-      y += actualPoemLines.length * actualPoemLineHeight;
     }
 
-    // Bottom section — positioned from bottom
-    let bottomY = h * 0.88;
+    // Footer – anchored to bottom margin
+    var fy = h - margin;
+    ctx.textBaseline = 'bottom';
 
-    // Family attribution
-    const familyName = fields.familyName || '';
     if (familyName) {
-      ctx.font = `400 ${Math.round(9 * scale)}px "Source Sans 3", sans-serif`;
+      ctx.font = 'italic 300 ' + famSize + 'px "Cormorant Garamond", serif';
       ctx.fillStyle = colors.family;
-      ctx.textAlign = 'center';
-      ctx.fillText(`Beloved companion of ${familyName}`, cx, bottomY, maxTextWidth);
-      bottomY -= 16 * scale;
+      ctx.fillText(famPrefix + ' ' + familyName, cx, fy, maxTextWidth);
+      fy -= famSize * 1.5;
     }
 
-    // Nickname
-    const nickname = fields.petNicknames || '';
     if (nickname) {
-      ctx.font = `italic 300 ${Math.round(10 * scale)}px "Cormorant Garamond", serif`;
+      ctx.font = 'italic 400 ' + nickSize + 'px "Cormorant Garamond", serif';
       ctx.fillStyle = colors.nickname;
-      ctx.textAlign = 'center';
-      // Wrap in quotes if not already
-      const displayNick = nickname.startsWith('"') ? nickname : `"${nickname}"`;
-      ctx.fillText(displayNick, cx, bottomY, maxTextWidth);
-      bottomY -= 16 * scale;
+      var displayNick = nickname.startsWith('"') ? nickname : '\u201C' + nickname + '\u201D';
+      ctx.fillText(displayNick, cx, fy, maxTextWidth);
+      fy -= nickSize * 1.6;
     }
 
-    // Divider 2 (above nickname/family)
-    if (nickname || familyName) {
-      bottomY -= 4 * scale;
-      ctx.beginPath();
-      ctx.moveTo(cx - 25 * scale, bottomY);
-      ctx.lineTo(cx + 25 * scale, bottomY);
-      ctx.strokeStyle = colors.divider;
-      ctx.lineWidth = 1 * scale;
-      ctx.globalAlpha = 0.5;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
+    if (hasFooter) {
+      drawDivider(ctx, cx, fy, 28 * scale, colors.divider, scale);
     }
+  }
+
+  // ── Text Panel (3rd panel custom message) ──────────────────
+
+  function renderTextPanel(ctx, canvas, panelId) {
+    const w = canvas.width;
+    const h = canvas.height;
+    if (w === 0 || h === 0) return;
+
+    const bg = styleColors?.tribute?.background || '#1a1a1a';
+    const textColor = styleColors?.tribute?.poem || '#C4A882';
+
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+
+    const customText = fields[`panel2Text`] || '';
+    if (!customText) {
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.font = `400 ${Math.round(Math.min(w, h) * 0.05)}px "Source Sans 3", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Custom text', w / 2, h / 2);
+      return;
+    }
+
+    const scale = w / 400;
+    const fontSize = 13 * scale;
+    const lineH = fontSize * 1.55;
+    const maxTextWidth = w * 0.8;
+    const cx = w / 2;
+
+    ctx.font = '300 ' + Math.round(fontSize) + 'px "Cormorant Garamond", serif';
+    ctx.fillStyle = textColor;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+
+    const lines = wrapText(ctx, customText, maxTextWidth);
+    const totalH = lines.length * lineH;
+    let y = (h - totalH) / 2;
+
+    for (const line of lines) {
+      if (line === '') {
+        y += lineH * 0.5;
+      } else {
+        ctx.fillText(line, cx, y, maxTextWidth);
+        y += lineH;
+      }
+    }
+  }
+
+  function drawDivider(ctx, cx, y, halfWidth, color, scale) {
+    ctx.beginPath();
+    ctx.moveTo(cx - halfWidth, y);
+    ctx.lineTo(cx + halfWidth, y);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1, 0.8 * scale);
+    ctx.globalAlpha = 0.4;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 
   // ── Helpers ────────────────────────────────────────────────
 
-  function drawCoverImage(ctx, img, position, dx, dy, dw, dh) {
-    const imgAspect = img.naturalWidth / img.naturalHeight;
-    const boxAspect = dw / dh;
+  function drawCoverImage(ctx, img, photoData, dx, dy, dw, dh) {
+    var imgAspect = img.naturalWidth / img.naturalHeight;
+    var boxAspect = dw / dh;
 
-    let sw, sh, sx, sy;
+    var sw, sh;
 
     if (imgAspect > boxAspect) {
       sh = img.naturalHeight;
@@ -390,36 +724,42 @@
       sh = sw / boxAspect;
     }
 
-    const [pxStr, pyStr] = (position || '50% 50%').split(/\s+/);
-    const px = parseFloat(pxStr) / 100;
-    const py = parseFloat(pyStr) / 100;
+    // Apply zoom
+    var zoom = (photoData && photoData.zoom) || 1;
+    sw = sw / zoom;
+    sh = sh / zoom;
 
-    sx = (img.naturalWidth - sw) * px;
-    sy = (img.naturalHeight - sh) * py;
+    // Apply pan (0-1 range, 0.5 = centered)
+    var px = (photoData && typeof photoData.panX === 'number') ? photoData.panX : 0.5;
+    var py = (photoData && typeof photoData.panY === 'number') ? photoData.panY : 0.5;
+
+    var sx = (img.naturalWidth - sw) * px;
+    var sy = (img.naturalHeight - sh) * py;
 
     ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
   }
 
   function wrapText(ctx, text, maxWidth) {
-    const paragraphs = text.split('\n');
-    const allLines = [];
+    var paragraphs = text.split('\n');
+    var allLines = [];
 
-    for (const para of paragraphs) {
+    for (var p = 0; p < paragraphs.length; p++) {
+      var para = paragraphs[p];
       if (!para.trim()) {
         allLines.push('');
         continue;
       }
 
-      const words = para.split(/\s+/);
-      let currentLine = '';
+      var words = para.split(/\s+/);
+      var currentLine = '';
 
-      for (const word of words) {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        const metrics = ctx.measureText(testLine);
+      for (var i = 0; i < words.length; i++) {
+        var testLine = currentLine ? currentLine + ' ' + words[i] : words[i];
+        var metrics = ctx.measureText(testLine);
 
         if (metrics.width > maxWidth && currentLine) {
           allLines.push(currentLine);
-          currentLine = word;
+          currentLine = words[i];
         } else {
           currentLine = testLine;
         }

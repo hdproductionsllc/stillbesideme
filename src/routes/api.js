@@ -137,10 +137,16 @@ router.post('/images/analyze-crop', async (req, res) => {
 const poems = require('../data/poems');
 
 /**
- * GET /api/poems — List all poems with preview text
+ * GET /api/poems – List poems with preview text.
+ * Optional ?category= filter: returns matching + universal poems.
  */
 router.get('/poems', (req, res) => {
-  res.json(poems.map(p => ({
+  const category = req.query.category;
+  const filtered = category
+    ? poems.filter(p => p.category === category || p.category === 'universal')
+    : poems;
+
+  res.json(filtered.map(p => ({
     id: p.id,
     title: p.title,
     author: p.author,
@@ -150,7 +156,7 @@ router.get('/poems', (req, res) => {
 });
 
 /**
- * GET /api/poems/:id — Full poem text
+ * GET /api/poems/:id – Full poem text
  */
 router.get('/poems/:id', (req, res) => {
   const poem = poems.find(p => p.id === req.params.id);
@@ -161,7 +167,7 @@ router.get('/poems/:id', (req, res) => {
 });
 
 /**
- * POST /api/poems/generate — AI poem generation via Anthropic Claude.
+ * POST /api/poems/generate – AI poem generation via Anthropic Claude.
  * Falls back to template-based poem when API key is missing.
  * Rate limited: 5 generations per session per hour.
  * Caches all generated poems in the session so users can browse previous versions.
@@ -169,7 +175,7 @@ router.get('/poems/:id', (req, res) => {
 const poemGenerator = require('../services/poemGenerator');
 
 router.post('/poems/generate', async (req, res) => {
-  // Rate limiting — 5 per session per hour
+  // Rate limiting – 5 per session per hour
   if (!req.session.poemGenerations) req.session.poemGenerations = [];
 
   const oneHourAgo = Date.now() - 60 * 60 * 1000;
@@ -182,12 +188,8 @@ router.post('/poems/generate', async (req, res) => {
     });
   }
 
-  const { petName, petType, personality, favoriteMemory, favoriteThing, nicknames, breed } = req.body;
-
   try {
-    const result = await poemGenerator.generate({
-      petName, petType, breed, nicknames, personality, favoriteMemory, favoriteThing
-    });
+    const result = await poemGenerator.generate(req.body);
 
     // Track generation timestamp
     req.session.poemGenerations.push(Date.now());

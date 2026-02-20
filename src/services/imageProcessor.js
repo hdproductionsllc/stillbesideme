@@ -1,5 +1,5 @@
 /**
- * Image Processor — HEIC conversion, thumbnails, quality assessment, smart crop.
+ * Image Processor – HEIC conversion, thumbnails, quality assessment, smart crop.
  *
  * Quality tiers use warm language because these are memorial photos.
  * We NEVER reject a photo.
@@ -51,7 +51,7 @@ async function getDimensions(buffer) {
 }
 
 /**
- * 4-tier quality assessment — warm messages, NEVER reject.
+ * 4-tier quality assessment – warm messages, NEVER reject.
  *
  * @param {number} imageWidth - Image pixel width
  * @param {number} imageHeight - Image pixel height
@@ -90,7 +90,7 @@ function assessQuality(imageWidth, imageHeight, printWidthIn = 16, printHeightIn
   return {
     tier: 'low',
     dpi: Math.round(effectiveDpi),
-    message: 'This photo is quite small and may appear soft when printed at this size. It will still be meaningful — would you like to try a smaller print size for better quality?',
+    message: 'This photo is quite small and may appear soft when printed at this size. It will still be meaningful – would you like to try a smaller print size for better quality?',
     icon: '!'
   };
 }

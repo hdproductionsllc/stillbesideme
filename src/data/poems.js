@@ -22,7 +22,7 @@ for all of our special friends,
 so they can run and play together.
 
 They are happy and content,
-except for one small thing —
+except for one small thing –
 they each miss someone very special
 who was left behind.
 
@@ -123,7 +123,7 @@ you gave your love to all.
 
 Now the days feel longer,
 and the house feels far too wide,
-but I carry you within me —
+but I carry you within me –
 you are always by my side.
 
 Not gone. Not forgotten.

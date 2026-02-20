@@ -1,5 +1,5 @@
 /**
- * Database — SQLite via sql.js (pure JS, no native compilation needed).
+ * Database – SQLite via sql.js (pure JS, no native compilation needed).
  * Provides a synchronous-feeling API with auto-save to disk.
  */
 
@@ -7,7 +7,8 @@ const initSqlJs = require('sql.js');
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = path.join(__dirname, '..', '..', 'data', 'store.db');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', '..', 'data');
+const DB_PATH = path.join(DATA_DIR, 'store.db');
 const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 
 let db = null;

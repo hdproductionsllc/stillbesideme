@@ -1,5 +1,5 @@
 /**
- * Storage — date-organized file storage for customer uploads.
+ * Storage – date-organized file storage for customer uploads.
  * uploads/2026/02/19/{uuid}.ext
  */
 
@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
-const UPLOADS_ROOT = path.join(__dirname, '..', '..', 'uploads');
+const UPLOADS_ROOT = process.env.UPLOADS_DIR || path.join(__dirname, '..', '..', 'uploads');
 
 /** Get today's storage directory, creating it if needed */
 function getDayDir() {

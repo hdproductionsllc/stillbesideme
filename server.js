@@ -7,14 +7,15 @@ const FileStore = require('session-file-store')(session);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, 'uploads');
+const OUTPUT_DIR = process.env.OUTPUT_DIR || path.join(__dirname, 'output');
 const SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
 
 // Ensure required directories exist
-for (const dir of [DATA_DIR, SESSIONS_DIR, 'uploads', 'output']) {
-  const fullPath = dir.includes(path.sep) ? dir : path.join(__dirname, dir);
-  if (!fs.existsSync(fullPath)) {
-    fs.mkdirSync(fullPath, { recursive: true });
+for (const dir of [DATA_DIR, SESSIONS_DIR, UPLOADS_DIR, OUTPUT_DIR]) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
 }
 
@@ -26,7 +27,7 @@ async function start() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true }));
 
-  // Sessions — file-backed, 30-day expiry
+  // Sessions – file-backed, 30-day expiry
   app.use(session({
     store: new FileStore({
       path: SESSIONS_DIR,
@@ -42,7 +43,8 @@ async function start() {
     cookie: {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       httpOnly: true,
-      sameSite: 'lax'
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production'
     }
   }));
 
@@ -51,11 +53,42 @@ async function start() {
 
   // Static files
   app.use(express.static(path.join(__dirname, 'public')));
-  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+  app.use('/uploads', express.static(UPLOADS_DIR));
 
-  // Clean URL: /customize → customize.html
+  // Clean URL: /customize and /customize/:templateId → customize.html
   app.get('/customize', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'customize.html'));
+  });
+  app.get('/customize/:templateId', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'customize.html'));
+  });
+
+  // XML Sitemap
+  app.get('/sitemap.xml', (req, res) => {
+    const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
+    const today = new Date().toISOString().split('T')[0];
+    res.set('Content-Type', 'application/xml');
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${baseUrl}/</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/customize/pet-tribute</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/customize/letter-from-heaven</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+</urlset>`);
   });
 
   // API routes
@@ -63,7 +96,7 @@ async function start() {
   app.use('/api/templates', require('./src/routes/templates'));
 
   app.listen(PORT, () => {
-    console.log(`\n  Still Beside Me — Memorial Art Store`);
+    console.log(`\n  Still Beside Me – Memorial Art Store`);
     console.log(`  http://localhost:${PORT}`);
     console.log(`  http://localhost:${PORT}/customize\n`);
   });

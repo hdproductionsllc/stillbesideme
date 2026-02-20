@@ -3,7 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Create Their Tribute — Still Beside Me</title>
+  <title>Create a Personalized Memorial Tribute | Still Beside Me</title>
+  <meta name="description" content="Design your personalized memorial tribute. Upload a photo, share your memories, and we'll create a custom poem or letter printed in a museum-quality frame. Free design proof.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Create a Personalized Memorial Tribute | Still Beside Me">
+  <meta property="og:description" content="Upload a photo, share your memories, and create a personalized poem or letter printed in a museum-quality frame.">
+  <meta name="robots" content="noindex, follow">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Source+Sans+3:wght@400;600&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
@@ -31,33 +36,15 @@
         <div class="frame-border">
           <div class="mat-board">
             <div class="preview-panels" id="preview-panels">
-              <div class="panel panel-photo" id="panel-photo">
-                <canvas id="photo-canvas"></canvas>
-              </div>
-              <div class="panel panel-tribute" id="panel-tribute">
-                <canvas id="tribute-canvas"></canvas>
-              </div>
+              <!-- Panels built dynamically by preview.js -->
             </div>
           </div>
         </div>
       </div>
-      <!-- Layout selector -->
-      <div class="layout-selector" id="layout-selector">
-        <div>
-          <div class="layout-option layout-option-horizontal active" data-layout="side-by-side">
-            <div class="layout-icon-block"></div>
-            <div class="layout-icon-block"></div>
-          </div>
-          <div class="layout-label">Horizontal</div>
-        </div>
-        <div>
-          <div class="layout-option layout-option-vertical" data-layout="stacked">
-            <div class="layout-icon-block"></div>
-            <div class="layout-icon-block"></div>
-          </div>
-          <div class="layout-label">Vertical</div>
-        </div>
-      </div>
+      <!-- Layout selector (rebuilt dynamically by customizer.js) -->
+      <div class="layout-selector" id="layout-selector"></div>
+      <!-- Third panel toggle -->
+      <div style="text-align:center;margin-bottom:var(--space-sm)" id="panel-toggle-wrap"></div>
       <!-- Style variant selector -->
       <div class="style-selector" id="style-selector"></div>
     </div>

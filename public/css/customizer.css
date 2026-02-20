@@ -1,5 +1,5 @@
 /* ============================================================
-   Still Beside Me — Customizer Layout & Components
+   Still Beside Me – Customizer Layout & Components
    ============================================================ */
 
 /* --- Split-Pane Layout --- */
@@ -35,7 +35,7 @@
 }
 
 /* ============================================================
-   CSS FRAME RENDERING — Matted frame around canvas panels
+   CSS FRAME RENDERING – Matted frame around canvas panels
    ============================================================ */
 
 .frame-preview {
@@ -57,21 +57,43 @@
 }
 
 .preview-panels {
-  display: flex;
+  display: grid;
   gap: var(--panel-gap);
+  position: relative;
+  /* Default 2-panel side-by-side (JS overrides via inline styles) */
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr;
+  grid-template-areas: "photo tribute";
+  aspect-ratio: 5 / 3.2;
 }
 
 .panel {
   overflow: hidden;
   position: relative;
+  min-width: 0;
+  min-height: 0;
 }
 
-.panel-photo {
-  flex: 1;
-}
+.panel-photo { grid-area: photo; }
+.panel-tribute { grid-area: tribute; }
+.panel-panel2 { grid-area: panel2; }
 
-.panel-tribute {
-  flex: 1;
+/* Beveled mat opening – recessed into mat (photo panels only) */
+.panel-photo::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  border-top: 3px solid rgba(0, 0, 0, 0.5);
+  border-left: 3px solid rgba(0, 0, 0, 0.35);
+  border-bottom: 3px solid rgba(200, 180, 150, 0.3);
+  border-right: 3px solid rgba(200, 180, 150, 0.2);
+  box-shadow:
+    inset 0 5px 8px -3px rgba(0, 0, 0, 0.35),
+    inset 4px 0 6px -3px rgba(0, 0, 0, 0.2),
+    inset 0 -4px 6px -3px rgba(200, 180, 150, 0.15),
+    inset -3px 0 5px -3px rgba(200, 180, 150, 0.08);
 }
 
 .panel canvas {
@@ -80,15 +102,125 @@
   display: block;
 }
 
-/* Side-by-side layout (default) */
-.preview-panels {
-  aspect-ratio: 5 / 3.2;
+/* ============================================================
+   DIVIDER HANDLES – Draggable resize between panels
+   ============================================================ */
+
+.divider-handle {
+  position: absolute;
+  z-index: 10;
+  background: transparent;
 }
 
-/* Stacked layout */
-.preview-panels.layout-stacked {
-  flex-direction: column;
-  aspect-ratio: 4 / 5;
+.divider-handle.col {
+  cursor: col-resize;
+  width: 12px;
+  top: 0;
+  bottom: 0;
+  margin-left: -6px;
+}
+
+.divider-handle.row {
+  cursor: row-resize;
+  height: 12px;
+  left: 0;
+  right: 0;
+  margin-top: -6px;
+}
+
+/* Gold line on hover */
+.divider-handle::after {
+  content: '';
+  position: absolute;
+  background: rgba(200, 160, 80, 0);
+  transition: background 0.15s;
+  border-radius: 1px;
+}
+
+.divider-handle.col::after {
+  width: 2px;
+  top: 10%;
+  bottom: 10%;
+  left: 50%;
+  margin-left: -1px;
+}
+
+.divider-handle.row::after {
+  height: 2px;
+  left: 10%;
+  right: 10%;
+  top: 50%;
+  margin-top: -1px;
+}
+
+.divider-handle:hover::after {
+  background: rgba(200, 160, 80, 0.6);
+}
+
+.divider-handle.dragging::after {
+  background: rgba(200, 160, 80, 0.9);
+}
+
+/* ============================================================
+   THIRD PANEL CONTROLS
+   ============================================================ */
+
+.add-panel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.75rem;
+  font-family: var(--font-body);
+  font-weight: 600;
+  color: #9B9590;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.add-panel-btn:hover {
+  color: var(--color-warm);
+  border-color: rgba(200, 160, 80, 0.3);
+  background: rgba(200, 160, 80, 0.08);
+}
+
+.add-panel-btn .icon {
+  font-size: 0.9rem;
+}
+
+/* ============================================================
+   LAYOUT ICON THUMBNAILS – CSS Grid mini-layouts
+   ============================================================ */
+
+/* 3-panel layout icons use CSS Grid */
+.layout-option-grid {
+  display: grid;
+  gap: 1px;
+  padding: 4px;
+}
+
+.layout-option-grid .layout-icon-block {
+  border-radius: 1px;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Photo blocks */
+.layout-option-grid .layout-icon-photo {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Tribute blocks */
+.layout-option-grid .layout-icon-tribute {
+  background: rgba(196, 168, 130, 0.35);
+}
+
+/* Panel2 blocks */
+.layout-option-grid .layout-icon-panel2 {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 /* --- Classic Dark Theme --- */
@@ -100,14 +232,13 @@
     inset 0 -1px 0 rgba(0,0,0,0.3);
 }
 .frame-preview.theme-classic-dark .mat-board {
-  background: #1a1a1a;
+  background: #0a0908;
+  border: 1px solid #181410;
   box-shadow:
     inset 0 1px 3px rgba(0,0,0,0.5),
     inset 0 -1px 0 rgba(255,255,255,0.03);
 }
-.frame-preview.theme-classic-dark .panel {
-  box-shadow: inset 0 1px 4px rgba(0,0,0,0.3);
-}
+/* Classic dark uses the base .panel-photo::before bevel (cream core, dark mat) */
 
 /* --- Warm Natural Theme --- */
 .frame-preview.theme-warm-natural .frame-border {
@@ -119,12 +250,22 @@
 }
 .frame-preview.theme-warm-natural .mat-board {
   background: #F5EDE0;
+  border: 1px solid #E0D8CC;
   box-shadow:
     inset 0 1px 3px rgba(0,0,0,0.15),
     inset 0 -1px 0 rgba(255,255,255,0.5);
 }
-.frame-preview.theme-warm-natural .panel {
-  box-shadow: inset 0 1px 4px rgba(0,0,0,0.08);
+/* Warm bevel – recessed into cream mat (photo panels only) */
+.frame-preview.theme-warm-natural .panel-photo::before {
+  border-top-color: rgba(0, 0, 0, 0.15);
+  border-left-color: rgba(0, 0, 0, 0.1);
+  border-bottom-color: rgba(255, 255, 255, 0.5);
+  border-right-color: rgba(255, 255, 255, 0.35);
+  box-shadow:
+    inset 0 6px 10px -3px rgba(0, 0, 0, 0.12),
+    inset 5px 0 8px -3px rgba(0, 0, 0, 0.06),
+    inset 0 -5px 8px -3px rgba(255, 255, 255, 0.3),
+    inset -5px 0 6px -3px rgba(255, 255, 255, 0.15);
 }
 
 /* --- Soft Light Theme --- */
@@ -137,20 +278,30 @@
 }
 .frame-preview.theme-soft-light .mat-board {
   background: #FFFFFF;
+  border: 1px solid #ebe8e4;
   box-shadow:
     inset 0 1px 3px rgba(0,0,0,0.06),
     inset 0 -1px 0 rgba(255,255,255,0.8);
 }
-.frame-preview.theme-soft-light .panel {
-  box-shadow: inset 0 1px 4px rgba(0,0,0,0.04);
+/* Light bevel – recessed into white mat, very subtle (photo panels only) */
+.frame-preview.theme-soft-light .panel-photo::before {
+  border-top-color: rgba(0, 0, 0, 0.08);
+  border-left-color: rgba(0, 0, 0, 0.05);
+  border-bottom-color: rgba(255, 255, 255, 0.7);
+  border-right-color: rgba(255, 255, 255, 0.5);
+  box-shadow:
+    inset 0 6px 10px -3px rgba(0, 0, 0, 0.06),
+    inset 5px 0 8px -3px rgba(0, 0, 0, 0.03),
+    inset 0 -5px 8px -3px rgba(255, 255, 255, 0.4),
+    inset -5px 0 6px -3px rgba(255, 255, 255, 0.2);
 }
 
 /* ============================================================
-   STYLE VARIANT SELECTOR — 3 clickable frame thumbnails
+   STYLE VARIANT SELECTOR – 3 clickable frame thumbnails
    ============================================================ */
 
 /* ============================================================
-   LAYOUT SELECTOR — Horizontal vs Vertical toggle
+   LAYOUT SELECTOR – Horizontal vs Vertical toggle
    ============================================================ */
 
 .layout-selector {
@@ -183,7 +334,7 @@
   border-color: var(--color-warm);
 }
 
-/* Horizontal icon — two side-by-side boxes */
+/* Horizontal icon – two side-by-side boxes */
 .layout-option-horizontal .layout-icon-block {
   flex: 1;
   height: 100%;
@@ -198,7 +349,7 @@
   background: rgba(196, 168, 130, 0.35);
 }
 
-/* Vertical icon — two stacked boxes */
+/* Vertical icon – two stacked boxes */
 .layout-option-vertical {
   flex-direction: column;
 }
@@ -415,8 +566,16 @@
   gap: 0.35rem;
 }
 
+.crop-hint {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  margin-top: var(--space-sm);
+  text-align: center;
+  font-style: italic;
+}
+
 /* ============================================================
-   FORM FIELDS — Guided emotional flow
+   FORM FIELDS – Guided emotional flow
    ============================================================ */
 
 .form-section {
@@ -558,7 +717,7 @@
 }
 
 /* ============================================================
-   POEM GENERATION — The climax moment
+   POEM GENERATION – The climax moment
    ============================================================ */
 
 .poem-climax {
@@ -704,6 +863,51 @@
   font-size: 0.8rem;
   color: var(--color-muted);
   margin-top: var(--space-sm);
+}
+
+/* --- Poem version tabs --- */
+.poem-version-tabs {
+  display: flex;
+  gap: var(--space-xs);
+  justify-content: center;
+  margin-bottom: var(--space-lg);
+}
+
+.poem-version-tab {
+  padding: 0.35rem 0.9rem;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.poem-version-tab:hover {
+  border-color: var(--color-warm);
+  color: var(--color-warm);
+}
+
+.poem-version-tab.active {
+  background: var(--color-warm);
+  border-color: var(--color-warm);
+  color: #fff;
+}
+
+/* --- Gift-mode detail note --- */
+.gift-detail-note {
+  font-size: 0.9rem;
+  color: var(--color-muted);
+  font-style: italic;
+  text-align: center;
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-lg);
+  background: rgba(196, 168, 130, 0.06);
+  border-radius: var(--radius);
+  border: 1px solid rgba(196, 168, 130, 0.12);
 }
 
 /* --- Animated poem reveal --- */

@@ -1,4 +1,4 @@
-# STILL BESIDE ME — PROMPT.md v2
+# STILL BESIDE ME – PROMPT.md v2
 
 > **Master development spec.** Read in full before writing any code. This defines the product, business logic, customer experience, infrastructure, and build sequence.
 
@@ -22,23 +22,23 @@ Every screen, every form field, every interaction exists to do two things:
 
 ## 2. The Emotional Engine (READ THIS FIRST)
 
-This product sells because grief is universal and love is permanent. The customer is not buying a canvas — they're buying the feeling of keeping someone close.
+This product sells because grief is universal and love is permanent. The customer is not buying a canvas – they're buying the feeling of keeping someone close.
 
-**Every form field is a selling moment.** When you ask someone to type their dog's name, they're not filling out a form — they're saying that name again. When you ask for a favorite memory, they're reliving it. When you ask what made them special, they're smiling through tears. By the time they see the preview with all of those details beautifully composed, they're emotionally invested. The preview IS the product. If it makes them feel something, they buy.
+**Every form field is a selling moment.** When you ask someone to type their dog's name, they're not filling out a form – they're saying that name again. When you ask for a favorite memory, they're reliving it. When you ask what made them special, they're smiling through tears. By the time they see the preview with all of those details beautifully composed, they're emotionally invested. The preview IS the product. If it makes them feel something, they buy.
 
 **Design implications:**
 - Form fields are not a checklist to rush through. They're a guided emotional journey.
-- Use warm, gentle microcopy. Not "Enter pet name" — instead: "What did you call them?"
+- Use warm, gentle microcopy. Not "Enter pet name" – instead: "What did you call them?"
 - Progress through the form should feel like telling a story about the loved one, not filling out a form.
 - The preview should update as they go, so they see their words becoming art in real-time.
 - NEVER show a price until they've seen the preview with their content in it.
-- Upsell moments happen when emotion is highest — right after they see the preview, right after they approve the proof.
+- Upsell moments happen when emotion is highest – right after they see the preview, right after they approve the proof.
 
 **Upsell opportunities (build into the flow):**
-- "Add a second photo — maybe their favorite toy, or a photo of you together?" (multi-photo template upgrade)
+- "Add a second photo – maybe their favorite toy, or a photo of you together?" (multi-photo template upgrade)
 - "Would you like a custom poem written just for [pet name]?" (AI poem add-on)
 - "Many families order a second piece for a parent or sibling. Save 20% on a second memorial." (post-checkout)
-- "Add a desktop companion piece — a 5×7 version for your nightstand." (size upsell)
+- "Add a desktop companion piece – a 5×7 version for your nightstand." (size upsell)
 - "Include a matching ornament for the holidays." (product cross-sell, Phase 2)
 
 ---
@@ -105,7 +105,7 @@ heroesliveforever/
 ### 3.2 Server Integration
 
 ```javascript
-// In server.js — mount SBM alongside HLF
+// In server.js – mount SBM alongside HLF
 app.use('/sbm', express.static(path.join(__dirname, 'stillbesideme', 'public')));
 app.use('/sbm', require('./stillbesideme/src/routes/pages'));
 app.use('/sbm/api', require('./stillbesideme/src/routes/api'));
@@ -122,10 +122,10 @@ app.use('/sbm/api/auth', require('./stillbesideme/src/routes/auth'));
 SQLite via `better-sqlite3`. No external database server needed for MVP. Single file, zero config, handles thousands of orders. Migrate to PostgreSQL when volume demands it.
 
 **Tables:**
-- `customers` — id, email, name, password_hash, created_at
-- `sessions` — id, customer_id (nullable for guests), cart_data, created_at, expires_at
-- `orders` — id, customer_id, session_id, status, template_id, product_sku, fields_json, photos_json, poem_text, proof_url, print_file_url, shipping_json, total_cents, created_at, updated_at
-- `order_events` — id, order_id, event_type, data_json, created_at (full audit trail)
+- `customers` – id, email, name, password_hash, created_at
+- `sessions` – id, customer_id (nullable for guests), cart_data, created_at, expires_at
+- `orders` – id, customer_id, session_id, status, template_id, product_sku, fields_json, photos_json, poem_text, proof_url, print_file_url, shipping_json, total_cents, created_at, updated_at
+- `order_events` – id, order_id, event_type, data_json, created_at (full audit trail)
 
 **Order statuses:** `draft` → `submitted` → `proof_ready` → `proof_approved` → `in_production` → `shipped` → `delivered`
 
@@ -136,7 +136,7 @@ SQLite via `better-sqlite3`. No external database server needed for MVP. Single 
 **MVP approach (launch):**
 - Store uploads in `stillbesideme/uploads/` on the server filesystem
 - Organize by date: `uploads/2026/02/19/{uuid}.{ext}`
-- Keep originals untouched — never overwrite or compress the source file
+- Keep originals untouched – never overwrite or compress the source file
 - Generate a display-quality thumbnail (800px wide, JPEG 85%) for preview rendering
 - Generate a print-quality version only at export time (preserve maximum resolution)
 
@@ -153,7 +153,7 @@ SQLite via `better-sqlite3`. No external database server needed for MVP. Single 
   - **Excellent** (≥200 DPI at print size): "This photo will look beautiful"
   - **Good** (150-199 DPI): "This photo will print well" (no warning needed)
   - **Usable** (100-149 DPI): Gentle note: "This photo is a bit small but we'll make it look its best. For the sharpest print, a higher resolution version would help."
-  - **Low** (<100 DPI): Honest but kind: "This photo is quite small and may appear soft when printed at this size. It will still be meaningful — would you like to try a smaller print size for better quality?"
+  - **Low** (<100 DPI): Honest but kind: "This photo is quite small and may appear soft when printed at this size. It will still be meaningful – would you like to try a smaller print size for better quality?"
 - **NEVER hard-reject a photo.** These are memorial photos. The customer may not have a better version. Let them make the choice.
 - Auto-enhance: Subtle sharpening + slight contrast boost on lower-quality uploads (Sharp can do this). Don't overdo it.
 
@@ -325,9 +325,9 @@ Each template supports **one or more customer photos** plus rich text fields:
 
 Some templates support 2-3 photos. The secondary photo slots are **upsell opportunities AND emotional hooks:**
 
-- "Upload a photo of their favorite toy" — immediately evokes a specific memory
-- "A photo of you together" — deepens emotional investment
-- "Their favorite spot in the house" — creates a richer, more personal piece
+- "Upload a photo of their favorite toy" – immediately evokes a specific memory
+- "A photo of you together" – deepens emotional investment
+- "Their favorite spot in the house" – creates a richer, more personal piece
 
 Multi-photo templates are more valuable products (and more emotionally invested customers). Price them $5-10 higher.
 
@@ -352,11 +352,11 @@ The key insight: **fields that don't appear on the product still sell the produc
 
 Customer arrives from Facebook ad, Instagram, Etsy, Google, or direct. They see:
 
-1. **Emotional hero section** — A gorgeous canvas hanging in a warm living room. Headline: "Keep them beside you." Subhead: "Create a personalized memorial that celebrates the one you love." CTA: "Create Your Memorial"
-2. **Collection cards** — Pet Memorials, In Loving Memory, Fishing In Heaven, First Responder. Beautiful photography. Click to filter.
-3. **Template grid** — Each template as a card with preview. Hover/tap shows "Personalize This" button.
-4. **Social proof** — Testimonials, review count, "Over X memorials created" counter.
-5. **How it Works** — 3 illustrated steps: Choose → Personalize → Receive.
+1. **Emotional hero section** – A gorgeous canvas hanging in a warm living room. Headline: "Keep them beside you." Subhead: "Create a personalized memorial that celebrates the one you love." CTA: "Create Your Memorial"
+2. **Collection cards** – Pet Memorials, In Loving Memory, Fishing In Heaven, First Responder. Beautiful photography. Click to filter.
+3. **Template grid** – Each template as a card with preview. Hover/tap shows "Personalize This" button.
+4. **Social proof** – Testimonials, review count, "Over X memorials created" counter.
+5. **How it Works** – 3 illustrated steps: Choose → Personalize → Receive.
 
 ### Step 2: PERSONALIZE → Customizer Page
 
@@ -368,26 +368,26 @@ This is where emotion builds and the sale happens. The customer should feel like
 
 **Form flow (ORDERED for emotional escalation):**
 
-1. **Upload their photo** — Big, beautiful upload area. "Share their favorite photo." Immediate preview update when uploaded.
+1. **Upload their photo** – Big, beautiful upload area. "Share their favorite photo." Immediate preview update when uploaded.
 
-2. **Tell us about them** — Name, nicknames, dates. Preview updates in real-time as they type.
+2. **Tell us about them** – Name, nicknames, dates. Preview updates in real-time as they type.
 
-3. **What made them special?** — Personality, breed, favorite things. These are optional but framed as invitations, not requirements. "Help us make this personal."
+3. **What made them special?** – Personality, breed, favorite things. These are optional but framed as invitations, not requirements. "Help us make this personal."
 
-4. **A favorite memory** — Open textarea. "The one that makes you smile." This is the emotional peak of the form.
+4. **A favorite memory** – Open textarea. "The one that makes you smile." This is the emotional peak of the form.
 
-5. **Choose their poem or message** — Three options:
+5. **Choose their poem or message** – Three options:
    - Select from poem library (dropdown with inline preview of each poem)
    - "Write a custom poem just for [petName]" → AI poem generator (THE DIFFERENTIATOR)
    - "Write your own message" → free textarea
 
-6. **Add another photo?** (upsell moment) — "Would you like to include a photo of their favorite toy, or a picture of you together?" Unlocks multi-photo template variant.
+6. **Add another photo?** (upsell moment) – "Would you like to include a photo of their favorite toy, or a picture of you together?" Unlocks multi-photo template variant.
 
-7. **Preview check** — Full preview with all content. "This is what your memorial will look like." Pause here. Let them look at it. Let it hit them.
+7. **Preview check** – Full preview with all content. "This is what your memorial will look like." Pause here. Let them look at it. Let it hit them.
 
-8. **Select size** — ONLY after they've seen and loved the preview. Show sizes with prices. Highlight "Most Popular."
+8. **Select size** – ONLY after they've seen and loved the preview. Show sizes with prices. Highlight "Most Popular."
 
-9. **Add to Cart** — Not "Buy Now." They may want to order more than one.
+9. **Add to Cart** – Not "Buy Now." They may want to order more than one.
 
 ### Step 3: CART → Cart & Checkout
 
@@ -398,9 +398,9 @@ This is where emotion builds and the sale happens. The customer should feel like
 - "Save 20% on a second piece" (discount upsell)
 
 **Checkout options:**
-- **Guest checkout** — Email + shipping address. Creates a guest session with order access link sent via email.
-- **Create account** — Email + password + shipping address. Can track orders, reorder, save details.
-- **Sign in** — Returning customer.
+- **Guest checkout** – Email + shipping address. Creates a guest session with order access link sent via email.
+- **Create account** – Email + password + shipping address. Can track orders, reorder, save details.
+- **Sign in** – Returning customer.
 
 **Payment:** Stripe (Phase 1). Cards, Apple Pay, Google Pay.
 
@@ -424,7 +424,7 @@ This is where emotion builds and the sale happens. The customer should feel like
 
 **If changes requested:** Customer can edit text fields and resubmit. New proof generated. (Photo changes require contacting support for MVP; self-service photo replacement in Phase 2.)
 
-**Auto-approve option:** During checkout, customer can check "I've reviewed everything — skip the proof and ship faster!" Order goes directly to production.
+**Auto-approve option:** During checkout, customer can check "I've reviewed everything – skip the proof and ship faster!" Order goes directly to production.
 
 ### Step 5: FULFILL → Production & Shipping
 
@@ -432,7 +432,7 @@ This is where emotion builds and the sale happens. The customer should feel like
 - System generates the final print file at exact fulfillment partner specifications
 - File is a high-res PNG or PDF with bleed, safe areas, and color profile baked in
 
-**Fulfillment options (flexible — not locked to one provider):**
+**Fulfillment options (flexible – not locked to one provider):**
 
 **Option A: Printful API (primary for launch)**
 - Automated: order approved → API call → Printful prints and ships
@@ -493,7 +493,7 @@ In the customizer, when customer selects "Write a custom poem just for [petName]
 
 3. Backend calls Anthropic API with crafted prompt (see below).
 
-4. Poem appears in preview, animated line by line (not instant — let the moment land).
+4. Poem appears in preview, animated line by line (not instant – let the moment land).
 
 5. Customer can:
    - **Keep it** → poem locks into the template
@@ -517,7 +517,7 @@ Pet Details:
 Write a 6-8 line poem that:
 - References the pet by name at least once
 - Incorporates at least one specific detail the owner shared
-- Feels warm and comforting — about love and presence, not just grief
+- Feels warm and comforting – about love and presence, not just grief
 - Is personal and unique, never generic
 - Is appropriate for permanent display as wall art (timeless, dignified)
 - Does NOT use clichés like "rainbow bridge" or "angel wings" unless the owner specifically referenced them
@@ -566,7 +566,7 @@ Response: { poem, generationId }
 - Generated poem cache
 - Uploaded photo references
 
-Sessions expire after 30 days of inactivity. Cart data preserved for 7 days (send "You left something behind" email for abandoned carts — Phase 2).
+Sessions expire after 30 days of inactivity. Cart data preserved for 7 days (send "You left something behind" email for abandoned carts – Phase 2).
 
 ---
 
@@ -574,7 +574,7 @@ Sessions expire after 30 days of inactivity. Cart data preserved for 7 days (sen
 
 ### 9.1 Printful Canvas Specifications
 
-Canvas prints have a **wrap area** — the image extends around the wooden frame edges. For a 1.5" deep frame, you need 1.5" of image on each side beyond the visible face.
+Canvas prints have a **wrap area** – the image extends around the wooden frame edges. For a 1.5" deep frame, you need 1.5" of image on each side beyond the visible face.
 
 | Product | Face Size | Wrap | Total Print Area | At 300 DPI |
 |---------|-----------|------|-----------------|------------|
@@ -681,7 +681,7 @@ This folder can be zipped and emailed to any print/frame shop. It contains every
 - FAQ section:
   - How long does shipping take? (5-10 business days)
   - Can I change my order after approving? (Contact us within 24 hours)
-  - What if my photo is low quality? (We'll do our best — you can also send us a higher quality version)
+  - What if my photo is low quality? (We'll do our best – you can also send us a higher quality version)
   - What if I'm not happy with the print? (We'll work with you to make it right)
   - Do you ship internationally? (Currently US only, more coming soon)
 
@@ -806,14 +806,14 @@ npm install heic-convert           # iPhone photo support
 ## 16. Template Visual Design Guidelines
 
 ### Background Treatments
-- **Dark Matte:** `#1a1a1a` to `#2C2C2C` — works with any photo, feels premium
+- **Dark Matte:** `#1a1a1a` to `#2C2C2C` – works with any photo, feels premium
 - **Warm Textured:** Subtle linen or paper texture overlay at low opacity
-- **Nature Gradient:** Deep forest green to dark — for outdoor/fishing themes
-- **Service Colors:** Deep navy (police), deep red (fire) — subdued, not bright
+- **Nature Gradient:** Deep forest green to dark – for outdoor/fishing themes
+- **Service Colors:** Deep navy (police), deep red (fire) – subdued, not bright
 
 ### Photo Treatment
 - Rounded rect mask with subtle border (2-4px, warm gold `#C4A882` or cream)
-- Soft vignette overlay on photo edges — helps ANY photo look intentional
+- Soft vignette overlay on photo edges – helps ANY photo look intentional
 - Dark photos get a subtle brightness/contrast boost
 - Light photos get a gentle warm tone overlay
 - NEVER sharp rectangle with no treatment. Looks like a placeholder.
@@ -825,7 +825,7 @@ npm install heic-convert           # iPhone photo support
 4. **Attribution:** Smallest. Source Sans 3, 400. Very muted.
 
 ### Canvas Wrap Safety
-- 1.5" wrap zone on all sides must contain ONLY background — no text, no face, no critical content
+- 1.5" wrap zone on all sides must contain ONLY background – no text, no face, no critical content
 - Inner safe zone: minimum 0.5" inward from the face edge
 - Template designs must account for this at every size
 
@@ -837,7 +837,7 @@ npm install heic-convert           # iPhone photo support
 
 2. **Mobile first.** 70%+ of traffic comes from phones via social media ads. If the customizer doesn't work beautifully on a 375px screen, nothing else matters.
 
-3. **Bad photos are the norm.** These are memorial photos — phone shots of old prints, tiny Facebook pics, screenshots. Make bad photos look their best. Never reject. Always encourage.
+3. **Bad photos are the norm.** These are memorial photos – phone shots of old prints, tiny Facebook pics, screenshots. Make bad photos look their best. Never reject. Always encourage.
 
 4. **The form IS the product experience.** Each question deepens emotional investment. By the time they see the preview, they're already committed. Don't rush the form.
 
@@ -847,11 +847,11 @@ npm install heic-convert           # iPhone photo support
 
 7. **Design quality is the product.** If templates look cheap, nothing else matters. Every template should look like something you'd be proud to hang on YOUR wall.
 
-8. **Always be selling.** Every screen should have a CTA. Every interaction should deepen commitment. Upsells are natural, not pushy — "Would you like to include a photo of their favorite toy?" feels caring, not salesy, because in this context it IS caring.
+8. **Always be selling.** Every screen should have a CTA. Every interaction should deepen commitment. Upsells are natural, not pushy – "Would you like to include a photo of their favorite toy?" feels caring, not salesy, because in this context it IS caring.
 
-9. **Proofs prevent chargebacks.** The proof approval flow isn't just customer service — it protects the business. A customer who approved their proof can't claim the product was wrong.
+9. **Proofs prevent chargebacks.** The proof approval flow isn't just customer service – it protects the business. A customer who approved their proof can't claim the product was wrong.
 
-10. **The print file is the deliverable.** Whether it goes to Printful, a local shop, or gets downloaded, the print-ready file must be production-perfect every time. Bleed, DPI, color profile, safe areas — no shortcuts.
+10. **The print file is the deliverable.** Whether it goes to Printful, a local shop, or gets downloaded, the print-ready file must be production-perfect every time. Bleed, DPI, color profile, safe areas – no shortcuts.
 
 ---
 

@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS customers (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Orders — the core business object
+-- Orders – the core business object
 CREATE TABLE IF NOT EXISTS orders (
   id TEXT PRIMARY KEY,
   customer_id TEXT REFERENCES customers(id),

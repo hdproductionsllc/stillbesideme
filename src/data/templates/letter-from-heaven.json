@@ -1,10 +1,27 @@
 {
-  "id": "pet-tribute",
-  "name": "Pet Tribute",
-  "collection": "pet-memorial",
-  "description": "A personalized AI tribute poem, matted and framed with your pet's photo – museum-quality and one of a kind.",
-  "category": "pet",
+  "id": "letter-from-heaven",
+  "name": "Letter From Heaven",
+  "collection": "in-loving-memory",
+  "description": "A personalized letter written from their perspective to their loved ones, framed alongside their photo – museum-quality and one of a kind.",
+  "category": "human",
   "poemSupport": "ai",
+
+  "tributeMapping": {
+    "name": "name",
+    "nickname": "nickname",
+    "familyName": "familyName",
+    "familyPrefix": "Forever loved by",
+    "birthDate": "birthDate",
+    "passDate": "passDate",
+    "poemText": "poemText"
+  },
+
+  "poemLabel": "Letter",
+
+  "formLabels": {
+    "poemSectionTitle": "Now let's write their letter from heaven",
+    "poemLibraryLink": "Or choose from our letter library instead"
+  },
 
   "canvas": {
     "width": 4800,
@@ -130,64 +147,26 @@
     }
   },
 
-  "tributeMapping": {
-    "name": "petName",
-    "nickname": "petNicknames",
-    "familyName": "familyName",
-    "familyPrefix": "Beloved companion of",
-    "birthDate": "birthDate",
-    "passDate": "passDate",
-    "poemText": "poemText"
-  },
-
-  "poemLabel": "Poem",
-
-  "giftLabels": {
-    "gift": {
-      "petName": "What was their pet's name?",
-      "petNicknames": "Any nicknames you know?",
-      "petType": "What kind of pet?",
-      "personality": "What made this pet special?",
-      "favoriteMemory": "A memory you've heard about",
-      "favoriteThing": "A favorite toy or treat you know of?",
-      "familyName": "Who is this gift for?"
-    },
-    "self": {
-      "petName": "What did you call them?",
-      "petNicknames": "Any nicknames?",
-      "petType": "What kind of companion?",
-      "personality": "What made them special?",
-      "favoriteMemory": "A favorite memory",
-      "favoriteThing": "Their favorite toy or treat?",
-      "familyName": "Who will miss them most?"
-    }
-  },
-
-  "formLabels": {
-    "poemSectionTitle": "Now let's write their tribute poem",
-    "poemLibraryLink": "Or choose from our poem library instead"
-  },
-
   "defaultStyle": "classic-dark",
   "defaultLayout": "side-by-side",
 
   "photoSlots": [
     { "id": "main", "label": "Share their photo", "sublabel": "The one that captures who they really were", "required": true },
-    { "id": "panel2", "label": "Second photo", "sublabel": "Another favorite moment", "required": false }
+    { "id": "panel2", "label": "Second photo", "sublabel": "Another cherished moment", "required": false }
   ],
 
   "memoryFields": [
-    { "id": "petName", "label": "What did you call them?", "type": "text", "required": true, "maxLength": 40, "displayOn": "tribute" },
-    { "id": "petNicknames", "label": "Any nicknames?", "sublabel": "The silly ones count too", "type": "text", "required": false, "maxLength": 80, "placeholder": "Mr. Wigglebutt, Buddy Bear, The Senator", "displayOn": "tribute", "feedsPoem": true },
-    { "id": "petType", "label": "What kind of companion?", "type": "select", "options": ["Dog", "Cat", "Bird", "Horse", "Rabbit", "Other"], "required": true, "feedsPoem": true },
-    { "id": "breed", "label": "Breed", "type": "text", "required": false, "maxLength": 40, "feedsPoem": true },
-    { "id": "birthDate", "label": "When were they born?", "sublabel": "Year or full date", "type": "text", "required": false, "maxLength": 20, "placeholder": "2014", "displayOn": "tribute" },
-    { "id": "passDate", "label": "When did they cross the rainbow bridge?", "sublabel": "Year or full date", "type": "text", "required": false, "maxLength": 20, "placeholder": "2026", "displayOn": "tribute" },
-    { "id": "personality", "label": "What made them special?", "sublabel": "The thing that made them uniquely yours", "type": "textarea", "required": false, "maxLength": 200, "feedsPoem": true },
-    { "id": "favoriteMemory", "label": "A favorite memory", "sublabel": "The one that makes you smile through tears", "type": "textarea", "required": false, "maxLength": 300, "feedsPoem": true },
-    { "id": "favoriteThing", "label": "Their favorite toy or treat?", "sublabel": "The thing they couldn't live without", "type": "text", "required": false, "maxLength": 60, "feedsPoem": true },
-    { "id": "familyName", "label": "Who will miss them most?", "sublabel": "Your family name or your name", "type": "text", "required": false, "maxLength": 80, "placeholder": "The Hamilton family", "displayOn": "tribute" },
-    { "id": "poemText", "label": "Tribute poem", "type": "poem-selector" }
+    { "id": "name", "label": "What was their name?", "type": "text", "required": true, "maxLength": 40, "displayOn": "tribute" },
+    { "id": "relationship", "label": "Who were they to you?", "type": "select", "options": ["Mother", "Father", "Wife", "Husband", "Son", "Daughter", "Sister", "Brother", "Grandmother", "Grandfather", "Friend", "Other"], "required": true, "feedsPoem": true },
+    { "id": "nickname", "label": "What did family call them?", "sublabel": "A nickname, a title, or what the grandkids said", "type": "text", "required": false, "maxLength": 80, "placeholder": "Nana, Pop, Coach", "displayOn": "tribute", "feedsPoem": true },
+    { "id": "birthDate", "label": "Date of birth", "sublabel": "Year or full date", "type": "text", "required": false, "maxLength": 20, "placeholder": "1945", "displayOn": "tribute" },
+    { "id": "passDate", "label": "Date of passing", "sublabel": "Year or full date", "type": "text", "required": false, "maxLength": 20, "placeholder": "2026", "displayOn": "tribute" },
+    { "id": "personality", "label": "What made them who they were?", "sublabel": "The qualities that defined them", "type": "textarea", "required": false, "maxLength": 300, "feedsPoem": true },
+    { "id": "favoriteMemory", "label": "A memory that captures them perfectly", "sublabel": "The story you'd tell someone who never met them", "type": "textarea", "required": false, "maxLength": 300, "feedsPoem": true },
+    { "id": "favoriteSaying", "label": "Something they always said", "sublabel": "A phrase, a piece of advice, a running joke", "type": "text", "required": false, "maxLength": 120, "feedsPoem": true },
+    { "id": "legacy", "label": "What did they teach you?", "sublabel": "The lesson that stayed with you", "type": "textarea", "required": false, "maxLength": 300, "feedsPoem": true },
+    { "id": "familyName", "label": "Who will miss them most?", "sublabel": "A name or family name for the tribute footer", "type": "text", "required": false, "maxLength": 80, "placeholder": "The Johnson family", "displayOn": "tribute" },
+    { "id": "poemText", "label": "Letter from heaven", "type": "poem-selector" }
   ],
 
   "printProducts": [

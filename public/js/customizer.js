@@ -1,6 +1,13 @@
 /**
- * Customizer.js — Guided emotional flow for the ONE pet tribute product.
- * No template selection — goes straight to the 12-question guided experience.
+ * Customizer.js – Multi-template guided emotional flow.
+ *
+ * Reads the template ID from the URL path (/customize/letter-from-heaven),
+ * defaulting to 'pet-tribute' when no template slug is present.
+ * Everything — form fields, poem labels, gift toggle, generate button —
+ * is driven by the template definition.
+ *
+ * Manages the form pane, layout/style selectors, photo crop interactions,
+ * draggable divider handles between panels, and optional third panel.
  */
 
 (function () {
@@ -9,46 +16,121 @@
   const formPane = document.getElementById('form-pane');
   if (!formPane) return;
 
-  const TEMPLATE_ID = 'pet-tribute';
-  const SESSION_KEY = 'sbm-customizer-state';
+  // ── Template ID from URL ──────────────────────────────────
+  const pathParts = window.location.pathname.split('/').filter(Boolean);
+  // /customize/letter-from-heaven → ['customize', 'letter-from-heaven']
+  const TEMPLATE_ID = pathParts.length > 1 ? pathParts[pathParts.length - 1] : 'pet-tribute';
+  const SESSION_KEY = `sbm-customizer-${TEMPLATE_ID}`;
+
   const MAX_REGENERATIONS = 3;
+  const MIN_FR = 0.3;        // minimum fr value when dragging dividers
 
   let template = null;
   let poems = [];
   let regenerationCount = 0;
+  let poemHistory = [];       // up to 3 generated poems
+  let activePoemIndex = -1;   // which version is showing
   let currentStyle = 'classic-dark';
   let currentLayout = 'side-by-side';
   let orderType = 'self'; // 'self' or 'gift'
+  let thirdPanelEnabled = false;
+  let thirdPanelType = 'photo'; // 'photo' or 'text'
+
+  // Track whether a photo has been uploaded per panel
+  const photoUploaded = {};   // panelId -> boolean
+
+  // Debounce timer for resize → reattach divider handles
+  let resizeTimer = null;
+
+  // ── Helpers (template-driven labels) ──────────────────────
+
+  /** The field ID used for the tribute "name" slot */
+  function nameFieldId() {
+    return (template && template.tributeMapping && template.tributeMapping.name) || 'petName';
+  }
+
+  /** The label word for the generated content — "Poem" or "Letter" */
+  function poemLabel() {
+    return (template && template.poemLabel) || 'Poem';
+  }
+
+  // ── Poem Version History (module-level so both wireUp and restore can use) ──
+
+  function updateVersionTabs() {
+    const vt = document.getElementById('poem-version-tabs');
+    if (!vt) return;
+    if (poemHistory.length < 2) {
+      vt.style.display = 'none';
+      return;
+    }
+    vt.style.display = '';
+    vt.innerHTML = poemHistory.map((_, i) =>
+      `<button class="poem-version-tab${i === activePoemIndex ? ' active' : ''}" data-index="${i}">Version ${i + 1}</button>`
+    ).join('');
+    vt.querySelectorAll('.poem-version-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        showPoemVersion(parseInt(tab.dataset.index));
+      });
+    });
+  }
+
+  function showPoemVersion(index) {
+    if (index < 0 || index >= poemHistory.length) return;
+    activePoemIndex = index;
+    const rt = document.getElementById('poem-result-text');
+    if (rt) rt.textContent = poemHistory[index];
+    PreviewRenderer.setField('poemText', poemHistory[index]);
+    updateVersionTabs();
+    saveState();
+  }
 
   // ── Initialization ─────────────────────────────────────────
 
   async function init() {
     try {
-      const [tmplRes, poemsRes] = await Promise.all([
-        fetch(`/api/templates/${TEMPLATE_ID}`),
-        fetch('/api/poems')
-      ]);
+      const tmplRes = await fetch(`/api/templates/${TEMPLATE_ID}`);
 
       if (!tmplRes.ok) {
-        formPane.innerHTML = '<p style="padding:2rem;color:var(--color-error)">Could not load. <a href="/">Go back</a></p>';
+        formPane.innerHTML = '<p style="padding:2rem;color:var(--color-error)">Could not load template. <a href="/">Go back</a></p>';
         return;
       }
 
       template = await tmplRes.json();
+
+      // Fetch poems filtered by template category
+      const poemsRes = await fetch(`/api/poems?category=${template.category}`);
       poems = await poemsRes.json();
 
-      // Initialize preview renderer with both canvases
-      PreviewRenderer.init('photo-canvas', 'tribute-canvas', template);
+      // Dynamic page title
+      document.title = `Create ${template.name} \u2013 Still Beside Me`;
+
+      // Initialize preview renderer with container ID
+      PreviewRenderer.init('preview-panels', template);
+
+      // Wire up photo crop interaction for main photo panel
+      initPhotoCropInteraction('photo');
 
       // Build the guided form
       buildGuidedForm();
 
-      // Build layout & style selectors
-      buildLayoutSelector();
+      // Build layout & style selectors (dynamic)
+      rebuildLayoutSelector();
       buildStyleSelector();
+      buildPanelToggle();
 
       // Restore saved state
       restoreState();
+
+      // Attach divider handles after initial layout
+      requestAnimationFrame(() => {
+        attachDividerHandles();
+      });
+
+      // Reattach dividers on window resize (debounced)
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => attachDividerHandles(), 150);
+      });
 
     } catch (err) {
       console.error('Failed to load:', err);
@@ -61,53 +143,83 @@
   function buildGuidedForm() {
     formPane.innerHTML = '';
 
-    // Order type toggle (gift vs self)
-    const toggleWrap = document.createElement('div');
-    toggleWrap.innerHTML = `
-      <div class="form-intro">Who is this tribute for?<span>This helps us personalize the experience</span></div>
-      <div class="order-type-toggle" id="order-type-toggle">
-        <button class="order-type-option${orderType === 'self' ? ' active' : ''}" data-type="self">My pet</button>
-        <button class="order-type-option${orderType === 'gift' ? ' active' : ''}" data-type="gift">Someone else's pet</button>
-      </div>
-      <p class="order-type-hint" id="order-type-hint">${orderType === 'gift' ? 'You\'re creating a meaningful gift — we\'ll guide you through it.' : 'Each detail helps us write their tribute.'}</p>
-    `;
-    formPane.appendChild(toggleWrap);
+    // Order type toggle — only show when template defines giftLabels
+    if (template.giftLabels) {
+      const toggleWrap = document.createElement('div');
+      toggleWrap.innerHTML = `
+        <div class="form-intro">Who is this tribute for?<span>This helps us personalize the experience</span></div>
+        <div class="order-type-toggle" id="order-type-toggle">
+          <button class="order-type-option${orderType === 'self' ? ' active' : ''}" data-type="self">My pet</button>
+          <button class="order-type-option${orderType === 'gift' ? ' active' : ''}" data-type="gift">Someone else's pet</button>
+        </div>
+        <p class="order-type-hint" id="order-type-hint">${orderType === 'gift' ? 'You\'re creating a meaningful gift \u2013 we\'ll guide you through it.' : 'Each detail helps us write their tribute.'}</p>
+      `;
+      formPane.appendChild(toggleWrap);
 
-    // Wire toggle
-    toggleWrap.querySelectorAll('.order-type-option').forEach(btn => {
-      btn.addEventListener('click', () => {
-        orderType = btn.dataset.type;
-        toggleWrap.querySelectorAll('.order-type-option').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const hint = document.getElementById('order-type-hint');
-        if (hint) {
-          hint.textContent = orderType === 'gift'
-            ? 'You\'re creating a meaningful gift — we\'ll guide you through it.'
-            : 'Each detail helps us write their tribute.';
-        }
-        updateFormLabelsForOrderType();
-        saveState();
+      // Wire toggle
+      toggleWrap.querySelectorAll('.order-type-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+          orderType = btn.dataset.type;
+          toggleWrap.querySelectorAll('.order-type-option').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const hint = document.getElementById('order-type-hint');
+          if (hint) {
+            hint.textContent = orderType === 'gift'
+              ? 'You\'re creating a meaningful gift \u2013 we\'ll guide you through it.'
+              : 'Each detail helps us write their tribute.';
+          }
+          updateFormLabelsForOrderType();
+          saveState();
+        });
       });
-    });
+    } else {
+      // Human templates: simple intro, no toggle
+      const introWrap = document.createElement('div');
+      introWrap.innerHTML = `
+        <div class="form-intro">Tell us about them<span>Every detail helps us write something truly personal</span></div>
+      `;
+      formPane.appendChild(introWrap);
+    }
 
     // 1. Photo upload
     const photoSection = createSection('Share their photo');
     const slot = template.photoSlots[0];
     photoSection.appendChild(createUploadZone(slot));
+
+    // Second photo upload zone (hidden until third panel is added)
+    const slot2 = template.photoSlots.find(s => s.id === 'panel2');
+    if (slot2) {
+      const secondUpload = createUploadZone(slot2);
+      secondUpload.id = 'second-photo-section';
+      secondUpload.style.display = thirdPanelEnabled && thirdPanelType === 'photo' ? '' : 'none';
+      photoSection.appendChild(secondUpload);
+    }
+
     formPane.appendChild(photoSection);
 
-    // 2–11. Memory fields (everything except poem-selector)
+    // 2-N. Memory fields (everything except poem-selector)
     const memSection = createSection('Tell us about them');
+
+    // Gift-mode helper note (only for templates with giftLabels)
+    if (template.giftLabels) {
+      const giftNote = document.createElement('p');
+      giftNote.id = 'gift-detail-note';
+      giftNote.className = 'gift-detail-note';
+      giftNote.textContent = 'Share what you know. The more details, the more personal the ' + poemLabel().toLowerCase() + ' \u2013 but even just a name and photo make a beautiful tribute.';
+      giftNote.style.display = orderType === 'gift' ? '' : 'none';
+      memSection.appendChild(giftNote);
+    }
+
     for (const field of template.memoryFields) {
       if (field.type === 'poem-selector') continue;
       memSection.appendChild(createField(field));
     }
     formPane.appendChild(memSection);
 
-    // 12. Poem generation — the climax
+    // Poem/Letter generation section
     formPane.appendChild(createPoemSection());
 
-    // Size selector (revealed after poem)
+    // Size selector
     formPane.appendChild(createSizeSection());
 
     // Cart action
@@ -119,7 +231,7 @@
         Add to Cart
       </button>
       <p style="text-align:center;margin-top:0.5rem;font-size:0.85rem;color:var(--color-muted)">
-        Checkout coming soon — your tribute is saved in this session
+        Checkout coming soon \u2013 your tribute is saved in this session
       </p>
     `;
     formPane.appendChild(cartSection);
@@ -178,8 +290,12 @@
   }
 
   async function handleFileUpload(slotId, file, wrapper) {
+    // Map slot IDs to panel IDs
+    const panelId = slotId === 'main' ? 'photo' : slotId;
+
     const localUrl = URL.createObjectURL(file);
-    PreviewRenderer.setPhoto(localUrl, '50% 50%');
+    photoUploaded[panelId] = true;
+    PreviewRenderer.setPhoto(panelId, localUrl, '50% 50%');
 
     showUploadPreview(slotId, localUrl, wrapper, 'Uploading...');
 
@@ -195,7 +311,7 @@
       const data = await res.json();
 
       if (data.success) {
-        PreviewRenderer.setPhoto(data.thumbnailUrl, data.crop.position);
+        PreviewRenderer.setPhoto(panelId, data.thumbnailUrl, data.crop.position);
         showUploadPreview(slotId, data.thumbnailUrl, wrapper, null, data.quality);
         saveState();
       } else {
@@ -203,7 +319,7 @@
       }
     } catch (err) {
       console.error('Upload error:', err);
-      showUploadPreview(slotId, localUrl, wrapper, 'Upload failed — using local preview');
+      showUploadPreview(slotId, localUrl, wrapper, 'Upload failed \u2013 using local preview');
     }
   }
 
@@ -248,11 +364,20 @@
     const existingAssurance = wrapper.querySelector('.photo-assurance');
     if (existingAssurance) existingAssurance.remove();
 
+    // Show crop hint
+    const existingCropHint = wrapper.querySelector('.crop-hint');
+    if (!existingCropHint && (quality || statusMsg)) {
+      const cropHint = document.createElement('p');
+      cropHint.className = 'crop-hint';
+      cropHint.textContent = 'Drag the preview to reposition. Scroll to zoom.';
+      wrapper.appendChild(cropHint);
+    }
+
     if (quality) {
       if (quality.tier === 'low') {
         const msg = document.createElement('p');
         msg.className = 'quality-message';
-        msg.textContent = 'This photo is lower resolution, but don\'t worry — our team will upscale and enhance it for the best possible print.';
+        msg.textContent = 'This photo is lower resolution, but don\'t worry \u2013 our team will upscale and enhance it for the best possible print.';
         wrapper.appendChild(msg);
       } else if (quality.tier === 'usable') {
         const msg = document.createElement('p');
@@ -261,12 +386,392 @@
         wrapper.appendChild(msg);
       }
 
-      // Always show the professional review assurance
       const assurance = document.createElement('p');
       assurance.className = 'photo-assurance';
       assurance.innerHTML = '&#10003; Every photo is reviewed and enhanced by a professional photographer before printing';
       wrapper.appendChild(assurance);
     }
+  }
+
+  // ── Photo Crop Interaction (drag to pan, scroll to zoom) ────
+
+  function initPhotoCropInteraction(panelId) {
+    const canvas = PreviewRenderer.getPhotoCanvas(panelId);
+    if (!canvas) return;
+
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let startPanX = 0.5;
+    let startPanY = 0.5;
+
+    // Mouse drag
+    canvas.addEventListener('mousedown', (e) => {
+      if (!photoUploaded[panelId]) return;
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      const crop = PreviewRenderer.getPhotoCrop(panelId);
+      startPanX = crop.panX;
+      startPanY = crop.panY;
+      canvas.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      const rect = canvas.getBoundingClientRect();
+      const crop = PreviewRenderer.getPhotoCrop(panelId);
+      const sensitivity = 1.5 / crop.zoom;
+      const newPanX = startPanX - (dx / rect.width) * sensitivity;
+      const newPanY = startPanY - (dy / rect.height) * sensitivity;
+      PreviewRenderer.setPhotoCrop(panelId, crop.zoom, newPanX, newPanY);
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        canvas.style.cursor = 'grab';
+        saveState();
+      }
+    });
+
+    // Scroll to zoom
+    canvas.addEventListener('wheel', (e) => {
+      if (!photoUploaded[panelId]) return;
+      e.preventDefault();
+      const crop = PreviewRenderer.getPhotoCrop(panelId);
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      PreviewRenderer.setPhotoCrop(panelId, crop.zoom + delta, crop.panX, crop.panY);
+      saveState();
+    }, { passive: false });
+
+    // Touch drag
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchStartPanX = 0.5;
+    let touchStartPanY = 0.5;
+    let initialPinchDist = 0;
+    let pinchStartZoom = 1;
+
+    canvas.addEventListener('touchstart', (e) => {
+      if (!photoUploaded[panelId]) return;
+      if (e.touches.length === 1) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        const crop = PreviewRenderer.getPhotoCrop(panelId);
+        touchStartPanX = crop.panX;
+        touchStartPanY = crop.panY;
+      } else if (e.touches.length === 2) {
+        initialPinchDist = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY
+        );
+        pinchStartZoom = PreviewRenderer.getPhotoCrop(panelId).zoom;
+      }
+      e.preventDefault();
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (!photoUploaded[panelId]) return;
+      const crop = PreviewRenderer.getPhotoCrop(panelId);
+      if (e.touches.length === 1) {
+        const dx = e.touches[0].clientX - touchStartX;
+        const dy = e.touches[0].clientY - touchStartY;
+        const rect = canvas.getBoundingClientRect();
+        const sensitivity = 1.5 / crop.zoom;
+        PreviewRenderer.setPhotoCrop(
+          panelId,
+          crop.zoom,
+          touchStartPanX - (dx / rect.width) * sensitivity,
+          touchStartPanY - (dy / rect.height) * sensitivity
+        );
+      } else if (e.touches.length === 2) {
+        const dist = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY
+        );
+        const scale = dist / initialPinchDist;
+        PreviewRenderer.setPhotoCrop(panelId, pinchStartZoom * scale, crop.panX, crop.panY);
+      }
+      e.preventDefault();
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', () => {
+      saveState();
+    });
+
+    canvas.style.cursor = 'grab';
+  }
+
+  // ── Divider Handles ──────────────────────────────────────────
+
+  function attachDividerHandles() {
+    const ctr = PreviewRenderer.getContainer();
+    if (!ctr) return;
+
+    ctr.querySelectorAll('.divider-handle').forEach(h => h.remove());
+
+    const style = getComputedStyle(ctr);
+    const colTracks = style.gridTemplateColumns.split(/\s+/).map(parseFloat);
+    const rowTracks = style.gridTemplateRows.split(/\s+/).map(parseFloat);
+    const gap = parseFloat(style.gap) || 0;
+
+    if (colTracks.length > 1) {
+      let x = 0;
+      for (let i = 0; i < colTracks.length - 1; i++) {
+        x += colTracks[i];
+        createHandle(ctr, 'col', i, x + gap * i + gap / 2, colTracks, rowTracks, gap);
+      }
+    }
+
+    if (rowTracks.length > 1) {
+      let y = 0;
+      for (let i = 0; i < rowTracks.length - 1; i++) {
+        y += rowTracks[i];
+        createHandle(ctr, 'row', i, y + gap * i + gap / 2, colTracks, rowTracks, gap);
+      }
+    }
+  }
+
+  function createHandle(ctr, axis, index, pos, colTracks, rowTracks, gap) {
+    const handle = document.createElement('div');
+    handle.className = `divider-handle ${axis}`;
+
+    if (axis === 'col') {
+      handle.style.left = pos + 'px';
+    } else {
+      handle.style.top = pos + 'px';
+    }
+
+    ctr.appendChild(handle);
+
+    let startPos = 0;
+    let startFr = null;
+
+    function onStart(clientX, clientY) {
+      startPos = axis === 'col' ? clientX : clientY;
+      startFr = PreviewRenderer.getCurrentFrValues();
+      handle.classList.add('dragging');
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = axis === 'col' ? 'col-resize' : 'row-resize';
+    }
+
+    function onMove(clientX, clientY) {
+      if (!startFr) return;
+
+      const ctrRect = ctr.getBoundingClientRect();
+      const totalPx = axis === 'col' ? ctrRect.width : ctrRect.height;
+
+      const delta = (axis === 'col' ? clientX : clientY) - startPos;
+      const deltaPct = delta / totalPx;
+
+      const frArr = axis === 'col' ? [...startFr.columns] : [...startFr.rows];
+      const totalFr = frArr.reduce((a, b) => a + b, 0);
+      const deltaFr = deltaPct * totalFr;
+
+      let newA = frArr[index] + deltaFr;
+      let newB = frArr[index + 1] - deltaFr;
+
+      if (newA < MIN_FR) {
+        newB -= (MIN_FR - newA);
+        newA = MIN_FR;
+      }
+      if (newB < MIN_FR) {
+        newA -= (MIN_FR - newB);
+        newB = MIN_FR;
+      }
+
+      frArr[index] = Math.max(MIN_FR, newA);
+      frArr[index + 1] = Math.max(MIN_FR, newB);
+
+      if (axis === 'col') {
+        PreviewRenderer.setCustomRatios(currentLayout, frArr, startFr.rows);
+      } else {
+        PreviewRenderer.setCustomRatios(currentLayout, startFr.columns, frArr);
+      }
+    }
+
+    function onEnd() {
+      if (!startFr) return;
+      startFr = null;
+      handle.classList.remove('dragging');
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      saveState();
+      requestAnimationFrame(() => attachDividerHandles());
+    }
+
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      onStart(e.clientX, e.clientY);
+
+      const moveHandler = (e) => onMove(e.clientX, e.clientY);
+      const upHandler = () => {
+        onEnd();
+        window.removeEventListener('mousemove', moveHandler);
+        window.removeEventListener('mouseup', upHandler);
+      };
+      window.addEventListener('mousemove', moveHandler);
+      window.addEventListener('mouseup', upHandler);
+    });
+
+    handle.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      onStart(touch.clientX, touch.clientY);
+
+      const moveHandler = (e) => {
+        const t = e.touches[0];
+        onMove(t.clientX, t.clientY);
+      };
+      const endHandler = () => {
+        onEnd();
+        window.removeEventListener('touchmove', moveHandler);
+        window.removeEventListener('touchend', endHandler);
+      };
+      window.addEventListener('touchmove', moveHandler, { passive: false });
+      window.addEventListener('touchend', endHandler);
+    }, { passive: false });
+
+    handle.addEventListener('dblclick', () => {
+      PreviewRenderer.resetCustomRatios(currentLayout);
+      saveState();
+      requestAnimationFrame(() => attachDividerHandles());
+    });
+  }
+
+  // ── Third Panel Toggle ──────────────────────────────────────
+
+  function buildPanelToggle() {
+    const wrap = document.getElementById('panel-toggle-wrap');
+    if (!wrap) return;
+    updatePanelToggle(wrap);
+  }
+
+  function updatePanelToggle(wrap) {
+    if (!wrap) wrap = document.getElementById('panel-toggle-wrap');
+    if (!wrap) return;
+
+    if (thirdPanelEnabled) {
+      wrap.innerHTML = `<button class="add-panel-btn" id="remove-panel-btn"><span class="icon">&minus;</span> Remove second photo</button>`;
+      wrap.querySelector('#remove-panel-btn').addEventListener('click', () => {
+        removeThirdPanel();
+      });
+    } else {
+      wrap.innerHTML = `<button class="add-panel-btn" id="add-panel-btn"><span class="icon">+</span> Add second photo</button>`;
+      wrap.querySelector('#add-panel-btn').addEventListener('click', () => {
+        addThirdPanel();
+      });
+    }
+  }
+
+  function addThirdPanel() {
+    thirdPanelEnabled = true;
+    thirdPanelType = 'photo';
+
+    const layoutMap = {
+      'side-by-side': 'hero-left',
+      'stacked': 'hero-top'
+    };
+    const newLayout = layoutMap[currentLayout] || 'hero-left';
+    currentLayout = newLayout;
+
+    PreviewRenderer.setLayout(newLayout);
+    rebuildLayoutSelector();
+    updatePanelToggle();
+
+    const secondSection = document.getElementById('second-photo-section');
+    if (secondSection) secondSection.style.display = '';
+
+    requestAnimationFrame(() => {
+      initPhotoCropInteraction('panel2');
+      attachDividerHandles();
+    });
+
+    saveState();
+  }
+
+  function removeThirdPanel() {
+    thirdPanelEnabled = false;
+
+    const layoutMap = {
+      'hero-left': 'side-by-side',
+      'hero-top': 'stacked',
+      'photos-left': 'side-by-side',
+      'tribute-top': 'stacked'
+    };
+    const newLayout = layoutMap[currentLayout] || 'side-by-side';
+    currentLayout = newLayout;
+
+    PreviewRenderer.setLayout(newLayout);
+    rebuildLayoutSelector();
+    updatePanelToggle();
+
+    const secondSection = document.getElementById('second-photo-section');
+    if (secondSection) secondSection.style.display = 'none';
+
+    requestAnimationFrame(() => attachDividerHandles());
+    saveState();
+  }
+
+  // ── Layout Selector (Dynamic) ────────────────────────────────
+
+  function rebuildLayoutSelector() {
+    const container = document.getElementById('layout-selector');
+    if (!container) return;
+
+    const layouts = PreviewRenderer.getLayouts();
+    const panelCount = thirdPanelEnabled ? 3 : 2;
+
+    const available = Object.entries(layouts).filter(([, def]) => def.panels === panelCount);
+
+    container.innerHTML = available.map(([key, def]) => {
+      const isActive = key === currentLayout ? ' active' : '';
+      const icon = buildLayoutIcon(def);
+      return `<div>
+        <div class="layout-option layout-option-grid${isActive}" data-layout="${key}" style="${layoutIconGridStyle(def)}">
+          ${icon}
+        </div>
+        <div class="layout-label">${def.label || key}</div>
+      </div>`;
+    }).join('');
+
+    container.querySelectorAll('.layout-option').forEach(opt => {
+      opt.addEventListener('click', () => {
+        const layout = opt.dataset.layout;
+        currentLayout = layout;
+        PreviewRenderer.setLayout(layout);
+
+        container.querySelectorAll('.layout-option').forEach(o => o.classList.remove('active'));
+        opt.classList.add('active');
+
+        requestAnimationFrame(() => attachDividerHandles());
+        saveState();
+      });
+    });
+  }
+
+  function layoutIconGridStyle(def) {
+    const cols = def.columns.map(v => v + 'fr').join(' ');
+    const rows = def.rows.map(v => v + 'fr').join(' ');
+    const areas = def.areas.map(r => '"' + r.join(' ') + '"').join(' ');
+    return `grid-template-columns:${cols};grid-template-rows:${rows};grid-template-areas:${areas};`;
+  }
+
+  function buildLayoutIcon(def) {
+    const names = new Set();
+    for (const row of def.areas) {
+      for (const name of row) names.add(name);
+    }
+    return Array.from(names).map(name => {
+      const typeClass = name === 'photo' ? 'layout-icon-photo'
+        : name === 'tribute' ? 'layout-icon-tribute'
+        : 'layout-icon-panel2';
+      return `<div class="layout-icon-block ${typeClass}" style="grid-area:${name}"></div>`;
+    }).join('');
   }
 
   // ── Form Fields ────────────────────────────────────────────
@@ -324,23 +829,28 @@
     return group;
   }
 
-  // ── Poem Section — The Climax ────────────────────────────────
+  // ── Poem Section ────────────────────────────────────────────
 
   function createPoemSection() {
     const section = document.createElement('div');
     section.className = 'form-section poem-climax';
     section.id = 'poem-section';
 
+    const sectionTitle = (template.formLabels && template.formLabels.poemSectionTitle) || 'Now let\'s write their tribute poem';
+    const libraryLink = (template.formLabels && template.formLabels.poemLibraryLink) || 'Or choose from our poem library instead';
+    const label = poemLabel();
+
     section.innerHTML = `
-      <h2 class="form-section-title">Now let's write their tribute poem</h2>
+      <h2 class="form-section-title">${sectionTitle}</h2>
       <button class="poem-generate-btn" id="generate-poem-btn">
-        Create Their Poem
+        Create Their ${label}
       </button>
       <div id="poem-result" class="poem-result" style="display:none">
+        <div class="poem-version-tabs" id="poem-version-tabs" style="display:none"></div>
         <div class="poem-result-text" id="poem-result-text"></div>
         <div class="poem-actions">
           <button class="poem-regenerate-btn" id="poem-regenerate-btn">Try another version</button>
-          <button class="poem-edit-btn" id="poem-edit-btn">Edit poem</button>
+          <button class="poem-edit-btn" id="poem-edit-btn">Edit ${label.toLowerCase()}</button>
         </div>
         <div class="regen-count" id="regen-count"></div>
       </div>
@@ -352,19 +862,17 @@
         </div>
       </div>
       <div style="margin-top:var(--space-lg);text-align:center">
-        <button class="poem-library-link" id="poem-library-toggle">Or choose from our poem library instead</button>
+        <button class="poem-library-link" id="poem-library-toggle">${libraryLink}</button>
       </div>
       <div id="poem-library-area" style="display:none" class="poem-library-panel">
         <select id="poem-library-select">
-          <option value="">Choose a poem...</option>
+          <option value="">Choose a ${label.toLowerCase()}...</option>
         </select>
-        <div class="poem-library-preview" id="poem-library-preview">Select a poem to see a preview</div>
+        <div class="poem-library-preview" id="poem-library-preview">Select a ${label.toLowerCase()} to see a preview</div>
       </div>
     `;
 
-    // Wire up events after inserting
     setTimeout(() => wireUpPoemSection(), 0);
-
     return section;
   }
 
@@ -384,35 +892,35 @@
     const librarySelect = document.getElementById('poem-library-select');
     const libraryPreview = document.getElementById('poem-library-preview');
 
-    // Update generate button with pet name
+    const label = poemLabel();
+    const nfId = nameFieldId();
+
     function updateGenerateButtonLabel() {
       const fields = PreviewRenderer.getFields();
-      const name = fields.petName;
+      const name = fields[nfId];
       generateBtn.textContent = name
-        ? `Create ${name}'s Poem`
-        : 'Create Their Poem';
+        ? `Create ${name}'s ${label}`
+        : `Create Their ${label}`;
     }
 
-    // Observe name field changes
-    const nameInput = document.getElementById('field-petName');
+    const nameInput = document.getElementById(`field-${nfId}`);
     if (nameInput) {
       nameInput.addEventListener('input', updateGenerateButtonLabel);
     }
 
-    // Loading indicator element (created on demand)
     let loadingEl = null;
 
-    function showPoemLoading(petName) {
+    function showPoemLoading(name) {
       if (!loadingEl) {
         loadingEl = document.createElement('div');
         loadingEl.className = 'poem-generating';
         loadingEl.innerHTML = `
-          <div class="poem-generating-text">Writing ${petName ? petName + "'s" : 'their'} poem...</div>
+          <div class="poem-generating-text">Writing ${name ? name + "'s" : 'their'} ${label.toLowerCase()}...</div>
           <div class="poem-generating-dots"><span></span><span></span><span></span></div>
         `;
       } else {
         loadingEl.querySelector('.poem-generating-text').textContent =
-          `Writing ${petName ? petName + "'s" : 'their'} poem...`;
+          `Writing ${name ? name + "'s" : 'their'} ${label.toLowerCase()}...`;
       }
       generateBtn.style.display = 'none';
       resultDiv.style.display = 'none';
@@ -428,46 +936,57 @@
       }
     }
 
-    /**
-     * Animate poem text line by line into the result element.
-     * Each line fades in with a stagger delay — "let the moment land."
-     */
     function revealPoem(poemText) {
       resultText.innerHTML = '';
       const lines = poemText.split('\n');
-      const LINE_DELAY = 250; // ms between each line
+      const LINE_DELAY = 250;
 
       lines.forEach((line, i) => {
         const span = document.createElement('span');
         span.className = 'poem-line';
-        span.textContent = line || '\u00A0'; // non-breaking space for blank lines
+        span.textContent = line || '\u00A0';
         span.style.animationDelay = `${i * LINE_DELAY}ms`;
         resultText.appendChild(span);
       });
 
-      // Update preview immediately (the canvas doesn't need animation)
       PreviewRenderer.setField('poemText', poemText);
     }
 
-    // Build the body for poem generation requests
+    /**
+     * Build the request body for poem generation.
+     * Iterates template.memoryFields where feedsPoem: true,
+     * plus adds category and templateId for server-side dispatch.
+     */
     function buildPoemBody() {
       const fields = PreviewRenderer.getFields();
-      return {
-        petName: fields.petName || '',
-        petType: fields.petType || '',
-        breed: fields.breed || '',
-        nicknames: fields.petNicknames || '',
-        personality: fields.personality || '',
-        favoriteMemory: fields.favoriteMemory || '',
-        favoriteThing: fields.favoriteThing || ''
+      const body = {
+        category: template.category,
+        templateId: template.id
       };
+
+      // Always include the name field
+      body[nfId] = fields[nfId] || '';
+
+      // Gather all feedsPoem fields
+      for (const mf of template.memoryFields) {
+        if (mf.feedsPoem) {
+          body[mf.id] = fields[mf.id] || '';
+        }
+      }
+
+      // Backward compat: pet templates send legacy field names the generator expects
+      if (template.category === 'pet') {
+        body.petName = fields.petName || '';
+        body.nicknames = fields.petNicknames || '';
+      }
+
+      return body;
     }
 
-    // Generate poem
     async function generatePoem() {
       const fields = PreviewRenderer.getFields();
       generateBtn.disabled = true;
-      showPoemLoading(fields.petName);
+      showPoemLoading(fields[nfId]);
 
       try {
         const res = await fetch('/api/poems/generate', {
@@ -489,17 +1008,20 @@
 
         hidePoemLoading();
         revealPoem(data.poem);
+        poemHistory.push(data.poem);
+        activePoemIndex = poemHistory.length - 1;
         resultDiv.style.display = '';
         editArea.style.display = 'none';
         libraryArea.style.display = 'none';
 
         regenerationCount++;
         updateRegenCount();
+        updateVersionTabs();
         saveState();
 
         generateBtn.style.display = 'none';
       } catch (err) {
-        console.error('Poem generation failed:', err);
+        console.error('Generation failed:', err);
         hidePoemLoading();
         updateGenerateButtonLabel();
         generateBtn.style.display = '';
@@ -510,7 +1032,6 @@
 
     generateBtn.addEventListener('click', generatePoem);
 
-    // Regenerate
     regenBtn.addEventListener('click', async () => {
       if (regenerationCount >= MAX_REGENERATIONS) return;
       regenBtn.disabled = true;
@@ -533,8 +1054,11 @@
         }
 
         revealPoem(data.poem);
+        poemHistory.push(data.poem);
+        activePoemIndex = poemHistory.length - 1;
         regenerationCount++;
         updateRegenCount();
+        updateVersionTabs();
         saveState();
       } catch (err) {
         console.error('Regeneration failed:', err);
@@ -547,14 +1071,13 @@
     function updateRegenCount() {
       const remaining = MAX_REGENERATIONS - regenerationCount;
       if (remaining <= 0) {
-        regenCount.textContent = 'No more regenerations — you can still edit the poem';
+        regenCount.textContent = `No more regenerations \u2013 you can still edit the ${label.toLowerCase()}`;
         regenBtn.disabled = true;
       } else {
         regenCount.textContent = `${remaining} regeneration${remaining === 1 ? '' : 's'} remaining`;
       }
     }
 
-    // Edit poem
     editBtn.addEventListener('click', () => {
       editTextarea.value = resultText.textContent;
       resultDiv.style.display = 'none';
@@ -566,6 +1089,9 @@
       if (edited) {
         resultText.textContent = edited;
         PreviewRenderer.setField('poemText', edited);
+        if (activePoemIndex >= 0 && activePoemIndex < poemHistory.length) {
+          poemHistory[activePoemIndex] = edited;
+        }
         saveState();
       }
       editArea.style.display = 'none';
@@ -577,17 +1103,15 @@
       resultDiv.style.display = '';
     });
 
-    // Library toggle
     libraryToggle.addEventListener('click', () => {
       const showing = libraryArea.style.display !== 'none';
       libraryArea.style.display = showing ? 'none' : '';
 
       if (!showing && librarySelect.options.length <= 1) {
-        // Populate library
         for (const p of poems) {
           const opt = document.createElement('option');
           opt.value = p.id;
-          opt.textContent = `${p.title}${p.author ? ` — ${p.author}` : ''}`;
+          opt.textContent = `${p.title}${p.author ? ` \u2013 ${p.author}` : ''}`;
           librarySelect.appendChild(opt);
         }
       }
@@ -595,7 +1119,7 @@
 
     librarySelect.addEventListener('change', async () => {
       if (!librarySelect.value) {
-        libraryPreview.textContent = 'Select a poem to see a preview';
+        libraryPreview.textContent = `Select a ${label.toLowerCase()} to see a preview`;
         return;
       }
 
@@ -604,7 +1128,6 @@
         const poem = await res.json();
         libraryPreview.textContent = poem.text;
 
-        // Apply to preview
         resultText.textContent = poem.text;
         resultDiv.style.display = '';
         editArea.style.display = 'none';
@@ -613,7 +1136,7 @@
         PreviewRenderer.setField('poemText', poem.text);
         saveState();
       } catch (err) {
-        libraryPreview.textContent = 'Failed to load poem';
+        libraryPreview.textContent = `Failed to load ${label.toLowerCase()}`;
       }
     });
   }
@@ -655,67 +1178,40 @@
   // ── Order Type Label Updates ─────────────────────────────────
 
   function updateFormLabelsForOrderType() {
-    // Adjust key labels based on gift vs self
-    const labelMap = {
-      'gift': {
-        'petName': 'What was their pet\'s name?',
-        'petNicknames': 'Any nicknames you know?',
-        'petType': 'What kind of pet?',
-        'personality': 'What made this pet special?',
-        'favoriteMemory': 'A memory you\'ve heard about',
-        'favoriteThing': 'A favorite toy or treat you know of?',
-        'familyName': 'Who is this gift for?'
-      },
-      'self': {
-        'petName': 'What did you call them?',
-        'petNicknames': 'Any nicknames?',
-        'petType': 'What kind of companion?',
-        'personality': 'What made them special?',
-        'favoriteMemory': 'A favorite memory',
-        'favoriteThing': 'Their favorite toy or treat?',
-        'familyName': 'Who will miss them most?'
-      }
-    };
+    // Read label maps from template.giftLabels (only pet templates have this)
+    if (!template.giftLabels) return;
 
-    const labels = labelMap[orderType] || labelMap['self'];
+    const labels = template.giftLabels[orderType] || template.giftLabels['self'];
+    if (!labels) return;
+
     for (const [fieldId, labelText] of Object.entries(labels)) {
       const labelEl = document.querySelector(`label[for="field-${fieldId}"]`);
       if (labelEl) {
-        // Preserve the optional tag if it exists
         const optTag = labelEl.querySelector('span');
         labelEl.textContent = labelText;
         if (optTag) labelEl.appendChild(optTag);
       }
     }
 
-    // Update sublabels for gift mode
+    const giftNote = document.getElementById('gift-detail-note');
+    if (giftNote) giftNote.style.display = orderType === 'gift' ? '' : 'none';
+
+    const personalitySub = document.querySelector('#field-personality')?.parentElement?.querySelector('.sublabel');
+    const memorySub = document.querySelector('#field-favoriteMemory')?.parentElement?.querySelector('.sublabel');
+    const familySub = document.querySelector('#field-familyName')?.parentElement?.querySelector('.sublabel');
+    const thingSub = document.querySelector('#field-favoriteThing')?.parentElement?.querySelector('.sublabel');
+
     if (orderType === 'gift') {
-      const personalitySub = document.querySelector('#field-personality')?.parentElement?.querySelector('.sublabel');
-      if (personalitySub) personalitySub.textContent = 'Anything you know about what made them unique';
-      const memorySub = document.querySelector('#field-favoriteMemory')?.parentElement?.querySelector('.sublabel');
-      if (memorySub) memorySub.textContent = 'Something the family shared with you, or your own memory of the pet';
-      const familySub = document.querySelector('#field-familyName')?.parentElement?.querySelector('.sublabel');
-      if (familySub) familySub.textContent = 'Their name or family name — this appears on the tribute';
+      if (personalitySub) personalitySub.textContent = 'Anything you know about them, or skip this';
+      if (memorySub) memorySub.textContent = 'A story you\'ve heard, or skip this';
+      if (familySub) familySub.textContent = 'Their name or family name \u2013 this appears on the tribute';
+      if (thingSub) thingSub.textContent = 'If you know it, great. If not, no worries';
+    } else {
+      if (personalitySub) personalitySub.textContent = 'The thing that made them uniquely yours';
+      if (memorySub) memorySub.textContent = 'The one that makes you smile through tears';
+      if (familySub) familySub.textContent = 'Your family name or your name';
+      if (thingSub) thingSub.textContent = 'The thing they couldn\'t live without';
     }
-  }
-
-  // ── Layout Selector ──────────────────────────────────────────
-
-  function buildLayoutSelector() {
-    const container = document.getElementById('layout-selector');
-    if (!container) return;
-
-    container.querySelectorAll('.layout-option').forEach(opt => {
-      opt.addEventListener('click', () => {
-        const layout = opt.dataset.layout;
-        currentLayout = layout;
-        PreviewRenderer.setLayout(layout);
-
-        container.querySelectorAll('.layout-option').forEach(o => o.classList.remove('active'));
-        opt.classList.add('active');
-        saveState();
-      });
-    });
   }
 
   // ── Style Variant Selector ───────────────────────────────────
@@ -750,13 +1246,11 @@
   function setStyle(styleKey) {
     currentStyle = styleKey;
 
-    // Update CSS frame theme
     const frameEl = document.getElementById('frame-preview');
     if (frameEl) {
       frameEl.className = 'frame-preview theme-' + styleKey;
     }
 
-    // Update preview renderer colors
     if (template.styleVariants[styleKey]) {
       PreviewRenderer.setStyle(template.styleVariants[styleKey]);
     }
@@ -774,6 +1268,13 @@
         style: currentStyle,
         layout: currentLayout,
         orderType,
+        poemHistory,
+        activePoemIndex,
+        photoCrop: PreviewRenderer.getPhotoCrop('photo'),
+        panel2Crop: PreviewRenderer.getPhotoCrop('panel2'),
+        thirdPanelEnabled,
+        thirdPanelType,
+        customRatios: PreviewRenderer.getCustomRatios(),
         selectedProduct: document.querySelector('.product-option.selected .product-option-label')?.textContent,
         regenerationCount,
         timestamp: Date.now()
@@ -795,7 +1296,7 @@
       // Restore fields
       if (state.fields) {
         for (const [fieldId, value] of Object.entries(state.fields)) {
-          if (fieldId === 'poemText') continue; // handle separately
+          if (fieldId === 'poemText') continue;
           const input = document.getElementById(`field-${fieldId}`);
           if (input && value) {
             input.value = value;
@@ -818,6 +1319,58 @@
             generateBtn.style.display = 'none';
           }
         }
+
+        // Restore poem history
+        if (state.poemHistory && state.poemHistory.length > 0) {
+          poemHistory = state.poemHistory;
+          activePoemIndex = typeof state.activePoemIndex === 'number' && state.activePoemIndex >= 0
+            ? state.activePoemIndex
+            : poemHistory.length - 1;
+          setTimeout(() => updateVersionTabs(), 50);
+        }
+      }
+
+      // Restore custom ratios
+      if (state.customRatios) {
+        for (const [key, ratios] of Object.entries(state.customRatios)) {
+          PreviewRenderer.setCustomRatios(key, ratios.columns, ratios.rows);
+        }
+      }
+
+      // Restore third panel state
+      if (state.thirdPanelEnabled) {
+        thirdPanelEnabled = true;
+        thirdPanelType = state.thirdPanelType || 'photo';
+      }
+
+      // Restore layout
+      if (state.layout) {
+        currentLayout = state.layout;
+        PreviewRenderer.setLayout(state.layout);
+        rebuildLayoutSelector();
+
+        if (thirdPanelEnabled) {
+          const secondSection = document.getElementById('second-photo-section');
+          if (secondSection && thirdPanelType === 'photo') secondSection.style.display = '';
+          updatePanelToggle();
+          requestAnimationFrame(() => initPhotoCropInteraction('panel2'));
+        }
+      }
+
+      // Restore photo crops
+      if (state.photoCrop) {
+        PreviewRenderer.setPhotoCrop('photo',
+          state.photoCrop.zoom || 1,
+          state.photoCrop.panX || 0.5,
+          state.photoCrop.panY || 0.5
+        );
+      }
+      if (state.panel2Crop) {
+        PreviewRenderer.setPhotoCrop('panel2',
+          state.panel2Crop.zoom || 1,
+          state.panel2Crop.panX || 0.5,
+          state.panel2Crop.panY || 0.5
+        );
       }
 
       // Restore style
@@ -829,25 +1382,15 @@
         });
       }
 
-      // Restore layout
-      if (state.layout && state.layout !== currentLayout) {
-        currentLayout = state.layout;
-        PreviewRenderer.setLayout(state.layout);
-        const layoutOpts = document.querySelectorAll('.layout-option');
-        layoutOpts.forEach(o => {
-          o.classList.toggle('active', o.dataset.layout === state.layout);
-        });
-      }
-
-      // Restore order type
-      if (state.orderType && state.orderType !== orderType) {
+      // Restore order type (only relevant for templates with giftLabels)
+      if (template.giftLabels && state.orderType && state.orderType !== orderType) {
         orderType = state.orderType;
         const toggleBtns = document.querySelectorAll('.order-type-option');
         toggleBtns.forEach(b => b.classList.toggle('active', b.dataset.type === orderType));
         const hint = document.getElementById('order-type-hint');
         if (hint) {
           hint.textContent = orderType === 'gift'
-            ? 'You\'re creating a meaningful gift — we\'ll guide you through it.'
+            ? 'You\'re creating a meaningful gift \u2013 we\'ll guide you through it.'
             : 'Each detail helps us write their tribute.';
         }
         updateFormLabelsForOrderType();
@@ -868,6 +1411,9 @@
           }
         });
       }
+
+      // Re-attach divider handles after restore
+      requestAnimationFrame(() => attachDividerHandles());
     } catch (e) {
       // Ignore restore errors
     }
