@@ -171,7 +171,8 @@
 
   "printProducts": [
     { "sku": "framed-8x10", "label": "Framed 8×10\"", "price": 7995 },
-    { "sku": "framed-12x16", "label": "Framed 12×16\"", "price": 10995, "default": true, "badge": "Most Popular" },
-    { "sku": "framed-16x20", "label": "Framed 16×20\"", "price": 12995 }
+    { "sku": "framed-11x14", "label": "Framed 11×14\"", "price": 10995, "default": true, "badge": "Most Popular" },
+    { "sku": "framed-16x20", "label": "Framed 16×20\"", "price": 12995 },
+    { "sku": "framed-20x24", "label": "Framed 20×24\"", "price": 15995 }
   ]
 }
