@@ -124,16 +124,62 @@ async function submitOrder(confirmationId) {
 
 /**
  * Register a webhook callback URL with WHCC.
+ * WHCC expects form-data (not JSON) for this endpoint.
  */
 async function registerWebhook(callbackUri) {
-  return apiRequest('POST', '/api/callback/create', { callbackUri });
+  const token = await getAccessToken();
+  const url = `${API_URL()}/api/callback/create`;
+
+  const form = new URLSearchParams();
+  form.append('callbackUri', callbackUri);
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: form
+  });
+
+  const text = await res.text();
+  let parsed;
+  try { parsed = JSON.parse(text); } catch { parsed = text; }
+
+  if (!res.ok || (parsed && parsed.ErrorNumber)) {
+    const err = new Error(`WHCC webhook register failed (${res.status}): ${parsed?.Message || text}`);
+    err.status = res.status;
+    err.body = parsed;
+    throw err;
+  }
+  return parsed;
 }
 
 /**
  * Verify a webhook registration with the code WHCC sends.
+ * WHCC expects form-data (not JSON) for this endpoint.
  */
 async function verifyWebhook(verifier) {
-  return apiRequest('POST', '/api/callback/verify', { verifier });
+  const token = await getAccessToken();
+  const url = `${API_URL()}/api/callback/verify`;
+
+  const form = new URLSearchParams();
+  form.append('verifier', verifier);
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: form
+  });
+
+  const text = await res.text();
+  let parsed;
+  try { parsed = JSON.parse(text); } catch { parsed = text; }
+
+  if (!res.ok || (parsed && parsed.ErrorNumber)) {
+    const err = new Error(`WHCC webhook verify failed (${res.status}): ${parsed?.Message || text}`);
+    err.status = res.status;
+    err.body = parsed;
+    throw err;
+  }
+  return parsed;
 }
 
 /**

@@ -1,7 +1,9 @@
 /**
  * WHCC Webhook Receiver
  * Handles order status updates: Processed (Accepted/Rejected) and Shipped.
- * Uses HMAC-SHA256 signature verification.
+ * Uses HMAC-SHA256 signature verification per WHCC docs:
+ *   WHCC-Signature: t=<timestamp>,v1=<hex-hmac>
+ *   Signed payload: "<timestamp>.<rawBody>"
  */
 
 const express = require('express');
@@ -9,30 +11,75 @@ const crypto = require('crypto');
 const router = express.Router();
 
 /**
- * Verify WHCC webhook signature using HMAC-SHA256.
- * WHCC sends the signature in the WHCC-Signature header.
+ * Parse WHCC-Signature header: "t=1591735205,v1=307D88AF..."
+ * Returns { timestamp, signature } or null.
  */
-function verifySignature(rawBody, signature) {
+function parseSignatureHeader(header) {
+  if (!header) return null;
+  const parts = {};
+  for (const pair of header.split(',')) {
+    const [key, ...rest] = pair.split('=');
+    parts[key.trim()] = rest.join('=').trim();
+  }
+  return (parts.t && parts.v1)
+    ? { timestamp: parts.t, signature: parts.v1 }
+    : null;
+}
+
+/**
+ * Verify WHCC webhook signature using HMAC-SHA256.
+ * WHCC signs: "<timestamp>.<rawBody>" with consumer secret.
+ */
+function verifySignature(rawBody, signatureHeader) {
   const secret = process.env.WHCC_CONSUMER_SECRET;
   if (!secret) {
     console.warn('WHCC webhook: no consumer secret configured, skipping verification');
     return true;
   }
-  if (!signature) return false;
 
+  const parsed = parseSignatureHeader(signatureHeader);
+  if (!parsed) return false;
+
+  const payload = `${parsed.timestamp}.${rawBody}`;
   const expected = crypto
     .createHmac('sha256', secret)
-    .update(rawBody)
-    .digest('hex');
+    .update(payload)
+    .digest('hex')
+    .toUpperCase();
 
   try {
     return crypto.timingSafeEqual(
-      Buffer.from(signature, 'hex'),
+      Buffer.from(parsed.signature.toUpperCase(), 'hex'),
       Buffer.from(expected, 'hex')
     );
   } catch {
     return false;
   }
+}
+
+/**
+ * Parse the raw body into an event object.
+ * WHCC may send JSON or form-encoded data (docs are ambiguous).
+ */
+function parseBody(rawBody) {
+  const str = rawBody.toString();
+
+  // Try JSON first
+  try {
+    return JSON.parse(str);
+  } catch { /* not JSON */ }
+
+  // Try URL-encoded form data (verifier=abc-123&other=value)
+  try {
+    const params = new URLSearchParams(str);
+    const obj = {};
+    for (const [key, value] of params) {
+      obj[key] = value;
+    }
+    if (Object.keys(obj).length > 0) return obj;
+  } catch { /* not form-encoded */ }
+
+  return null;
 }
 
 /**
@@ -45,12 +92,10 @@ router.post('/callback', (req, res) => {
   const db = req.app.locals.db;
   const rawBody = req.body;
 
-  let event;
-  try {
-    event = JSON.parse(rawBody.toString());
-  } catch (err) {
-    console.error('WHCC webhook: invalid JSON', err);
-    return res.status(400).json({ error: 'Invalid JSON' });
+  const event = parseBody(rawBody);
+  if (!event) {
+    console.error('WHCC webhook: could not parse body:', rawBody?.toString()?.substring(0, 200));
+    return res.status(400).json({ error: 'Could not parse body' });
   }
 
   console.log('WHCC webhook received:', JSON.stringify(event, null, 2));
@@ -58,19 +103,21 @@ router.post('/callback', (req, res) => {
   // Handle verification request from WHCC (sent during webhook registration)
   if (event.verifier) {
     console.log('WHCC webhook VERIFICATION CODE:', event.verifier);
-    return res.json({ received: true, verifier: event.verifier });
+    // Return 200 OK — WHCC just needs a successful response
+    return res.status(200).send('OK');
   }
 
   // Verify HMAC signature on real events
-  const signature = req.headers['whcc-signature'];
-  if (!verifySignature(rawBody, signature)) {
+  const signatureHeader = req.headers['whcc-signature'];
+  if (!verifySignature(rawBody, signatureHeader)) {
     console.error('WHCC webhook: invalid signature');
     return res.status(401).json({ error: 'Invalid signature' });
   }
 
   try {
-    const confirmationId = event.ConfirmationID || event.ConfirmationId || event.confirmationId;
-    const eventType = event.EventType || event.eventType || event.Type || event.type;
+    // WHCC docs use "ConfirmationId" (lowercase d) and "Event" (not "EventType")
+    const confirmationId = event.ConfirmationId || event.ConfirmationID || event.confirmationId;
+    const eventType = event.Event || event.event || event.EventType || event.eventType;
 
     if (!confirmationId) {
       console.warn('WHCC webhook: no ConfirmationId in payload');
@@ -94,7 +141,6 @@ router.post('/callback', (req, res) => {
       const status = event.Status || event.status;
 
       if (status === 'Accepted' || status === 'accepted') {
-        // Order accepted by WHCC for production
         db.run(
           `UPDATE whcc_orders SET status = 'accepted', updated_at = datetime('now')
            WHERE confirmation_id = ?`,
@@ -106,8 +152,8 @@ router.post('/callback', (req, res) => {
           [orderId]
         );
       } else if (status === 'Rejected' || status === 'rejected') {
-        // Order rejected — needs investigation
-        const reason = event.Reason || event.reason || 'Unknown reason';
+        const reason = (event.Errors || []).map(e => e.Error || e.error).join('; ')
+          || event.Reason || event.reason || 'Unknown reason';
         db.run(
           `UPDATE whcc_orders SET status = 'rejected', error_message = ?,
            updated_at = datetime('now') WHERE confirmation_id = ?`,
@@ -125,10 +171,11 @@ router.post('/callback', (req, res) => {
         [orderId, `whcc_${(status || 'unknown').toLowerCase()}`, JSON.stringify(event)]
       );
     } else if (eventType === 'Shipped' || eventType === 'shipped') {
-      // Order shipped — extract tracking info
-      const trackingNumber = event.TrackingNumber || event.trackingNumber || '';
-      const carrier = event.Carrier || event.carrier || '';
-      const trackingUrl = event.TrackingUrl || event.trackingUrl || '';
+      // Extract tracking from ShippingInfo array (per WHCC docs)
+      const shipInfo = (event.ShippingInfo || [])[0] || {};
+      const trackingNumber = shipInfo.TrackingNumber || event.TrackingNumber || '';
+      const carrier = shipInfo.Carrier || event.Carrier || '';
+      const trackingUrl = shipInfo.TrackingUrl || event.TrackingUrl || '';
 
       db.run(
         `UPDATE whcc_orders SET status = 'shipped', tracking_number = ?,
@@ -148,7 +195,6 @@ router.post('/callback', (req, res) => {
         [orderId, 'whcc_shipped', JSON.stringify(event)]
       );
     } else {
-      // Unknown event type — log it anyway
       db.run(
         `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
         [orderId, `whcc_webhook_${eventType || 'unknown'}`, JSON.stringify(event)]
