@@ -96,7 +96,7 @@ async function start() {
   app.use('/api/templates', require('./src/routes/templates'));
 
   // WHCC Print Lab integration
-  app.use('/api/whcc-webhooks', express.raw({ type: 'application/json' }));
+  app.use('/api/whcc-webhooks', express.raw({ type: '*/*' }));
   app.use('/api/whcc', require('./src/routes/whcc'));
   app.use('/api/whcc-editor', require('./src/routes/whccEditor'));
   app.use('/api/whcc-webhooks', require('./src/routes/whccWebhooks'));
