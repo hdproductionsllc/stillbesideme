@@ -52,7 +52,13 @@
       "WebFetch(domain:developer.whcc.com)",
       "WebFetch(domain:www.printful.com)",
       "WebFetch(domain:www.prodigi.com)",
-      "WebFetch(domain:www.whcc.com)"
+      "WebFetch(domain:www.whcc.com)",
+      "WebFetch(domain:bayphoto.com)",
+      "WebFetch(domain:www.millerslab.com)",
+      "WebFetch(domain:www.framedestination.com)",
+      "WebFetch(domain:www.levelframes.com)",
+      "WebFetch(domain:www.mpix.com)",
+      "WebFetch(domain:thestackhouse.com)"
     ]
   }
 }

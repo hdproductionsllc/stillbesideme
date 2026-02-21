@@ -110,11 +110,26 @@
 - [ ] Stripe integration (requires keys)
 - [ ] Order creation in database
 
+### WHCC Print Lab Integration (standalone API clients)
+- [x] Database migration: whcc_catalog, whcc_product_map, whcc_orders tables
+- [x] Catalog service: 24hr cache, SKU mapping CRUD, auto-detect product matches
+- [x] Order Submit API client: auth, catalog, import/submit, webhook registration
+- [x] Editor API client: JWT auth, products, designs, editor sessions, orders
+- [x] Webhook handler: HMAC-SHA256 verification, Processed/Shipped events
+- [x] Admin routes: health, catalog search, product mapping, test orders
+- [x] Editor routes: health, products, designs, sessions, export, orders
+- [x] Routes mounted in server.js with raw body middleware for webhooks
+- [ ] Get valid WHCC API credentials (current sandbox creds return 403)
+- [ ] Fetch catalog and set up product mappings (framed-8x10, 11x14, 16x20, 20x24)
+- [ ] Test sandbox order end-to-end
+- [ ] Register webhook with public Railway URL
+- [ ] Wire placeOrder() into checkout flow after payment
+
 ### Proof & Fulfillment
 - [ ] Server-side proof renderer
 - [ ] Proof approval page
 - [ ] Print-ready file generator (with bleed)
-- [ ] Printful API integration
+- [ ] WHCC order submission after proof approval
 
 ### Content & Polish
 - [ ] Add curated human-specific poems to poems.js (Letter From Heaven, I'm Free, Miss Me But Let Me Go)
