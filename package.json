@@ -19,6 +19,9 @@
     "sql.js": "^1.11.0",
     "uuid": "^10.0.0"
   },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "author": "HD Productions LLC",
   "license": "UNLICENSED",
   "private": true
