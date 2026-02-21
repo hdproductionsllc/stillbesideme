@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Confirmed | Still Beside Me</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/store.css">
+  <style>
+    .confirmation {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: var(--space-2xl) var(--space-md);
+      text-align: center;
+    }
+    .confirmation-icon {
+      font-size: 3rem;
+      margin-bottom: var(--space-md);
+    }
+    .confirmation h1 {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 400;
+      margin-bottom: var(--space-sm);
+    }
+    .confirmation .subtitle {
+      color: var(--color-muted);
+      font-size: 1.1rem;
+      margin-bottom: var(--space-xl);
+    }
+    .order-details {
+      background: var(--color-surface, #f9f6f2);
+      border-radius: 12px;
+      padding: var(--space-lg);
+      text-align: left;
+      margin-bottom: var(--space-xl);
+    }
+    .order-details h2 {
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-weight: 400;
+      margin-bottom: var(--space-md);
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-label { color: var(--color-muted); }
+    .detail-value { font-weight: 600; }
+    .next-steps {
+      text-align: left;
+      margin-bottom: var(--space-xl);
+    }
+    .next-steps h2 {
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-weight: 400;
+      margin-bottom: var(--space-md);
+    }
+    .next-steps ol {
+      padding-left: 1.5rem;
+      line-height: 1.8;
+    }
+    .next-steps li { margin-bottom: 0.5rem; }
+    .loading-state {
+      padding: var(--space-2xl);
+      color: var(--color-muted);
+    }
+    .error-state {
+      padding: var(--space-2xl);
+      color: var(--color-error, #c0392b);
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a href="/" class="site-logo">Still Beside Me</a>
+    </div>
+  </header>
+
+  <main class="confirmation" id="confirmation">
+    <div class="loading-state" id="loading">Loading your order details...</div>
+  </main>
+
+  <script>
+  (function() {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session_id');
+    const container = document.getElementById('confirmation');
+
+    if (!sessionId) {
+      container.innerHTML = '<div class="error-state">No order found. <a href="/">Return to store</a></div>';
+      return;
+    }
+
+    fetch(`/api/orders/confirmation?session_id=${encodeURIComponent(sessionId)}`)
+      .then(r => r.json())
+      .then(order => {
+        if (order.error) {
+          container.innerHTML = `
+            <div class="confirmation-icon">&#10003;</div>
+            <h1>Thank you for your order!</h1>
+            <p class="subtitle">Your payment was received. We're preparing your tribute now.</p>
+            <p style="color:var(--color-muted)">If you have questions, email us at support@stillbesideme.com</p>
+            <p style="margin-top:var(--space-xl)"><a href="/" class="btn btn-warm">Return to Store</a></p>
+          `;
+          return;
+        }
+
+        const total = order.totalCents ? `$${(order.totalCents / 100).toFixed(2)}` : '';
+        const shipping = order.shipping;
+        const shippingHtml = shipping
+          ? `<div class="detail-row"><span class="detail-label">Ships to</span><span class="detail-value">${shipping.name || ''}<br>${shipping.address1 || ''}${shipping.address2 ? ', ' + shipping.address2 : ''}<br>${shipping.city || ''}, ${shipping.state || ''} ${shipping.zip || ''}</span></div>`
+          : '';
+
+        container.innerHTML = `
+          <div class="confirmation-icon">&#10003;</div>
+          <h1>Your tribute is on its way</h1>
+          <p class="subtitle">Thank you for honoring someone special. We'll take it from here.</p>
+
+          <div class="order-details">
+            <h2>Order Summary</h2>
+            <div class="detail-row">
+              <span class="detail-label">Order</span>
+              <span class="detail-value">${order.orderId.substring(0, 8).toUpperCase()}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Product</span>
+              <span class="detail-value">${order.sku.replace('framed-', 'Framed ').replace('x', ' x ')}"</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Total</span>
+              <span class="detail-value">${total}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Shipping</span>
+              <span class="detail-value">Free</span>
+            </div>
+            ${shippingHtml}
+            ${order.email ? `<div class="detail-row"><span class="detail-label">Confirmation sent to</span><span class="detail-value">${order.email}</span></div>` : ''}
+          </div>
+
+          <div class="next-steps">
+            <h2>What happens next</h2>
+            <ol>
+              <li>Our team reviews your tribute and enhances your photo for print</li>
+              <li>Your piece is printed on archival paper and professionally framed</li>
+              <li>Carefully packaged and shipped to your door (5-10 business days)</li>
+              <li>You'll receive tracking info by email once it ships</li>
+            </ol>
+          </div>
+
+          <p><a href="/" class="btn btn-warm">Return to Store</a></p>
+        `;
+      })
+      .catch(() => {
+        container.innerHTML = `
+          <div class="confirmation-icon">&#10003;</div>
+          <h1>Thank you for your order!</h1>
+          <p class="subtitle">Your payment was received. We're preparing your tribute now.</p>
+          <p style="margin-top:var(--space-xl)"><a href="/" class="btn btn-warm">Return to Store</a></p>
+        `;
+      });
+  })();
+  </script>
+</body>
+</html>

@@ -222,19 +222,25 @@
     // Size selector
     formPane.appendChild(createSizeSection());
 
-    // Cart action
+    // Purchase action
     const cartSection = document.createElement('div');
     cartSection.className = 'cart-action';
     cartSection.id = 'cart-section';
     cartSection.innerHTML = `
-      <button class="btn btn-warm btn-lg" disabled title="Coming soon">
-        Add to Cart
+      <button class="btn btn-warm btn-lg" id="purchase-btn">
+        Purchase
       </button>
       <p style="text-align:center;margin-top:0.5rem;font-size:0.85rem;color:var(--color-muted)">
-        Checkout coming soon \u2013 your tribute is saved in this session
+        Free shipping. Museum-quality framed print.
       </p>
     `;
     formPane.appendChild(cartSection);
+
+    // Wire up purchase button after it's in the DOM
+    setTimeout(() => {
+      updatePurchaseButton();
+      document.getElementById('purchase-btn').addEventListener('click', handlePurchase);
+    }, 0);
   }
 
   function createSection(title) {
@@ -1154,6 +1160,8 @@
     for (const product of template.printProducts) {
       const option = document.createElement('div');
       option.className = `product-option${product.default ? ' selected' : ''}`;
+      option.dataset.sku = product.sku;
+      option.dataset.price = product.price;
       option.innerHTML = `
         <div>
           <span class="product-option-label">${product.label}</span>
@@ -1165,6 +1173,7 @@
       option.addEventListener('click', () => {
         grid.querySelectorAll('.product-option').forEach(o => o.classList.remove('selected'));
         option.classList.add('selected');
+        updatePurchaseButton();
         saveState();
       });
 
@@ -1258,6 +1267,82 @@
     saveState();
   }
 
+  // ── Purchase Flow ─────────────────────────────────────────
+
+  function getSelectedProduct() {
+    const selected = document.querySelector('.product-option.selected');
+    if (!selected) return null;
+    return {
+      sku: selected.dataset.sku,
+      price: parseInt(selected.dataset.price, 10),
+      label: selected.querySelector('.product-option-label')?.textContent,
+    };
+  }
+
+  function updatePurchaseButton() {
+    const btn = document.getElementById('purchase-btn');
+    if (!btn) return;
+    const product = getSelectedProduct();
+    if (product) {
+      btn.textContent = `Purchase \u2013 $${(product.price / 100).toFixed(2)}`;
+    }
+  }
+
+  async function handlePurchase() {
+    const btn = document.getElementById('purchase-btn');
+    const product = getSelectedProduct();
+
+    if (!product) {
+      alert('Please select a size.');
+      return;
+    }
+
+    const fields = PreviewRenderer.getFields();
+    const poemText = fields.poemText;
+
+    if (!poemText || !poemText.trim()) {
+      alert('Please generate or select a poem before purchasing.');
+      return;
+    }
+
+    // Disable button and show loading
+    btn.disabled = true;
+    btn.textContent = 'Preparing checkout...';
+
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          templateId: TEMPLATE_ID,
+          sku: product.sku,
+          fields,
+          poemText: poemText.trim(),
+          style: currentStyle,
+          layout: currentLayout,
+          orderType,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || 'Something went wrong. Please try again.');
+        btn.disabled = false;
+        updatePurchaseButton();
+        return;
+      }
+
+      // Redirect to Stripe Checkout
+      window.location.href = data.checkoutUrl;
+    } catch (err) {
+      console.error('Checkout error:', err);
+      alert('Could not connect to checkout. Please try again.');
+      btn.disabled = false;
+      updatePurchaseButton();
+    }
+  }
+
   // ── State Persistence ──────────────────────────────────────
 
   function saveState() {
@@ -1276,6 +1361,7 @@
         thirdPanelType,
         customRatios: PreviewRenderer.getCustomRatios(),
         selectedProduct: document.querySelector('.product-option.selected .product-option-label')?.textContent,
+        selectedSku: document.querySelector('.product-option.selected')?.dataset?.sku,
         regenerationCount,
         timestamp: Date.now()
       };
