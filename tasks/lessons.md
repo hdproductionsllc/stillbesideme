@@ -20,6 +20,14 @@
 - **Frame size updates preview**: When the user selects a product size (e.g., 5x7, 11x14), the preview aspect ratio MUST update to match the real frame proportions. Landscape layouts use the wider dimension as width.
 - **Panel gap = separator line**: Set `.preview-panels` background per theme to a shade slightly different from the tribute background, so the CSS Grid gap reads as an intentional divider. Must be visible in ALL themes, not just classic dark.
 
+## Pricing & Margins
+- **WHCC doesn't expose wholesale pricing via API.** Pricing is on their website: whcc.com → Products → Wall Art → Framing → Framed Prints → Pricing tab.
+- **Always calculate WHCC cost as: frame + mat + acrylic.** The frame price includes a lustre print, but mat and acrylic are add-ons. Mat costs scale dramatically ($3.50 at 5x7, $92 at 30x40).
+- **Target 40% gross margin minimum** on every SKU. Calculate: retail price = WHCC cost / 0.60, rounded to .95. After Stripe fees (2.9% + $0.30), effective margin is ~37%.
+- **Don't claim "real wood" unless using Woodland line.** Lexington and most other WHCC mouldings are composite/MDF. Say "handcrafted frame" or "museum-quality frame" instead.
+- **Removed non-standard WHCC sizes** (12x16, 18x24) and redundant sizes (8x8, 8x12, 10x10, 12x18, 16x24, 24x36). Final lineup: 5x7, 8x10, 11x14, 16x20, 20x24, 20x30, 30x40.
+- **Current frame config:** Lexington Black (attr 602), Double White Mat (560, 615, 2495), Standard Acrylic (1878), Lustre Print (617), Wire Hanger (1907).
+
 ## Product Context
 - PRIMARY buyer is sympathy gifter, SECONDARY is pet owner memorializing their own pet.
 - Form questions must accommodate gift buyers who may not know personal details. Sublabels should explicitly say "skip this" for optional emotional fields in gift mode.

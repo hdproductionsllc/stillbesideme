@@ -191,21 +191,12 @@
   ],
 
   "printProducts": [
-    { "sku": "framed-5x7", "label": "Framed 5×7\"", "price": 5995, "badge": "Gift Size" },
-    { "sku": "framed-8x8", "label": "Framed 8×8\"", "price": 6995 },
-    { "sku": "framed-8x10", "label": "Framed 8×10\"", "price": 7995 },
-    { "sku": "framed-8x12", "label": "Framed 8×12\"", "price": 8495 },
-    { "sku": "framed-10x10", "label": "Framed 10×10\"", "price": 8995 },
-    { "sku": "framed-11x14", "label": "Framed 11×14\"", "price": 10995, "default": true, "badge": "Most Popular" },
-    { "sku": "framed-12x16", "label": "Framed 12×16\"", "price": 11995 },
-    { "sku": "framed-12x18", "label": "Framed 12×18\"", "price": 12495 },
-    { "sku": "framed-16x20", "label": "Framed 16×20\"", "price": 14995 },
-    { "sku": "framed-16x24", "label": "Framed 16×24\"", "price": 15995 },
-    { "sku": "framed-18x24", "label": "Framed 18×24\"", "price": 16995 },
-    { "sku": "framed-20x24", "label": "Framed 20×24\"", "price": 17995 },
-    { "sku": "framed-20x30", "label": "Framed 20×30\"", "price": 19995 },
-    { "sku": "framed-24x30", "label": "Framed 24×30\"", "price": 22995, "badge": "Statement Piece" },
-    { "sku": "framed-24x36", "label": "Framed 24×36\"", "price": 25995 },
-    { "sku": "framed-30x40", "label": "Framed 30×40\"", "price": 29995 }
+    { "sku": "framed-5x7", "label": "Framed 5×7\"", "price": 8495, "badge": "Gift Size" },
+    { "sku": "framed-8x10", "label": "Framed 8×10\"", "price": 10995 },
+    { "sku": "framed-11x14", "label": "Framed 11×14\"", "price": 15995, "default": true, "badge": "Most Popular" },
+    { "sku": "framed-16x20", "label": "Framed 16×20\"", "price": 24995 },
+    { "sku": "framed-20x24", "label": "Framed 20×24\"", "price": 34995 },
+    { "sku": "framed-20x30", "label": "Framed 20×30\"", "price": 42995, "badge": "Statement Piece" },
+    { "sku": "framed-30x40", "label": "Framed 30×40\"", "price": 69995 }
   ]
 }

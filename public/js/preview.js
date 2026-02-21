@@ -334,9 +334,12 @@
     if (!LAYOUTS[layoutKey]) return;
     buildPanels(layoutKey);
 
+    // Double rAF ensures CSS Grid reflow completes before measuring
     requestAnimationFrame(() => {
-      sizeCanvases();
-      queueRender();
+      requestAnimationFrame(() => {
+        sizeCanvases();
+        render();
+      });
     });
   }
 
@@ -346,9 +349,13 @@
     if (!match) { frameDims = null; return; }
     frameDims = [parseInt(match[1], 10), parseInt(match[2], 10)];
     applyGridStyles(currentLayout);
+    // Double rAF ensures browser has reflowed the CSS aspect-ratio
+    // change before we measure panel dimensions and re-render text
     requestAnimationFrame(function () {
-      sizeCanvases();
-      queueRender();
+      requestAnimationFrame(function () {
+        sizeCanvases();
+        render();
+      });
     });
   }
 
