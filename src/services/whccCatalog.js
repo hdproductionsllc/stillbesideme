@@ -83,6 +83,7 @@ function getAllMappings(db) {
 function setProductMapping(db, { sku, productUid, nodeId, attributeUids, description }) {
   const existing = db.get('SELECT sku FROM whcc_product_map WHERE sku = ?', [sku]);
   const attrsJson = JSON.stringify(attributeUids || []);
+  const safeNodeId = nodeId || null;
 
   if (existing) {
     db.run(
@@ -90,13 +91,13 @@ function setProductMapping(db, { sku, productUid, nodeId, attributeUids, descrip
        SET whcc_product_uid = ?, whcc_node_id = ?, whcc_attribute_uids = ?,
            description = ?, updated_at = datetime('now')
        WHERE sku = ?`,
-      [productUid, nodeId, attrsJson, description || null, sku]
+      [productUid, safeNodeId, attrsJson, description || null, sku]
     );
   } else {
     db.run(
       `INSERT INTO whcc_product_map (sku, whcc_product_uid, whcc_node_id, whcc_attribute_uids, description)
        VALUES (?, ?, ?, ?, ?)`,
-      [sku, productUid, nodeId, attrsJson, description || null]
+      [sku, productUid, safeNodeId, attrsJson, description || null]
     );
   }
 }
