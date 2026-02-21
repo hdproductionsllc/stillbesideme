@@ -43,14 +43,7 @@ function verifySignature(rawBody, signature) {
  */
 router.post('/callback', (req, res) => {
   const db = req.app.locals.db;
-  const signature = req.headers['whcc-signature'];
   const rawBody = req.body;
-
-  // Verify signature
-  if (!verifySignature(rawBody, signature)) {
-    console.error('WHCC webhook: invalid signature');
-    return res.status(401).json({ error: 'Invalid signature' });
-  }
 
   let event;
   try {
@@ -61,6 +54,19 @@ router.post('/callback', (req, res) => {
   }
 
   console.log('WHCC webhook received:', JSON.stringify(event, null, 2));
+
+  // Handle verification request from WHCC (sent during webhook registration)
+  if (event.verifier) {
+    console.log('WHCC webhook VERIFICATION CODE:', event.verifier);
+    return res.json({ received: true, verifier: event.verifier });
+  }
+
+  // Verify HMAC signature on real events
+  const signature = req.headers['whcc-signature'];
+  if (!verifySignature(rawBody, signature)) {
+    console.error('WHCC webhook: invalid signature');
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
 
   try {
     const confirmationId = event.ConfirmationID || event.ConfirmationId || event.confirmationId;

@@ -126,14 +126,14 @@ async function submitOrder(confirmationId) {
  * Register a webhook callback URL with WHCC.
  */
 async function registerWebhook(callbackUri) {
-  return apiRequest('POST', '/api/Webhooks/Register', { Uri: callbackUri });
+  return apiRequest('POST', '/api/callback/create', { callbackUri });
 }
 
 /**
  * Verify a webhook registration with the code WHCC sends.
  */
-async function verifyWebhook(verificationCode) {
-  return apiRequest('POST', '/api/Webhooks/Verify', { Code: verificationCode });
+async function verifyWebhook(verifier) {
+  return apiRequest('POST', '/api/callback/verify', { verifier });
 }
 
 /**

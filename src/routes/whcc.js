@@ -303,4 +303,24 @@ router.post('/webhook/register', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/whcc/webhook/verify
+ * Complete webhook verification with the code WHCC sent.
+ * Body: { verifier: "the-code-from-whcc" }
+ */
+router.post('/webhook/verify', async (req, res) => {
+  const { verifier } = req.body;
+
+  if (!verifier) {
+    return res.status(400).json({ error: 'verifier is required' });
+  }
+
+  try {
+    const result = await whccOrderApi.verifyWebhook(verifier);
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(502).json({ error: err.message, details: err.body });
+  }
+});
+
 module.exports = router;
