@@ -23,6 +23,28 @@
 - **Test credentials immediately** after writing the auth code. Don't assume they're invalid just because the first attempt fails; the auth method might be wrong.
 - **Inspect real API responses** before writing parsers. WHCC catalog is nested (`Categories[].ProductList[]`), not a flat array. Attribute fields use `Id`/`AttributeName`, not `AttributeUID`/`Name`.
 
+## Stripe Setup (Still Beside Me)
+To go live with payments, 3 things need to be configured:
+
+1. **API Keys** - Stripe Dashboard → Developers → API Keys
+   - Copy the **Secret key** (`sk_test_...` for test, `sk_live_...` for production)
+   - Publishable key is `pk_test_...` / `pk_live_...` (not currently used since we redirect to Stripe hosted checkout)
+
+2. **Webhook Endpoint** - Stripe Dashboard → Developers → Webhooks → Add endpoint
+   - URL: `https://www.stillbesideme.com/api/stripe-webhooks`
+   - Events to subscribe to: `checkout.session.completed`, `checkout.session.expired`
+   - After creating, copy the **Signing secret** (`whsec_...`)
+
+3. **Railway Environment Variables** - Railway Dashboard → your service → Variables
+   - `STRIPE_SECRET_KEY` = secret key from step 1
+   - `STRIPE_WEBHOOK_SECRET` = signing secret from step 2
+
+**Flow**: Customer clicks "Purchase" → `POST /api/checkout` creates order + Stripe Session → redirect to Stripe hosted page → customer pays → Stripe webhook fires `checkout.session.completed` → our handler (`src/routes/stripeWebhooks.js`) confirms payment, saves shipping address, calls `whccOrderApi.placeOrder()` → WHCC prints and ships.
+
+**Key files**: `src/routes/checkout.js`, `src/routes/stripeWebhooks.js`, `public/order-confirmed.html`
+
+**Testing**: Use Stripe test mode with card `4242 4242 4242 4242`, any future expiry, any CVC. For local webhook testing: `stripe listen --forward-to localhost:3001/api/stripe-webhooks`
+
 ## Landing Page Framework (Oliver Kenyon CRO)
 Every landing page should follow this structure in order:
 
