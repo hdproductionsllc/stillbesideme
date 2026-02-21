@@ -48,8 +48,9 @@ router.get('/catalog', async (req, res) => {
       data = await whccCatalog.getCatalog('order', db, () => whccOrderApi.fetchCatalog());
     }
 
-    const count = Array.isArray(data) ? data.length : 'N/A';
-    res.json({ productCount: count, catalog: data });
+    const categories = data?.Categories || [];
+    const productCount = categories.reduce((sum, c) => sum + (c.ProductList || []).length, 0);
+    res.json({ categoryCount: categories.length, productCount, catalog: data });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
@@ -69,15 +70,29 @@ router.get('/catalog/search', async (req, res) => {
 
   try {
     const data = await whccCatalog.getCatalog('order', db, () => whccOrderApi.fetchCatalog());
+    const categories = data?.Categories || [];
 
-    if (!Array.isArray(data)) {
-      return res.json({ results: [], note: 'Catalog is not an array — inspect /api/whcc/catalog for structure' });
+    // Search across all categories and products
+    const results = [];
+    for (const cat of categories) {
+      for (const product of (cat.ProductList || [])) {
+        const searchable = `${cat.Name} ${product.Name}`.toLowerCase();
+        if (searchable.includes(query)) {
+          results.push({
+            category: cat.Name,
+            productId: product.Id,
+            name: product.Name,
+            nodeId: (product.ProductNodes || [])[0]?.DP2NodeID,
+            attributes: (product.AttributeCategories || []).map(ac => ({
+              id: ac.Id,
+              name: ac.AttributeCategoryName,
+              requiredLevel: ac.RequiredLevel,
+              options: (ac.Attributes || []).map(a => ({ id: a.Id, name: a.AttributeName }))
+            }))
+          });
+        }
+      }
     }
-
-    const results = data.filter(product => {
-      const searchable = JSON.stringify(product).toLowerCase();
-      return searchable.includes(query);
-    });
 
     res.json({ query, resultCount: results.length, results });
   } catch (err) {
@@ -150,25 +165,31 @@ router.post('/test-order', async (req, res) => {
     });
   }
 
+  const nodeId = mapping.whcc_node_id ? Number(mapping.whcc_node_id) : 10000;
   const testPayload = {
     EntryId: `test-${Date.now()}`,
-    Product: {
-      ProductUID: mapping.whcc_product_uid,
-      Attributes: (mapping.whcc_attribute_uids || []).map(uid => ({ AttributeUID: uid }))
-    },
-    Images: [{
-      ImageUrl: imageUrl || `${process.env.BASE_URL || 'http://localhost:3001'}/uploads/test.jpg`,
-      ImageHash: '',
-      Quantity: 1
-    }],
-    ShipTo: shipTo || {
-      Name: 'Test Order',
-      Address1: '3412 S 300 E',
-      City: 'Salt Lake City',
-      State: 'UT',
-      Zip: '84115',
-      Country: 'US'
-    }
+    Orders: [{
+      SequenceNumber: 1,
+      ShipToAddress: shipTo || {
+        Name: 'Test Order',
+        Addr1: '3412 S 300 E',
+        City: 'Salt Lake City',
+        State: 'UT',
+        Zip: '84115',
+        Country: 'US'
+      },
+      OrderItems: [{
+        ProductUID: Number(mapping.whcc_product_uid),
+        Quantity: 1,
+        ItemAssets: [{
+          ProductNodeID: nodeId,
+          AssetPath: imageUrl || `${process.env.BASE_URL || 'http://localhost:3001'}/uploads/test.jpg`,
+          ImageHash: '',
+          AutoRotate: true
+        }],
+        ItemAttributes: (mapping.whcc_attribute_uids || []).map(uid => ({ AttributeUID: Number(uid) }))
+      }]
+    }]
   };
 
   try {

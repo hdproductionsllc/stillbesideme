@@ -102,11 +102,34 @@ function setProductMapping(db, { sku, productUid, nodeId, attributeUids, descrip
 }
 
 /**
+ * Flatten WHCC catalog (nested Categories → flat product list).
+ * Each product gets its parent category name attached.
+ */
+function flattenCatalog(catalogData) {
+  const products = [];
+  const categories = catalogData?.Categories || catalogData?.categories || [];
+
+  if (Array.isArray(categories)) {
+    for (const cat of categories) {
+      for (const product of (cat.ProductList || [])) {
+        products.push({ ...product, categoryName: cat.Name });
+      }
+    }
+  }
+
+  // Fallback: if catalog is already a flat array
+  if (products.length === 0 && Array.isArray(catalogData)) {
+    return catalogData;
+  }
+
+  return products;
+}
+
+/**
  * Scan WHCC catalog for products matching our print sizes.
- * Returns suggested mappings for review.
+ * Returns suggested mappings for review — prioritizes "Framed Prints" category.
  */
 function autoMapProducts(catalogData, db) {
-  // Our SKU patterns: framed-8x10, framed-11x14, framed-16x20, framed-20x24
   const ourSizes = [
     { sku: 'framed-8x10', width: 8, height: 10 },
     { sku: 'framed-11x14', width: 11, height: 14 },
@@ -114,38 +137,43 @@ function autoMapProducts(catalogData, db) {
     { sku: 'framed-20x24', width: 20, height: 24 }
   ];
 
+  const products = flattenCatalog(catalogData);
   const suggestions = [];
-
-  if (!catalogData || !Array.isArray(catalogData)) {
-    return suggestions;
-  }
 
   for (const size of ourSizes) {
     const sizeStr = `${size.width}x${size.height}`;
-    const altStr = `${size.width} x ${size.height}`;
     const matches = [];
 
-    // Walk catalog looking for size matches in product names/descriptions
-    for (const product of catalogData) {
-      const name = (product.Name || product.name || '').toLowerCase();
-      const desc = (product.Description || product.description || '').toLowerCase();
-      const searchable = `${name} ${desc}`;
-
-      if (searchable.includes(sizeStr) || searchable.includes(altStr)) {
+    for (const product of products) {
+      const name = product.Name || '';
+      if (name.includes(sizeStr)) {
+        const node = (product.ProductNodes || [])[0];
         matches.push({
-          productUid: product.ProductUID || product.productUid || product.id,
-          name: product.Name || product.name,
-          description: product.Description || product.description
+          productId: product.Id,
+          name,
+          category: product.categoryName,
+          nodeId: node?.DP2NodeID || null,
+          attributeCategories: (product.AttributeCategories || []).map(ac => ({
+            name: ac.AttributeCategoryName,
+            requiredId: ac.RequiredLevel,
+            options: (ac.Attributes || []).slice(0, 3).map(a => a.AttributeName)
+          }))
         });
       }
     }
 
-    const existing = getProductMapping(size.sku, db);
+    // Sort: Framed Prints first
+    matches.sort((a, b) => {
+      if (a.category === 'Framed Prints' && b.category !== 'Framed Prints') return -1;
+      if (b.category === 'Framed Prints' && a.category !== 'Framed Prints') return 1;
+      return 0;
+    });
 
     suggestions.push({
       sku: size.sku,
-      currentMapping: existing,
-      candidates: matches
+      currentMapping: getProductMapping(size.sku, db),
+      recommended: matches.find(m => m.category === 'Framed Prints') || matches[0] || null,
+      allMatches: matches
     });
   }
 

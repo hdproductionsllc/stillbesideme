@@ -29,12 +29,13 @@ async function getAccessToken() {
     throw new Error('WHCC_CONSUMER_KEY and WHCC_CONSUMER_SECRET must be set');
   }
 
-  const res = await fetch(`${API_URL()}/api/AccessToken`, {
-    headers: {
-      'Consumer-Key': key,
-      'Consumer-Secret': secret
-    }
+  const params = new URLSearchParams({
+    grant_type: 'consumer_credentials',
+    consumer_key: key,
+    consumer_secret: secret
   });
+
+  const res = await fetch(`${API_URL()}/api/AccessToken?${params}`);
 
   if (!res.ok) {
     const body = await res.text();
@@ -43,12 +44,11 @@ async function getAccessToken() {
 
   const data = await res.json();
 
-  // WHCC sometimes returns errors inside a 200 response
   if (data.ErrorNumber) {
     throw new Error(`WHCC auth error ${data.ErrorNumber}: ${data.Message}`);
   }
 
-  const token = data.AccessToken || data.accessToken;
+  const token = data.Token;
   if (!token) {
     throw new Error(`WHCC auth: unexpected response format: ${JSON.stringify(data).substring(0, 200)}`);
   }
@@ -176,27 +176,33 @@ async function placeOrder(orderId, db) {
   const imageUrl = buildImageUrl(primaryPhoto.originalPath);
   const entryId = uuidv4();
 
-  // Build WHCC order payload
+  // Build WHCC order payload (matches their OrderImport schema)
+  const nodeId = mapping.whcc_node_id ? Number(mapping.whcc_node_id) : 10000;
   const payload = {
     EntryId: entryId,
-    Product: {
-      ProductUID: mapping.whcc_product_uid,
-      Attributes: (mapping.whcc_attribute_uids || []).map(uid => ({ AttributeUID: uid }))
-    },
-    Images: [{
-      ImageUrl: imageUrl,
-      ImageHash: primaryPhoto.md5 || '',
-      Quantity: 1
-    }],
-    ShipTo: {
-      Name: shipping.name || '',
-      Address1: shipping.address1 || shipping.street || '',
-      Address2: shipping.address2 || '',
-      City: shipping.city || '',
-      State: shipping.state || '',
-      Zip: shipping.zip || shipping.postalCode || '',
-      Country: shipping.country || 'US'
-    }
+    Orders: [{
+      SequenceNumber: 1,
+      ShipToAddress: {
+        Name: shipping.name || '',
+        Addr1: shipping.address1 || shipping.street || '',
+        Addr2: shipping.address2 || '',
+        City: shipping.city || '',
+        State: shipping.state || '',
+        Zip: shipping.zip || shipping.postalCode || '',
+        Country: shipping.country || 'US'
+      },
+      OrderItems: [{
+        ProductUID: Number(mapping.whcc_product_uid),
+        Quantity: 1,
+        ItemAssets: [{
+          ProductNodeID: nodeId,
+          AssetPath: imageUrl,
+          ImageHash: primaryPhoto.md5 || '',
+          AutoRotate: true
+        }],
+        ItemAttributes: (mapping.whcc_attribute_uids || []).map(uid => ({ AttributeUID: Number(uid) }))
+      }]
+    }]
   };
 
   // Track in our database

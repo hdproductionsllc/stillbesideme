@@ -18,6 +18,11 @@
 - PRIMARY buyer is sympathy gifter, SECONDARY is pet owner memorializing their own pet.
 - Form questions must accommodate gift buyers who may not know personal details. Sublabels should explicitly say "skip this" for optional emotional fields in gift mode.
 
+## API Integration
+- **Always read the actual API docs before coding auth.** Don't assume header-based auth. WHCC uses query parameters (`grant_type=consumer_credentials&consumer_key=X&consumer_secret=X`) not headers. Cost us an entire debug cycle.
+- **Test credentials immediately** after writing the auth code. Don't assume they're invalid just because the first attempt fails; the auth method might be wrong.
+- **Inspect real API responses** before writing parsers. WHCC catalog is nested (`Categories[].ProductList[]`), not a flat array. Attribute fields use `Id`/`AttributeName`, not `AttributeUID`/`Name`.
+
 ## Landing Page Framework (Oliver Kenyon CRO)
 Every landing page should follow this structure in order:
 
