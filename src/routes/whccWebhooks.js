@@ -103,7 +103,7 @@ router.post('/callback', (req, res) => {
   // Handle verification request from WHCC (sent during webhook registration)
   if (event.verifier) {
     console.log('WHCC webhook VERIFICATION CODE:', event.verifier);
-    // Return 200 OK — WHCC just needs a successful response
+    // Return 200 OK – WHCC just needs a successful response
     return res.status(200).send('OK');
   }
 

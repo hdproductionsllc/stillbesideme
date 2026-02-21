@@ -68,7 +68,7 @@ async function handleCheckoutCompleted(session, db) {
     return;
   }
 
-  // Idempotency — don't process twice
+  // Idempotency – don't process twice
   if (order.status === 'submitted' || order.status === 'in_production' || order.status === 'shipped') {
     console.log(`Stripe webhook: order ${orderId} already processed (status: ${order.status})`);
     return;
@@ -126,7 +126,7 @@ async function handleCheckoutCompleted(session, db) {
     console.log(`Order ${orderId} submitted to WHCC:`, result.confirmationId);
   } catch (err) {
     console.error(`Failed to submit order ${orderId} to WHCC:`, err.message);
-    // Order is saved and paid — WHCC submission can be retried manually
+    // Order is saved and paid – WHCC submission can be retried manually
     db.run(
       `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
       [orderId, 'whcc_submit_failed', JSON.stringify({ error: err.message })]

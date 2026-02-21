@@ -1,4 +1,4 @@
-# Print Fulfillment Research — Still Beside Me
+# Print Fulfillment Research – Still Beside Me
 
 **Date:** 2026-02-20
 **Goal:** Find the best automated fulfillment path for custom framed memorial art.
@@ -10,7 +10,7 @@
 
 **Recommended approach: WHCC API as primary fulfillment.**
 
-WHCC has a fully documented REST API at [developer.whcc.com](https://developer.whcc.com/) with endpoints to create, confirm, and track orders. Since the owner already has pro pricing at WHCC and they are the industry gold standard for quality, this is the clear winner. They support white-label drop shipping ($7.95/order) with no WHCC branding — the customer only sees your business name. Their API supports everything from simple prints to complex frames with multi-opening mats.
+WHCC has a fully documented REST API at [developer.whcc.com](https://developer.whcc.com/) with endpoints to create, confirm, and track orders. Since the owner already has pro pricing at WHCC and they are the industry gold standard for quality, this is the clear winner. They support white-label drop shipping ($7.95/order) with no WHCC branding – the customer only sees your business name. Their API supports everything from simple prints to complex frames with multi-opening mats.
 
 **Backup/future option:** Prodigi or Printful as secondary fulfillment for lower-cost product tiers or international orders.
 
@@ -18,7 +18,7 @@ WHCC has a fully documented REST API at [developer.whcc.com](https://developer.w
 
 ## Option-by-Option Comparison
 
-### 1. WHCC (White House Custom Colour) — RECOMMENDED
+### 1. WHCC (White House Custom Colour) – RECOMMENDED
 
 | Criteria | Details |
 |---|---|
@@ -29,15 +29,15 @@ WHCC has a fully documented REST API at [developer.whcc.com](https://developer.w
 | **Mat Board** | White, Black, Gray. Single-opening and multi-opening layouts |
 | **Acrylic Options** | Standard acrylic, Glare-resistant acrylic, No acrylic |
 | **Paper/Print Surfaces** | Lustre (Fujicolor Crystal Archive), Deep Matte, Lustre w/ Protective Lamination, Fine Art papers (Smooth Matte, Aquarelle Rag, Photo Rag Baryta, Torchon, Photo Rag Metallic), Canvas, Metal |
-| **Quality Tier** | Professional — industry gold standard. 100-year display longevity, 200-year dark storage. Fujicolor Crystal Archive archival paper |
-| **Pricing (framed)** | Starts at $38.89 (smallest). Pro photographer wholesale pricing — not publicly listed, only visible in your account. Estimated: 8x10 framed ~$40-55, 16x20 framed ~$75-120 depending on moulding |
+| **Quality Tier** | Professional – industry gold standard. 100-year display longevity, 200-year dark storage. Fujicolor Crystal Archive archival paper |
+| **Pricing (framed)** | Starts at $38.89 (smallest). Pro photographer wholesale pricing – not publicly listed, only visible in your account. Estimated: 8x10 framed ~$40-55, 16x20 framed ~$75-120 depending on moulding |
 | **Drop Shipping** | Yes. $7.95/order to contiguous US. Expedited shipping available |
 | **White Label** | Yes. No WHCC branding inside or outside the package. Your business name and return address on shipping label. No invoice included |
 | **Premium Packaging** | $5.50 add-on for gift-ready unboxing experience (discounted for drop ship) |
 | **Turnaround** | 3-5 days production |
 | **Shipping** | Free ground shipping on standard orders. Expedited upgrades available |
 | **Minimum Order** | $16.00 per product catalog category, waived for drop ship with lowest-cost shipping |
-| **Existing Account** | YES — owner already has pro pricing |
+| **Existing Account** | YES – owner already has pro pricing |
 
 **API Capabilities (from developer.whcc.com):**
 - Order Submit API: create, confirm, track orders via REST
@@ -57,7 +57,7 @@ WHCC has a fully documented REST API at [developer.whcc.com](https://developer.w
 2. Industry-best quality for memorial/sympathy products (this matters for your brand)
 3. Full REST API that can be called from your Node.js server
 4. White-label drop shipping with premium packaging option
-5. The premium packaging ($5.50 extra) is perfect for a sympathy gift — beautiful unboxing
+5. The premium packaging ($5.50 extra) is perfect for a sympathy gift – beautiful unboxing
 6. Archival quality (100-year display life) is a genuine selling point for memorial art
 
 ---
@@ -68,10 +68,10 @@ WHCC has a fully documented REST API at [developer.whcc.com](https://developer.w
 |---|---|
 | **REST API** | NO. No public API found |
 | **Ordering Systems** | ROES (desktop Java app), ACI FLEX (proprietary desktop software), OrderPix Suite, ROES for Web |
-| **Framed Print Products** | Yes — full matting and framing division |
-| **Quality Tier** | Professional — comparable to WHCC |
+| **Framed Print Products** | Yes – full matting and framing division |
+| **Quality Tier** | Professional – comparable to WHCC |
 | **Pricing** | Not publicly listed |
-| **Drop Shipping** | Unknown — likely available but not documented publicly |
+| **Drop Shipping** | Unknown – likely available but not documented publicly |
 | **White Label** | Unknown |
 | **Automation** | Not possible without GUI automation hacks |
 
@@ -87,20 +87,20 @@ WHCC has a fully documented REST API at [developer.whcc.com](https://developer.w
 | **Authentication** | Private tokens with access scopes and expiration dates |
 | **Framed Print Products** | Yes. Enhanced Matte Paper Framed Poster (no mat), Matte Paper Framed Poster With Mat, Premium Luster Photo Paper Framed Poster |
 | **Frame Options** | Black, White, Red Oak (alder wood, 0.75" thick) |
-| **Mat Board** | Yes — "Framed Poster With Mat" product has smooth white mat board |
+| **Mat Board** | Yes – "Framed Poster With Mat" product has smooth white mat board |
 | **Paper** | Enhanced Matte (10.3 mil, 189 g/m², Epson), Premium Luster Photo Paper |
-| **Quality Tier** | Consumer-plus — "museum-quality" marketing but not on par with pro labs. Giclée inkjet on matte paper, NOT silver halide/Crystal Archive |
+| **Quality Tier** | Consumer-plus – "museum-quality" marketing but not on par with pro labs. Giclée inkjet on matte paper, NOT silver halide/Crystal Archive |
 | **Pricing (base cost)** | 8x10 framed: ~$18.50, 12x16: ~$22-26, 16x20: ~$28-32 (estimates, exact pricing in dashboard). With mat: add ~$5-8 |
 | **Shipping (US)** | $10.49 first item + $4.50 each additional |
-| **Drop Shipping** | Yes — built-in, it is a POD service |
-| **White Label** | Yes — your branding, custom packing slips, branded inserts on Growth plan |
+| **Drop Shipping** | Yes – built-in, it is a POD service |
+| **White Label** | Yes – your branding, custom packing slips, branded inserts on Growth plan |
 | **Turnaround** | 2-5 business days |
 | **Rate Limits** | 30 requests per 60 seconds (unauthenticated) |
 
 **Key API endpoints:**
-- `GET /products` — catalog with all variants and pricing
-- `POST /orders` — create and submit orders
-- `GET /orders/{id}` — track order status
+- `GET /products` – catalog with all variants and pricing
+- `POST /orders` – create and submit orders
+- `GET /orders/{id}` – track order status
 - Webhooks for order status changes
 
 **Pros:** Cheapest base cost, excellent API documentation, easy integration, no minimum orders, free to start.
@@ -121,18 +121,18 @@ WHCC has a fully documented REST API at [developer.whcc.com](https://developer.w
 | **Paper** | Fine art giclée printing |
 | **Glaze Options** | Perspex and moth-eye glaze (anti-reflective) |
 | **Quality Tier** | Mid-to-high. Handmade by specialist picture framers. Better than Printful, below WHCC |
-| **Pricing** | Not publicly listed — available in dashboard. Quote endpoint: `POST /v4.0/quotes` |
-| **Drop Shipping** | Yes — built-in. 50+ print partners in 10+ countries |
-| **White Label** | Yes — fully white-label packaging |
+| **Pricing** | Not publicly listed – available in dashboard. Quote endpoint: `POST /v4.0/quotes` |
+| **Drop Shipping** | Yes – built-in. 50+ print partners in 10+ countries |
+| **White Label** | Yes – fully white-label packaging |
 | **Turnaround** | Typically dispatched within 24-48 hours |
 | **SKU format** | e.g., `GLOBAL-CFPM-16X20` for classic frame |
 
 **Key API endpoints:**
-- `POST /v4.0/Orders` — create and submit in single request
-- `GET /v4.0/Orders` — list/filter orders
-- `GET /v4.0/products/{sku}` — product details
-- `POST /v4.0/quotes` — get pricing without creating order
-- `GET /v4.0/Orders/{id}/actions` — available actions (cancel, update)
+- `POST /v4.0/Orders` – create and submit in single request
+- `GET /v4.0/Orders` – list/filter orders
+- `GET /v4.0/products/{sku}` – product details
+- `POST /v4.0/quotes` – get pricing without creating order
+- `GET /v4.0/Orders/{id}/actions` – available actions (cancel, update)
 - Idempotency key support for duplicate prevention
 - Postman collection available
 
@@ -146,14 +146,14 @@ WHCC has a fully documented REST API at [developer.whcc.com](https://developer.w
 | Criteria | Details |
 |---|---|
 | **REST API** | Yes. Full REST/JSON API, free access, well-documented |
-| **Framed Print Products** | Yes. Economy (MDF), Standard (MDF), Premium (real wood — Classic or Contemporary styles) |
+| **Framed Print Products** | Yes. Economy (MDF), Standard (MDF), Premium (real wood – Classic or Contemporary styles) |
 | **Frame Options** | Premium: Black, White, Natural, Walnut, Cherry. Thickness: 1", 1.25", 1.5" |
-| **Mat Board** | Yes on Premium — No Mat, 1.5", 2", 2.5" options |
-| **Paper** | Premium: Epson Hot Press Bright White (330gsm), Hahnemuhle Photo Rag 308, Moab Entrada Bright Rag (290gsm), Moab Somerset Museum Rag (300gsm) — all 100% cotton, acid-free, archival |
+| **Mat Board** | Yes on Premium – No Mat, 1.5", 2", 2.5" options |
+| **Paper** | Premium: Epson Hot Press Bright White (330gsm), Hahnemuhle Photo Rag 308, Moab Entrada Bright Rag (290gsm), Moab Somerset Museum Rag (300gsm) – all 100% cotton, acid-free, archival |
 | **Glass** | Shatter-proof UV-coated acrylic |
-| **Quality Tier** | Premium tier is high quality — archival cotton papers, real wood frames, UV acrylic |
+| **Quality Tier** | Premium tier is high quality – archival cotton papers, real wood frames, UV acrylic |
 | **Pricing** | Not publicly listed. 8x10 framed was ~$19.90 base (older data). Shipping can be expensive |
-| **Drop Shipping** | Yes — built-in |
+| **Drop Shipping** | Yes – built-in |
 | **White Label** | Available |
 | **Sizes** | 8x8 through 24x36, including 8x10, 12x16, 16x20 |
 
@@ -169,19 +169,19 @@ WHCC has a fully documented REST API at [developer.whcc.com](https://developer.w
 
 ---
 
-### 6. Frame It Easy — NOTABLE DISCOVERY
+### 6. Frame It Easy – NOTABLE DISCOVERY
 
 | Criteria | Details |
 |---|---|
 | **REST API** | Yes. Full REST API with [Postman documentation](https://documenter.getpostman.com/view/7462304/Tz5s3bQB) |
 | **What They Do** | Custom framing + printing 3PL. US-based manufacturing. They print, frame, package, and ship |
 | **Frame Options** | Any size from 5x5 to 42x62 in 1/16" increments. Multiple frame styles |
-| **Mat Board** | Yes — custom matting |
+| **Mat Board** | Yes – custom matting |
 | **Paper** | Museum-quality giclée on conservation-grade materials |
-| **Quality Tier** | High — museum-grade framing, conservation materials |
+| **Quality Tier** | High – museum-grade framing, conservation materials |
 | **Pricing** | 15% trade discount for resellers, no minimums |
-| **Drop Shipping** | Yes — US only |
-| **White Label** | Yes — full white-label branding |
+| **Drop Shipping** | Yes – US only |
+| **White Label** | Yes – full white-label branding |
 | **Integrations** | Shopify app, direct API, or manual website orders |
 
 **API workflow:**
@@ -294,11 +294,11 @@ If you ever want to offer a "Standard" tier at a lower price point alongside the
 ## Immediate Next Steps
 
 1. **Log into WHCC developer portal** at [developer.whcc.com](https://developer.whcc.com/) with your existing account and review the full API documentation
-2. **Get API credentials** — register for developer access / OAuth tokens
-3. **Test in sandbox** — create a test order via the API to understand the request/response format
-4. **Map product AttributeUIDs** — identify the specific moulding, mat, acrylic, and paper combinations you want to offer
-5. **Build the integration** — Node.js service that calls WHCC API after proof approval
-6. **Set up webhooks or polling** — for order status updates and tracking numbers
+2. **Get API credentials** – register for developer access / OAuth tokens
+3. **Test in sandbox** – create a test order via the API to understand the request/response format
+4. **Map product AttributeUIDs** – identify the specific moulding, mat, acrylic, and paper combinations you want to offer
+5. **Build the integration** – Node.js service that calls WHCC API after proof approval
+6. **Set up webhooks or polling** – for order status updates and tracking numbers
 
 ---
 

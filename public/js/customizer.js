@@ -3,7 +3,7 @@
  *
  * Reads the template ID from the URL path (/customize/letter-from-heaven),
  * defaulting to 'pet-tribute' when no template slug is present.
- * Everything — form fields, poem labels, gift toggle, generate button —
+ * Everything – form fields, poem labels, gift toggle, generate button –
  * is driven by the template definition.
  *
  * Manages the form pane, layout/style selectors, photo crop interactions,
@@ -49,7 +49,7 @@
     return (template && template.tributeMapping && template.tributeMapping.name) || 'petName';
   }
 
-  /** The label word for the generated content — "Poem" or "Letter" */
+  /** The label word for the generated content – "Poem" or "Letter" */
   function poemLabel() {
     return (template && template.poemLabel) || 'Poem';
   }
@@ -121,6 +121,12 @@
       // Restore saved state
       restoreState();
 
+      // Set initial frame size from selected product
+      const initialProduct = document.querySelector('.product-option.selected');
+      if (initialProduct && initialProduct.dataset.sku && PreviewRenderer.setFrameSize) {
+        PreviewRenderer.setFrameSize(initialProduct.dataset.sku);
+      }
+
       // Attach divider handles after initial layout
       requestAnimationFrame(() => {
         attachDividerHandles();
@@ -143,7 +149,7 @@
   function buildGuidedForm() {
     formPane.innerHTML = '';
 
-    // Order type toggle — only show when template defines giftLabels
+    // Order type toggle – only show when template defines giftLabels
     if (template.giftLabels) {
       const toggleWrap = document.createElement('div');
       toggleWrap.innerHTML = `
@@ -1174,6 +1180,10 @@
         grid.querySelectorAll('.product-option').forEach(o => o.classList.remove('selected'));
         option.classList.add('selected');
         updatePurchaseButton();
+        // Update preview to match frame proportions
+        if (PreviewRenderer && PreviewRenderer.setFrameSize) {
+          PreviewRenderer.setFrameSize(product.sku);
+        }
         saveState();
       });
 

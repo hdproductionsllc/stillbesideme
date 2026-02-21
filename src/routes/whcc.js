@@ -148,7 +148,7 @@ router.post('/product-map/auto', async (req, res) => {
 /**
  * POST /api/whcc/test-order
  * Send a test order to the WHCC sandbox.
- * Body: { imageUrl?, shipTo? } — uses defaults for missing fields.
+ * Body: { imageUrl?, shipTo? } – uses defaults for missing fields.
  */
 router.post('/test-order', async (req, res) => {
   const db = req.app.locals.db;

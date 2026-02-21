@@ -128,7 +128,7 @@ function flattenCatalog(catalogData) {
 
 /**
  * Scan WHCC catalog for products matching our print sizes.
- * Returns suggested mappings for review — prioritizes "Framed Prints" category.
+ * Returns suggested mappings for review – prioritizes "Framed Prints" category.
  */
 function autoMapProducts(catalogData, db) {
   const ourSizes = [

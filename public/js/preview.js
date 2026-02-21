@@ -84,6 +84,9 @@
   // photos object: panelId -> { image, position, zoom, panX, panY }
   const photos = {};
 
+  // Frame size from selected product SKU (e.g. [11, 14] for "framed-11x14")
+  let frameDims = null;
+
   // Custom fr ratios (user-dragged dividers): layoutKey -> { columns: [...], rows: [...] }
   const customRatios = {};
 
@@ -103,6 +106,7 @@
     setField,
     setStyle,
     setLayout,
+    setFrameSize,
     getFields: () => ({ ...fields }),
     render,
     getCurrentFrValues,
@@ -234,7 +238,18 @@
     container.style.gridTemplateAreas = layout.areas.map(
       row => '"' + row.join(' ') + '"'
     ).join(' ');
-    container.style.aspectRatio = layout.aspectRatio;
+
+    // Use frame size if selected, otherwise fall back to layout default
+    if (frameDims) {
+      // Determine if this layout is landscape or portrait from its default ratio
+      var parts = layout.aspectRatio.split('/');
+      var isLandscape = parseFloat(parts[0]) > parseFloat(parts[1]);
+      var w = isLandscape ? Math.max(frameDims[0], frameDims[1]) : Math.min(frameDims[0], frameDims[1]);
+      var h = isLandscape ? Math.min(frameDims[0], frameDims[1]) : Math.max(frameDims[0], frameDims[1]);
+      container.style.aspectRatio = w + '/' + h;
+    } else {
+      container.style.aspectRatio = layout.aspectRatio;
+    }
   }
 
   // ── Data Setters ───────────────────────────────────────────
@@ -320,6 +335,18 @@
     buildPanels(layoutKey);
 
     requestAnimationFrame(() => {
+      sizeCanvases();
+      queueRender();
+    });
+  }
+
+  function setFrameSize(sku) {
+    // Parse "framed-11x14" → [11, 14]
+    var match = sku && sku.match(/framed-(\d+)x(\d+)/);
+    if (!match) { frameDims = null; return; }
+    frameDims = [parseInt(match[1], 10), parseInt(match[2], 10)];
+    applyGridStyles(currentLayout);
+    requestAnimationFrame(function () {
       sizeCanvases();
       queueRender();
     });
@@ -472,7 +499,10 @@
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
 
-    const scale = w / 400;
+    // Scale by the limiting dimension – width for tall/narrow panels,
+    // height for wide/short panels (stacked layout). Prevents text from
+    // blowing up when the panel is wide but short.
+    const scale = Math.min(w / 400, h / 260);
     const cx = w / 2;
     const maxTextWidth = w * 0.76;
 
@@ -672,7 +702,7 @@
       return;
     }
 
-    const scale = w / 400;
+    const scale = Math.min(w / 400, h / 260);
     const fontSize = 13 * scale;
     const lineH = fontSize * 1.55;
     const maxTextWidth = w * 0.8;

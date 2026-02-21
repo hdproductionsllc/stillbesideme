@@ -13,6 +13,12 @@
 - When rendering text on canvas, try all spacing compression tiers BEFORE shrinking font size. Poem font only shrinks as a last resort (floor 82%). Never cut off text with a hard `break`.
 - Blank lines in poems should render at 50% line height, not full height. They're breathing room, not wasted space.
 - Use en dash (`\u2013`) for date ranges on tribute panels, curly quotes (`\u201C`/`\u201D`) for nicknames.
+- **Scale text by BOTH width and height**: `Math.min(w / 400, h / 260)`. Never use width-only scaling (`w / 400`) because wide-but-short panels (stacked layout) blow up the text. Height cap prevents overflow.
+
+## Frame Preview Rendering
+- **Single mat-opening bevel** on `.preview-panels::before` (not per-panel). Real WHCC mats have one opening; the composite print shows through it. Never add bevels to individual `.panel-photo` elements.
+- **Frame size updates preview**: When the user selects a product size (e.g., 5x7, 11x14), the preview aspect ratio MUST update to match the real frame proportions. Landscape layouts use the wider dimension as width.
+- **Panel gap = separator line**: Set `.preview-panels` background per theme to a shade slightly different from the tribute background, so the CSS Grid gap reads as an intentional divider. Must be visible in ALL themes, not just classic dark.
 
 ## Product Context
 - PRIMARY buyer is sympathy gifter, SECONDARY is pet owner memorializing their own pet.

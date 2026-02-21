@@ -45,11 +45,31 @@
   max-width: 480px;
   width: 100%;
   border-radius: 2px;
+  position: relative;
+}
+
+/* Glass reflection – subtle diagonal shine across the entire framed piece */
+.frame-preview::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+  border-radius: 2px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.02) 30%,
+    transparent 55%,
+    transparent 80%,
+    rgba(255, 255, 255, 0.015) 100%
+  );
 }
 
 .frame-preview .frame-border {
   padding: var(--frame-width);
   border-radius: 2px;
+  position: relative;
 }
 
 .frame-preview .mat-board {
@@ -78,22 +98,24 @@
 .panel-tribute { grid-area: tribute; }
 .panel-panel2 { grid-area: panel2; }
 
-/* Beveled mat opening – recessed into mat (photo panels only) */
-.panel-photo::before {
+/* Single mat-opening bevel – one continuous 45-degree cut around the entire print.
+   Real WHCC mats have a single opening; the composite print shows through it. */
+.preview-panels::before {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 1;
-  border-top: 3px solid rgba(0, 0, 0, 0.5);
-  border-left: 3px solid rgba(0, 0, 0, 0.35);
-  border-bottom: 3px solid rgba(200, 180, 150, 0.3);
-  border-right: 3px solid rgba(200, 180, 150, 0.2);
+  z-index: 5;
+  /* Top/left darker (shadow side), bottom/right lighter (mat core catching light) */
+  border-top: 3px solid rgba(0, 0, 0, 0.45);
+  border-left: 3px solid rgba(0, 0, 0, 0.3);
+  border-bottom: 3px solid rgba(200, 185, 155, 0.35);
+  border-right: 3px solid rgba(200, 185, 155, 0.25);
   box-shadow:
-    inset 0 5px 8px -3px rgba(0, 0, 0, 0.35),
-    inset 4px 0 6px -3px rgba(0, 0, 0, 0.2),
-    inset 0 -4px 6px -3px rgba(200, 180, 150, 0.15),
-    inset -3px 0 5px -3px rgba(200, 180, 150, 0.08);
+    inset 0 6px 14px -4px rgba(0, 0, 0, 0.35),
+    inset 5px 0 10px -4px rgba(0, 0, 0, 0.18),
+    inset 0 -5px 10px -4px rgba(200, 185, 155, 0.12),
+    inset -4px 0 8px -4px rgba(200, 185, 155, 0.06);
 }
 
 .panel canvas {
@@ -227,73 +249,93 @@
 .frame-preview.theme-classic-dark .frame-border {
   background: linear-gradient(145deg, #2c2018, #3a2a1c 15%, #1e1610 40%, #2a1e14 70%, #1a120c);
   box-shadow:
-    0 6px 32px rgba(0,0,0,0.5),
-    inset 0 1px 0 rgba(255,255,255,0.08),
-    inset 0 -1px 0 rgba(0,0,0,0.3);
+    /* Wall-mount depth – frame floats on the wall */
+    0 10px 45px rgba(0, 0, 0, 0.55),
+    0 3px 15px rgba(0, 0, 0, 0.35),
+    /* Top/left edge catching light */
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 1px 0 0 rgba(255, 255, 255, 0.05),
+    /* Bottom/right inner depth */
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    inset -1px 0 0 rgba(0, 0, 0, 0.2);
 }
 .frame-preview.theme-classic-dark .mat-board {
   background: #0a0908;
   border: 1px solid #181410;
   box-shadow:
-    inset 0 1px 3px rgba(0,0,0,0.5),
-    inset 0 -1px 0 rgba(255,255,255,0.03);
+    inset 0 2px 4px rgba(0, 0, 0, 0.5),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03);
 }
-/* Classic dark uses the base .panel-photo::before bevel (cream core, dark mat) */
+.frame-preview.theme-classic-dark .preview-panels {
+  background: #0a0908;
+}
 
 /* --- Warm Natural Theme --- */
 .frame-preview.theme-warm-natural .frame-border {
   background: linear-gradient(145deg, #b8956a, #c9a87c 15%, #a0804f 40%, #c4a06d 70%, #96783f);
   box-shadow:
-    0 6px 32px rgba(0,0,0,0.3),
-    inset 0 1px 0 rgba(255,255,255,0.15),
-    inset 0 -1px 0 rgba(0,0,0,0.2);
+    0 10px 45px rgba(0, 0, 0, 0.3),
+    0 3px 15px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 1px 0 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+    inset -1px 0 0 rgba(0, 0, 0, 0.1);
 }
 .frame-preview.theme-warm-natural .mat-board {
   background: #F5EDE0;
   border: 1px solid #E0D8CC;
   box-shadow:
-    inset 0 1px 3px rgba(0,0,0,0.15),
-    inset 0 -1px 0 rgba(255,255,255,0.5);
+    inset 0 2px 4px rgba(0, 0, 0, 0.12),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.5);
 }
-/* Warm bevel – recessed into cream mat (photo panels only) */
-.frame-preview.theme-warm-natural .panel-photo::before {
-  border-top-color: rgba(0, 0, 0, 0.15);
-  border-left-color: rgba(0, 0, 0, 0.1);
-  border-bottom-color: rgba(255, 255, 255, 0.5);
-  border-right-color: rgba(255, 255, 255, 0.35);
+.frame-preview.theme-warm-natural .preview-panels {
+  background: #E8DDD0;
+}
+/* Warm mat-opening bevel – cream mat with white core */
+.frame-preview.theme-warm-natural .preview-panels::before {
+  border-top-color: rgba(0, 0, 0, 0.12);
+  border-left-color: rgba(0, 0, 0, 0.08);
+  border-bottom-color: rgba(255, 255, 255, 0.55);
+  border-right-color: rgba(255, 255, 255, 0.4);
   box-shadow:
-    inset 0 6px 10px -3px rgba(0, 0, 0, 0.12),
-    inset 5px 0 8px -3px rgba(0, 0, 0, 0.06),
-    inset 0 -5px 8px -3px rgba(255, 255, 255, 0.3),
-    inset -5px 0 6px -3px rgba(255, 255, 255, 0.15);
+    inset 0 6px 12px -4px rgba(0, 0, 0, 0.1),
+    inset 5px 0 10px -4px rgba(0, 0, 0, 0.05),
+    inset 0 -5px 10px -4px rgba(255, 255, 255, 0.35),
+    inset -4px 0 8px -4px rgba(255, 255, 255, 0.18);
 }
 
 /* --- Soft Light Theme --- */
 .frame-preview.theme-soft-light .frame-border {
   background: linear-gradient(145deg, #e8e4e0, #f0ece8 15%, #d8d4d0 40%, #ece8e4 70%, #d0ccc8);
   box-shadow:
-    0 6px 32px rgba(0,0,0,0.15),
-    inset 0 1px 0 rgba(255,255,255,0.5),
-    inset 0 -1px 0 rgba(0,0,0,0.08);
+    0 10px 45px rgba(0, 0, 0, 0.14),
+    0 3px 15px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 1px 0 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+    inset -1px 0 0 rgba(0, 0, 0, 0.04);
 }
 .frame-preview.theme-soft-light .mat-board {
   background: #FFFFFF;
   border: 1px solid #ebe8e4;
   box-shadow:
-    inset 0 1px 3px rgba(0,0,0,0.06),
-    inset 0 -1px 0 rgba(255,255,255,0.8);
+    inset 0 2px 4px rgba(0, 0, 0, 0.05),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.8);
 }
-/* Light bevel – recessed into white mat, very subtle (photo panels only) */
-.frame-preview.theme-soft-light .panel-photo::before {
-  border-top-color: rgba(0, 0, 0, 0.08);
-  border-left-color: rgba(0, 0, 0, 0.05);
+.frame-preview.theme-soft-light .preview-panels {
+  background: #EDEBE8;
+}
+/* Light mat-opening bevel – white mat, ultra-subtle */
+.frame-preview.theme-soft-light .preview-panels::before {
+  border-top-color: rgba(0, 0, 0, 0.07);
+  border-left-color: rgba(0, 0, 0, 0.04);
   border-bottom-color: rgba(255, 255, 255, 0.7);
   border-right-color: rgba(255, 255, 255, 0.5);
   box-shadow:
-    inset 0 6px 10px -3px rgba(0, 0, 0, 0.06),
-    inset 5px 0 8px -3px rgba(0, 0, 0, 0.03),
-    inset 0 -5px 8px -3px rgba(255, 255, 255, 0.4),
-    inset -5px 0 6px -3px rgba(255, 255, 255, 0.2);
+    inset 0 6px 12px -4px rgba(0, 0, 0, 0.05),
+    inset 5px 0 10px -4px rgba(0, 0, 0, 0.025),
+    inset 0 -5px 10px -4px rgba(255, 255, 255, 0.4),
+    inset -4px 0 8px -4px rgba(255, 255, 255, 0.2);
 }
 
 /* ============================================================
