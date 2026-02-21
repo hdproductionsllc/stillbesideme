@@ -23,6 +23,9 @@ for (const dir of [DATA_DIR, SESSIONS_DIR, UPLOADS_DIR, OUTPUT_DIR]) {
 async function start() {
   const db = await require('./src/db/database').init();
 
+  // WHCC webhooks need raw body for HMAC signature verification (must be before express.json)
+  app.use('/api/whcc-webhooks', express.raw({ type: '*/*' }));
+
   // Middleware
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true }));
@@ -96,7 +99,6 @@ async function start() {
   app.use('/api/templates', require('./src/routes/templates'));
 
   // WHCC Print Lab integration
-  app.use('/api/whcc-webhooks', express.raw({ type: '*/*' }));
   app.use('/api/whcc', require('./src/routes/whcc'));
   app.use('/api/whcc-editor', require('./src/routes/whccEditor'));
   app.use('/api/whcc-webhooks', require('./src/routes/whccWebhooks'));
