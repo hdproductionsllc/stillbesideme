@@ -63,7 +63,7 @@ router.post('/callback', (req, res) => {
   console.log('WHCC webhook received:', JSON.stringify(event, null, 2));
 
   try {
-    const confirmationId = event.ConfirmationId || event.confirmationId;
+    const confirmationId = event.ConfirmationID || event.ConfirmationId || event.confirmationId;
     const eventType = event.EventType || event.eventType || event.Type || event.type;
 
     if (!confirmationId) {

@@ -154,18 +154,19 @@ router.post('/test-order', async (req, res) => {
   const db = req.app.locals.db;
   const { imageUrl, shipTo } = req.body;
 
-  // Use any existing product mapping, or a placeholder
-  const mappings = whccCatalog.getAllMappings(db);
-  const mapping = mappings[0];
+  // Use 8x10 mapping by default, or first available
+  const mapping = whccCatalog.getProductMapping(req.body.sku || 'framed-8x10', db)
+    || whccCatalog.getAllMappings(db)[0];
 
   if (!mapping) {
     return res.status(400).json({
-      error: 'No product mappings configured. Fetch the catalog and set up mappings first.',
-      hint: 'GET /api/whcc/catalog → POST /api/whcc/product-map'
+      error: 'No product mappings configured.',
+      hint: 'GET /api/whcc/catalog then POST /api/whcc/product-map'
     });
   }
 
-  const nodeId = mapping.whcc_node_id ? Number(mapping.whcc_node_id) : 10000;
+  // Default attributes validated against sandbox (Lexington Black, Double White Mat, Lustre)
+  const defaultItemAttrs = [623, 602, 560, 615, 2495, 617, 627, 1878, 1907];
   const testPayload = {
     EntryId: `test-${Date.now()}`,
     Orders: [{
@@ -178,23 +179,35 @@ router.post('/test-order', async (req, res) => {
         Zip: '84115',
         Country: 'US'
       },
+      ShipFromAddress: {
+        Name: 'Still Beside Me',
+        Addr1: '3412 S 300 E',
+        City: 'Salt Lake City',
+        State: 'UT',
+        Zip: '84115',
+        Country: 'US'
+      },
+      OrderAttributes: [
+        { AttributeUID: 96 },   // Drop Ship to Client
+        { AttributeUID: 100 }   // USA Trackable 3 days or less
+      ],
       OrderItems: [{
         ProductUID: Number(mapping.whcc_product_uid),
         Quantity: 1,
         ItemAssets: [{
-          ProductNodeID: nodeId,
-          AssetPath: imageUrl || `${process.env.BASE_URL || 'http://localhost:3001'}/uploads/test.jpg`,
+          ProductNodeID: 10000,
+          AssetPath: imageUrl || 'https://picsum.photos/id/237/3000/2400.jpg',
           ImageHash: '',
           AutoRotate: true
         }],
-        ItemAttributes: (mapping.whcc_attribute_uids || []).map(uid => ({ AttributeUID: Number(uid) }))
+        ItemAttributes: defaultItemAttrs.map(uid => ({ AttributeUID: uid }))
       }]
     }]
   };
 
   try {
     const importResult = await whccOrderApi.importOrder(testPayload);
-    const confirmationId = importResult.ConfirmationId || importResult.confirmationId || importResult;
+    const confirmationId = importResult.ConfirmationID || importResult.ConfirmationId;
 
     // Track it
     db.run(

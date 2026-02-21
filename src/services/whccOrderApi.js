@@ -150,9 +150,28 @@ function buildImageUrl(relativePath) {
   return `${BASE_URL()}/uploads/${relativePath}`;
 }
 
+// Default framed print attributes (validated against WHCC sandbox)
+const DEFAULT_FRAME_ATTRIBUTES = {
+  orderAttributes: [
+    96,    // Drop Ship to Client
+    100    // USA Trackable 3 days or less
+  ],
+  itemAttributes: [
+    623,   // Standard Framed Print Mounting
+    602,   // Lexington Black Frame
+    560,   // Mat
+    615,   // Double White Mat
+    2495,  // 1" Mat
+    617,   // Lustre Photo Print
+    627,   // Lustre Coating (Kodak Lustre)
+    1878,  // Standard Acrylic
+    1907   // Wire Wall Hanger with Paper Backing
+  ]
+};
+
 /**
  * High-level: place an order with WHCC from our order data.
- * Reads our order → builds WHCC payload → import → submit → track.
+ * Reads our order -> builds WHCC payload -> import -> submit -> track.
  */
 async function placeOrder(orderId, db) {
   const order = db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
@@ -176,8 +195,12 @@ async function placeOrder(orderId, db) {
   const imageUrl = buildImageUrl(primaryPhoto.originalPath);
   const entryId = uuidv4();
 
-  // Build WHCC order payload (matches their OrderImport schema)
-  const nodeId = mapping.whcc_node_id ? Number(mapping.whcc_node_id) : 10000;
+  // Use custom attributes from mapping, or fall back to defaults
+  const itemAttrs = (mapping.whcc_attribute_uids && mapping.whcc_attribute_uids.length > 0)
+    ? mapping.whcc_attribute_uids
+    : DEFAULT_FRAME_ATTRIBUTES.itemAttributes;
+
+  // Build WHCC order payload (validated against sandbox)
   const payload = {
     EntryId: entryId,
     Orders: [{
@@ -191,16 +214,25 @@ async function placeOrder(orderId, db) {
         Zip: shipping.zip || shipping.postalCode || '',
         Country: shipping.country || 'US'
       },
+      ShipFromAddress: {
+        Name: 'Still Beside Me',
+        Addr1: '3412 S 300 E',
+        City: 'Salt Lake City',
+        State: 'UT',
+        Zip: '84115',
+        Country: 'US'
+      },
+      OrderAttributes: DEFAULT_FRAME_ATTRIBUTES.orderAttributes.map(uid => ({ AttributeUID: uid })),
       OrderItems: [{
         ProductUID: Number(mapping.whcc_product_uid),
         Quantity: 1,
         ItemAssets: [{
-          ProductNodeID: nodeId,
+          ProductNodeID: 10000,
           AssetPath: imageUrl,
           ImageHash: primaryPhoto.md5 || '',
           AutoRotate: true
         }],
-        ItemAttributes: (mapping.whcc_attribute_uids || []).map(uid => ({ AttributeUID: Number(uid) }))
+        ItemAttributes: itemAttrs.map(uid => ({ AttributeUID: Number(uid) }))
       }]
     }]
   };
@@ -214,7 +246,17 @@ async function placeOrder(orderId, db) {
 
   // Import to WHCC
   const importResult = await importOrder(payload);
-  const confirmationId = importResult.ConfirmationId || importResult.confirmationId || importResult;
+  const confirmationId = importResult.ConfirmationID || importResult.ConfirmationId;
+
+  if (!confirmationId) {
+    const errMsg = importResult.Message || JSON.stringify(importResult);
+    db.run(
+      `UPDATE whcc_orders SET status = 'error', error_message = ?,
+       response_json = ?, updated_at = datetime('now') WHERE entry_id = ?`,
+      [errMsg, JSON.stringify(importResult), entryId]
+    );
+    throw new Error(`WHCC import failed: ${errMsg}`);
+  }
 
   db.run(
     `UPDATE whcc_orders SET confirmation_id = ?, status = 'imported',
