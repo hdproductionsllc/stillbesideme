@@ -82,6 +82,30 @@ async function start() {
   app.get('/loss-of-father-gift', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'loss-of-father-gift.html'));
   });
+  app.get('/loss-of-husband-gift', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'loss-of-husband-gift.html'));
+  });
+  app.get('/loss-of-wife-gift', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'loss-of-wife-gift.html'));
+  });
+  app.get('/loss-of-grandmother-gift', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'loss-of-grandmother-gift.html'));
+  });
+  app.get('/loss-of-grandfather-gift', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'loss-of-grandfather-gift.html'));
+  });
+  app.get('/loss-of-child-gift', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'loss-of-child-gift.html'));
+  });
+  app.get('/loss-of-brother-gift', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'loss-of-brother-gift.html'));
+  });
+  app.get('/loss-of-sister-gift', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'loss-of-sister-gift.html'));
+  });
+  app.get('/loss-of-best-friend-gift', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'loss-of-best-friend-gift.html'));
+  });
 
   // Blog routes – clean URLs
   app.get('/blog', (req, res) => {
@@ -156,6 +180,54 @@ async function start() {
   </url>
   <url>
     <loc>${baseUrl}/loss-of-father-gift</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/loss-of-husband-gift</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/loss-of-wife-gift</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/loss-of-grandmother-gift</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/loss-of-grandfather-gift</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/loss-of-child-gift</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/loss-of-brother-gift</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/loss-of-sister-gift</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/loss-of-best-friend-gift</loc>
     <lastmod>${today}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
