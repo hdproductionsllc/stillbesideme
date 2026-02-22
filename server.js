@@ -60,6 +60,29 @@ async function start() {
   app.use(express.static(path.join(__dirname, 'public')));
   app.use('/uploads', express.static(UPLOADS_DIR));
 
+  // SEO landing pages – clean URLs
+  app.get('/pet-memorial-gifts', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'pet-memorial-gifts.html'));
+  });
+  app.get('/sympathy-gifts', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'sympathy-gifts.html'));
+  });
+  app.get('/memorial-gifts', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'memorial-gifts.html'));
+  });
+  app.get('/dog-memorial-gifts', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'dog-memorial-gifts.html'));
+  });
+  app.get('/cat-memorial-gifts', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'cat-memorial-gifts.html'));
+  });
+  app.get('/loss-of-mother-gift', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'loss-of-mother-gift.html'));
+  });
+  app.get('/loss-of-father-gift', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'loss-of-father-gift.html'));
+  });
+
   // Clean URL: /customize and /customize/:templateId → customize.html
   app.get('/customize', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'customize.html'));
@@ -80,6 +103,48 @@ async function start() {
     <lastmod>${today}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/pet-memorial-gifts</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/sympathy-gifts</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/memorial-gifts</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/dog-memorial-gifts</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/cat-memorial-gifts</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/loss-of-mother-gift</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/loss-of-father-gift</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>${baseUrl}/customize/pet-tribute</loc>
