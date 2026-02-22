@@ -1,11 +1,12 @@
 /**
  * Stripe Webhook Handler
  * Processes checkout.session.completed and checkout.session.expired events.
- * On successful payment: saves shipping, updates order, triggers WHCC fulfillment.
+ * On successful payment: saves shipping, generates proof, emails customer for approval.
  */
 
 const express = require('express');
 const router = express.Router();
+const { v4: uuidv4 } = require('uuid');
 
 /**
  * POST /api/stripe-webhooks
@@ -69,7 +70,7 @@ async function handleCheckoutCompleted(session, db) {
   }
 
   // Idempotency – don't process twice
-  if (order.status === 'submitted' || order.status === 'in_production' || order.status === 'shipped') {
+  if (['proof_ready', 'proof_approved', 'change_requested', 'in_production', 'shipped'].includes(order.status)) {
     console.log(`Stripe webhook: order ${orderId} already processed (status: ${order.status})`);
     return;
   }
@@ -96,16 +97,22 @@ async function handleCheckoutCompleted(session, db) {
     });
   }
 
-  // Update order with payment + shipping info
+  // Generate proof token for approval URL
+  const proofToken = uuidv4();
+
+  // Update order with payment + shipping info, set to proof_ready (NOT submitted)
+  const provider = process.env.FULFILLMENT_PROVIDER || 'whcc';
   db.run(
     `UPDATE orders SET
-       status = 'submitted',
+       status = 'proof_ready',
        stripe_payment_intent_id = ?,
        email = ?,
        shipping_json = COALESCE(?, shipping_json),
+       proof_token = ?,
+       fulfillment_provider = ?,
        updated_at = datetime('now')
      WHERE id = ?`,
-    [paymentIntentId, email, shippingJson, orderId]
+    [paymentIntentId, email, shippingJson, proofToken, provider, orderId]
   );
 
   // Log event
@@ -119,26 +126,40 @@ async function handleCheckoutCompleted(session, db) {
     })]
   );
 
-  // Submit to fulfillment provider (Luma or WHCC)
-  const provider = process.env.FULFILLMENT_PROVIDER || 'whcc';
-  db.run('UPDATE orders SET fulfillment_provider = ? WHERE id = ?', [provider, orderId]);
-
+  // Generate proof image and send email (non-blocking — order is safe even if this fails)
   try {
-    if (provider === 'luma') {
-      const lumaOrderApi = require('../services/lumaOrderApi');
-      const result = await lumaOrderApi.placeOrder(orderId, db);
-      console.log(`Order ${orderId} submitted to Luma:`, result.orderNumber);
-    } else {
-      const whccOrderApi = require('../services/whccOrderApi');
-      const result = await whccOrderApi.placeOrder(orderId, db);
-      console.log(`Order ${orderId} submitted to WHCC:`, result.confirmationId);
-    }
-  } catch (err) {
-    console.error(`Failed to submit order ${orderId} to ${provider}:`, err.message);
-    // Order is saved and paid - fulfillment can be retried manually
+    const proofGenerator = require('../services/proofGenerator');
+    const updatedOrder = db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
+    const { proofRelativeUrl } = await proofGenerator.generateProof(updatedOrder);
+
+    // Save proof URL to order
+    db.run('UPDATE orders SET proof_url = ?, updated_at = datetime(\'now\') WHERE id = ?', [proofRelativeUrl, orderId]);
+
+    // Send proof email
+    const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
+    const proofImageUrl = `${baseUrl}${proofRelativeUrl}`;
+    const approvalPageUrl = `${baseUrl}/proof/${proofToken}`;
+
+    const emailService = require('../services/emailService');
+    await emailService.sendProofEmail(email, {
+      orderId,
+      templateName: updatedOrder.template_id,
+      sku: updatedOrder.product_sku,
+      totalCents: updatedOrder.total_cents,
+    }, proofImageUrl, approvalPageUrl);
+
     db.run(
       `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
-      [orderId, `${provider}_submit_failed`, JSON.stringify({ error: err.message })]
+      [orderId, 'proof_sent', JSON.stringify({ proofUrl: proofRelativeUrl, email })]
+    );
+
+    console.log(`Order ${orderId}: proof generated and emailed to ${email}`);
+  } catch (err) {
+    console.error(`Failed to generate/send proof for order ${orderId}:`, err.message);
+    // Order is saved and paid — proof can be generated/sent manually
+    db.run(
+      `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+      [orderId, 'proof_generation_failed', JSON.stringify({ error: err.message })]
     );
   }
 }

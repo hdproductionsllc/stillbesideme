@@ -293,6 +293,15 @@ async function start() {
   app.use('/api/luma', require('./src/routes/luma'));
   app.use('/api/luma-webhooks', require('./src/routes/lumaWebhooks'));
 
+  // Proof approval workflow
+  app.use('/api/proof', require('./src/routes/proofApproval'));
+  app.get('/proof/:token', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'proof-approval.html'));
+  });
+
+  // Serve proof images from output directory
+  app.use('/output', express.static(OUTPUT_DIR));
+
   // 404 catch-all (must be last route)
   app.use((req, res) => {
     res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
