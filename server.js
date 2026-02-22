@@ -25,6 +25,7 @@ async function start() {
 
   // Webhooks need raw body for signature verification (must be before express.json)
   app.use('/api/whcc-webhooks', express.raw({ type: '*/*' }));
+  app.use('/api/luma-webhooks', express.raw({ type: 'application/json' }));
   app.use('/api/stripe-webhooks', express.raw({ type: 'application/json' }));
 
   // Middleware
@@ -112,6 +113,10 @@ async function start() {
   app.use('/api/whcc', require('./src/routes/whcc'));
   app.use('/api/whcc-editor', require('./src/routes/whccEditor'));
   app.use('/api/whcc-webhooks', require('./src/routes/whccWebhooks'));
+
+  // Luma Prints integration
+  app.use('/api/luma', require('./src/routes/luma'));
+  app.use('/api/luma-webhooks', require('./src/routes/lumaWebhooks'));
 
   app.listen(PORT, () => {
     console.log(`\n  Still Beside Me – Memorial Art Store`);

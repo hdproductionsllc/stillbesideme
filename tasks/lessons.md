@@ -59,6 +59,16 @@ To go live with payments, 3 things need to be configured:
 
 **Testing**: Use Stripe test mode with card `4242 4242 4242 4242`, any future expiry, any CVC. For local webhook testing: `stripe listen --forward-to localhost:3001/api/stripe-webhooks`
 
+## Luma Prints Integration
+- **Auth is HTTP Basic** (base64-encode `key:secret`), not OAuth tokens like WHCC. Much simpler.
+- **Sandbox URL**: `https://us.api-sandbox.lumaprints.com`, **Production**: `https://us.api.lumaprints.com`
+- **Product discovery workflow**: `GET /api/v1/stores` -> `GET /api/v1/products/categories` -> `GET /api/v1/products/subcategories/{id}/options`. Run `GET /api/luma/setup` to see everything at once.
+- **Option IDs must be discovered first** via the setup endpoint, then hardcoded in `LUMA_CONFIG` inside `src/services/lumaOrderApi.js`. They won't change unless Luma updates their catalog.
+- **LUMA_STORE_ID** must be set in `.env` after running the setup endpoint. Without it, `placeOrder()` will throw.
+- **Fulfillment dispatch** is controlled by `FULFILLMENT_PROVIDER` env var (`luma` or `whcc`). Change it to switch providers without code changes.
+- **Webhook is simpler than WHCC**: Luma fires a single `shipping` event with tracking info. No signature verification dance, no two-step register/verify flow.
+- **Cost comparison**: Luma $33 for 11x14 framed vs WHCC $92. Same product specs (solid wood frame, white mat, acrylic, archival paper).
+
 ## Landing Page Framework (Oliver Kenyon CRO)
 Every landing page should follow this structure in order:
 

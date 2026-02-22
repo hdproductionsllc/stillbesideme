@@ -119,17 +119,26 @@ async function handleCheckoutCompleted(session, db) {
     })]
   );
 
-  // Submit to WHCC for printing
+  // Submit to fulfillment provider (Luma or WHCC)
+  const provider = process.env.FULFILLMENT_PROVIDER || 'whcc';
+  db.run('UPDATE orders SET fulfillment_provider = ? WHERE id = ?', [provider, orderId]);
+
   try {
-    const whccOrderApi = require('../services/whccOrderApi');
-    const result = await whccOrderApi.placeOrder(orderId, db);
-    console.log(`Order ${orderId} submitted to WHCC:`, result.confirmationId);
+    if (provider === 'luma') {
+      const lumaOrderApi = require('../services/lumaOrderApi');
+      const result = await lumaOrderApi.placeOrder(orderId, db);
+      console.log(`Order ${orderId} submitted to Luma:`, result.orderNumber);
+    } else {
+      const whccOrderApi = require('../services/whccOrderApi');
+      const result = await whccOrderApi.placeOrder(orderId, db);
+      console.log(`Order ${orderId} submitted to WHCC:`, result.confirmationId);
+    }
   } catch (err) {
-    console.error(`Failed to submit order ${orderId} to WHCC:`, err.message);
-    // Order is saved and paid – WHCC submission can be retried manually
+    console.error(`Failed to submit order ${orderId} to ${provider}:`, err.message);
+    // Order is saved and paid - fulfillment can be retried manually
     db.run(
       `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
-      [orderId, 'whcc_submit_failed', JSON.stringify({ error: err.message })]
+      [orderId, `${provider}_submit_failed`, JSON.stringify({ error: err.message })]
     );
   }
 }
