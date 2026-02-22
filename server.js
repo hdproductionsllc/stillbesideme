@@ -293,6 +293,11 @@ async function start() {
   app.use('/api/luma', require('./src/routes/luma'));
   app.use('/api/luma-webhooks', require('./src/routes/lumaWebhooks'));
 
+  // 404 catch-all (must be last route)
+  app.use((req, res) => {
+    res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
+  });
+
   app.listen(PORT, () => {
     console.log(`\n  Still Beside Me – Memorial Art Store`);
     console.log(`  http://localhost:${PORT}`);
