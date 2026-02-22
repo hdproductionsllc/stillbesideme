@@ -654,6 +654,35 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
   color: #b89a74;
 }
 
+.collection-sublinks {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-top: calc(-1 * var(--space-sm));
+  padding-bottom: var(--space-sm);
+}
+
+.collection-sublinks span {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+.collection-sublinks a {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-warm);
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.collection-sublinks a:hover {
+  color: #b89a74;
+  border-bottom-color: #b89a74;
+}
+
 /* ============================================================
    SECTION 3: STYLE SHOWCASE
    ============================================================ */
