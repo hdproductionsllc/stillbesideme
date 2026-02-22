@@ -83,6 +83,20 @@ async function start() {
     res.sendFile(path.join(__dirname, 'public', 'loss-of-father-gift.html'));
   });
 
+  // Blog routes – clean URLs
+  app.get('/blog', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'blog', 'index.html'));
+  });
+  app.get('/blog/how-to-write-sympathy-card', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'blog', 'how-to-write-sympathy-card.html'));
+  });
+  app.get('/blog/first-year-after-losing-pet', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'blog', 'first-year-after-losing-pet.html'));
+  });
+  app.get('/blog/personalized-memorial-gifts-vs-flowers', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'blog', 'personalized-memorial-gifts-vs-flowers.html'));
+  });
+
   // Clean URL: /customize and /customize/:templateId → customize.html
   app.get('/customize', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'customize.html'));
@@ -157,6 +171,30 @@ async function start() {
     <lastmod>${today}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/blog</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/blog/how-to-write-sympathy-card</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/blog/first-year-after-losing-pet</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/blog/personalized-memorial-gifts-vs-flowers</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
   </url>
 </urlset>`);
   });
