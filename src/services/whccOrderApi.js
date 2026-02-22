@@ -206,7 +206,7 @@ const DEFAULT_FRAME_ATTRIBUTES = {
     623,   // Standard Framed Print Mounting
     602,   // Lexington Black Frame
     560,   // Mat
-    615,   // Double White Mat
+    1922,  // Single White Mat
     2495,  // 1" Mat
     617,   // Lustre Photo Print
     627,   // Lustre Coating (Kodak Lustre)

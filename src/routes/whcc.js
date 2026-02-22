@@ -165,8 +165,8 @@ router.post('/test-order', async (req, res) => {
     });
   }
 
-  // Default attributes validated against sandbox (Lexington Black, Double White Mat, Lustre)
-  const defaultItemAttrs = [623, 602, 560, 615, 2495, 617, 627, 1878, 1907];
+  // Default attributes validated against sandbox (Lexington Black, Single White Mat, Lustre)
+  const defaultItemAttrs = [623, 602, 560, 1922, 2495, 617, 627, 1878, 1907];
   const testPayload = {
     EntryId: `test-${Date.now()}`,
     Orders: [{
