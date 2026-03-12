@@ -1176,8 +1176,8 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
 
 .footer-inner {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
-  gap: var(--space-2xl);
+  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
+  gap: var(--space-xl);
   margin-bottom: var(--space-2xl);
 }
 
@@ -1193,14 +1193,24 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
   font-size: 0.9rem;
 }
 
+.footer-col-title {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-primary);
+  margin-bottom: var(--space-sm);
+}
+
 .footer-links {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
 }
 
 .footer-links a {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--color-muted);
 }
 .footer-links a:hover {
@@ -1482,12 +1492,22 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
   }
 
   .footer-inner {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-xl);
+  }
+
+  .footer-brand {
+    grid-column: 1 / -1;
     text-align: center;
   }
 
   .footer-signup-form {
     margin: 0 auto;
+  }
+
+  .footer-contact {
+    grid-column: 1 / -1;
+    text-align: center;
   }
 
   .trust-badges {
