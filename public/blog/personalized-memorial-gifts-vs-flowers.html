@@ -4,8 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Google Analytics -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
-  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-XXXXXXXXXX');</script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CM9DENCN96"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-CM9DENCN96');</script>
+  <!-- Meta Pixel (activate by setting META_PIXEL_ID) -->
+  <script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');if(typeof META_PIXEL_ID!=='undefined'){fbq('init',META_PIXEL_ID);fbq('track','PageView');}</script>
   <title>Why Personalized Memorial Gifts Mean More Than Flowers | Still Beside Me</title>
   <meta name="description" content="Flowers last a week. Cards end up in drawers. Here's why a personalized memorial gift &ndash; something that captures who they actually were &ndash; is the sympathy gift people keep forever.">
   <link rel="canonical" href="https://stillbesideme.com/blog/personalized-memorial-gifts-vs-flowers">
@@ -202,17 +204,46 @@
           <a href="/loss-of-sister-gift">Loss of Sister</a>
           <a href="/loss-of-best-friend-gift">Loss of Best Friend</a>
           <a href="/blog">Blog</a>
+          <a href="/contact">Contact</a>
         </div>
         <div class="footer-contact">
           <p>Questions about ordering? We&rsquo;re real people who care.</p>
           <a href="mailto:hello@stillbesideme.com">hello@stillbesideme.com</a>
+        <div class="footer-signup">
+            <p>Get gentle inspiration delivered to your inbox.</p>
+            <form class="footer-signup-form" data-signup-form>
+              <input type="email" placeholder="Your email" required>
+              <button type="submit" class="btn btn-warm btn-sm">Subscribe</button>
+            </form>
+          </div>
         </div>
       </div>
       <div class="footer-bottom">
         <p>&copy; 2026 Still Beside Me. All rights reserved.</p>
+        <div class="footer-legal">
+          <a href="/privacy-policy">Privacy Policy</a>
+          <a href="/terms">Terms of Service</a>
+          <a href="/refund-policy">Refund Policy</a>
+          <a href="/shipping-policy">Shipping Policy</a>
+        </div>
       </div>
     </div>
   </footer>
+
+
+  <!-- Email Capture Popup -->
+  <div class="email-popup-overlay" id="email-popup">
+    <div class="email-popup">
+      <button class="email-popup-close" aria-label="Close">&times;</button>
+      <h3>Before you go...</h3>
+      <p>Grief doesn't follow a schedule. Get gentle inspiration and be the first to know about new collections.</p>
+      <form class="email-popup-form" id="popup-signup-form">
+        <input type="email" placeholder="Your email address" required>
+        <button type="submit" class="btn btn-warm">Stay Connected</button>
+      </form>
+      <div class="email-popup-success" style="display:none;">Thank you. We'll be in touch.</div>
+    </div>
+  </div>
 
   <script src="/js/store.js"></script>
 </body>

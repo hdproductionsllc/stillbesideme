@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CM9DENCN96"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-CM9DENCN96');</script>
+  <!-- Meta Pixel (activate by setting META_PIXEL_ID) -->
+  <script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');if(typeof META_PIXEL_ID!=='undefined'){fbq('init',META_PIXEL_ID);fbq('track','PageView');}</script>
+  <title>Contact Us | Still Beside Me</title>
+  <meta name="description" content="Questions about your memorial tribute? We're real people who care. Reach out anytime.">
+  <link rel="canonical" href="https://stillbesideme.com/contact">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Source+Sans+3:wght@400;600&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/store.css">
+  <style>
+    .contact-hero {
+      background-color: var(--color-bg, #FAF8F5);
+      text-align: center;
+      padding: 4rem 0 3rem;
+    }
+
+    .contact-hero h1 {
+      font-family: var(--font-display, 'Cormorant Garamond', serif);
+      font-size: 2.75rem;
+      font-weight: 300;
+      color: var(--color-primary, #2C2C2C);
+      margin: 0 0 1rem;
+    }
+
+    .contact-hero .subtitle {
+      font-family: var(--font-body, 'Source Sans 3', sans-serif);
+      font-size: 1.15rem;
+      color: var(--color-muted, #9B9590);
+      max-width: 600px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    .contact-content {
+      padding: 3rem 0 5rem;
+    }
+
+    .contact-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: start;
+    }
+
+    .contact-form-section h2,
+    .contact-info-section h2 {
+      font-family: var(--font-display, 'Cormorant Garamond', serif);
+      font-size: 1.75rem;
+      font-weight: 400;
+      color: var(--color-primary, #2C2C2C);
+      margin: 0 0 1.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-family: var(--font-body, 'Source Sans 3', sans-serif);
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--color-primary, #2C2C2C);
+      margin-bottom: 0.25rem;
+    }
+
+    .form-group .helper-text {
+      font-family: var(--font-body, 'Source Sans 3', sans-serif);
+      font-size: 0.825rem;
+      color: var(--color-muted, #9B9590);
+      margin-top: 0.2rem;
+      margin-bottom: 0;
+    }
+
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      border: 1px solid var(--color-border, #E8E4DF);
+      border-radius: var(--radius, 6px);
+      padding: 0.75rem 1rem;
+      font-family: var(--font-body, 'Source Sans 3', sans-serif);
+      font-size: 1rem;
+      color: var(--color-primary, #2C2C2C);
+      background: var(--color-surface, #FFFFFF);
+      transition: border-color 0.2s ease;
+      box-sizing: border-box;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus {
+      border-color: var(--color-warm, #C4A882);
+      outline: none;
+    }
+
+    .form-group textarea {
+      min-height: 150px;
+      resize: vertical;
+    }
+
+    .form-submit {
+      margin-top: 1.5rem;
+    }
+
+    .form-submit .btn {
+      width: 100%;
+      padding: 0.85rem 2rem;
+      font-size: 1.05rem;
+      cursor: pointer;
+    }
+
+    .form-submit .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .form-message {
+      margin-top: 1rem;
+      padding: 1rem 1.25rem;
+      border-radius: var(--radius, 6px);
+      font-family: var(--font-body, 'Source Sans 3', sans-serif);
+      font-size: 0.95rem;
+      display: none;
+    }
+
+    .form-message.success {
+      display: block;
+      background-color: #f0f7f0;
+      color: #2d6a2d;
+      border: 1px solid #c8e0c8;
+    }
+
+    .form-message.error {
+      display: block;
+      background-color: #fdf0f0;
+      color: #9a2e2e;
+      border: 1px solid #e8c8c8;
+    }
+
+    .contact-info-section {
+      padding: 2.5rem;
+      background: var(--color-surface, #FFFFFF);
+      border: 1px solid var(--color-border, #E8E4DF);
+      border-radius: var(--radius, 6px);
+    }
+
+    .contact-info-item {
+      margin-bottom: 2rem;
+    }
+
+    .contact-info-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .contact-info-item h3 {
+      font-family: var(--font-body, 'Source Sans 3', sans-serif);
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--color-primary, #2C2C2C);
+      margin: 0 0 0.35rem;
+    }
+
+    .contact-info-item p {
+      font-family: var(--font-body, 'Source Sans 3', sans-serif);
+      font-size: 1rem;
+      color: var(--color-muted, #9B9590);
+      margin: 0;
+      line-height: 1.6;
+    }
+
+    .contact-info-item a {
+      color: var(--color-warm, #C4A882);
+      text-decoration: none;
+      font-size: 1.05rem;
+    }
+
+    .contact-info-item a:hover {
+      text-decoration: underline;
+    }
+
+    .contact-info-note {
+      margin-top: 2.5rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--color-border, #E8E4DF);
+    }
+
+    .contact-info-note p {
+      font-family: var(--font-display, 'Cormorant Garamond', serif);
+      font-size: 1.2rem;
+      font-style: italic;
+      color: var(--color-primary, #2C2C2C);
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    @media (max-width: 768px) {
+      .contact-hero {
+        padding: 3rem 0 2rem;
+      }
+
+      .contact-hero h1 {
+        font-size: 2rem;
+      }
+
+      .contact-grid {
+        grid-template-columns: 1fr;
+        gap: 2.5rem;
+      }
+
+      .contact-info-section {
+        padding: 2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a href="/" class="site-logo">Still Beside Me</a>
+      <nav class="site-nav">
+        <a href="/#how-it-works">How It Works</a>
+        <a href="/#our-story">Our Story</a>
+        <a href="/#collections" class="btn btn-warm btn-sm">Create a Tribute</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="contact-hero">
+    <div class="container">
+      <h1>We're here for you</h1>
+      <p class="subtitle">Whether you have questions about your order, need help with your tribute, or just want to talk &mdash; we're real people who care.</p>
+    </div>
+  </section>
+
+  <section class="contact-content">
+    <div class="container">
+      <div class="contact-grid">
+        <div class="contact-form-section">
+          <h2>Send us a message</h2>
+          <form id="contact-form" novalidate>
+            <div class="form-group">
+              <label for="contact-name">Name</label>
+              <input type="text" id="contact-name" name="name" required autocomplete="name" placeholder="Your name">
+            </div>
+            <div class="form-group">
+              <label for="contact-email">Email</label>
+              <input type="email" id="contact-email" name="email" required autocomplete="email" placeholder="your@email.com">
+            </div>
+            <div class="form-group">
+              <label for="contact-order">Order Number</label>
+              <input type="text" id="contact-order" name="orderNumber" placeholder="e.g. SBM-1234">
+              <p class="helper-text">If this is about an existing order</p>
+            </div>
+            <div class="form-group">
+              <label for="contact-message">Message</label>
+              <textarea id="contact-message" name="message" required placeholder="How can we help?"></textarea>
+            </div>
+            <div class="form-submit">
+              <button type="submit" class="btn btn-warm">Send Message</button>
+            </div>
+            <div id="form-message" class="form-message"></div>
+          </form>
+        </div>
+
+        <div class="contact-info-section">
+          <h2>Get in touch</h2>
+          <div class="contact-info-item">
+            <h3>Email</h3>
+            <a href="mailto:hello@stillbesideme.com">hello@stillbesideme.com</a>
+          </div>
+          <div class="contact-info-item">
+            <h3>Response Time</h3>
+            <p>We typically respond within 24 hours.</p>
+          </div>
+          <div class="contact-info-note">
+            <p>We understand these tributes are deeply personal. No question is too small &mdash; if it matters to you, it matters to us.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <div class="brand">Still Beside Me</div>
+          <p>Museum-quality memorial tributes &ndash; personalized poems and letters, framed with their photo.</p>
+        </div>
+        <div class="footer-links">
+          <a href="/pet-memorial-gifts">Pet Memorial Gifts</a>
+          <a href="/memorial-gifts">Memorial Gifts</a>
+          <a href="/sympathy-gifts">Sympathy Gifts</a>
+          <a href="/blog">Blog</a>
+          <a href="/contact">Contact</a>
+        </div>
+        <div class="footer-contact">
+          <p>Questions about ordering? We're real people who care.</p>
+          <a href="mailto:hello@stillbesideme.com">hello@stillbesideme.com</a>
+        <div class="footer-signup">
+            <p>Get gentle inspiration delivered to your inbox.</p>
+            <form class="footer-signup-form" data-signup-form>
+              <input type="email" placeholder="Your email" required>
+              <button type="submit" class="btn btn-warm btn-sm">Subscribe</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2026 Still Beside Me. All rights reserved.</p>
+        <div class="footer-legal">
+          <a href="/privacy-policy">Privacy Policy</a>
+          <a href="/terms">Terms of Service</a>
+          <a href="/refund-policy">Refund Policy</a>
+          <a href="/shipping-policy">Shipping Policy</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Email Capture Popup -->
+  <div class="email-popup-overlay" id="email-popup">
+    <div class="email-popup">
+      <button class="email-popup-close" aria-label="Close">&times;</button>
+      <h3>Before you go...</h3>
+      <p>Grief doesn't follow a schedule. Get gentle inspiration and be the first to know about new collections.</p>
+      <form class="email-popup-form" id="popup-signup-form">
+        <input type="email" placeholder="Your email address" required>
+        <button type="submit" class="btn btn-warm">Stay Connected</button>
+      </form>
+      <div class="email-popup-success" style="display:none;">Thank you. We'll be in touch.</div>
+    </div>
+  </div>
+
+  <script src="/js/store.js"></script>
+  <script>
+    (function() {
+      var form = document.getElementById('contact-form');
+      var messageEl = document.getElementById('form-message');
+      var submitBtn = form.querySelector('button[type="submit"]');
+
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        // Clear previous messages
+        messageEl.className = 'form-message';
+        messageEl.style.display = 'none';
+        messageEl.textContent = '';
+
+        // Basic validation
+        var name = form.querySelector('#contact-name').value.trim();
+        var email = form.querySelector('#contact-email').value.trim();
+        var message = form.querySelector('#contact-message').value.trim();
+        var orderNumber = form.querySelector('#contact-order').value.trim();
+
+        if (!name || !email || !message) {
+          messageEl.textContent = 'Please fill in all required fields.';
+          messageEl.className = 'form-message error';
+          return;
+        }
+
+        // Simple email validation
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          messageEl.textContent = 'Please enter a valid email address.';
+          messageEl.className = 'form-message error';
+          return;
+        }
+
+        // Disable button and show sending state
+        submitBtn.disabled = true;
+        var originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Sending...';
+
+        var payload = {
+          name: name,
+          email: email,
+          message: message
+        };
+        if (orderNumber) {
+          payload.orderNumber = orderNumber;
+        }
+
+        fetch('/api/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        .then(function(res) {
+          if (!res.ok) throw new Error('Server error');
+          return res.json();
+        })
+        .then(function() {
+          messageEl.textContent = 'Thank you for reaching out. We\u2019ll get back to you as soon as we can.';
+          messageEl.className = 'form-message success';
+          form.reset();
+        })
+        .catch(function() {
+          messageEl.textContent = 'Something went wrong. Please email us directly at hello@stillbesideme.com.';
+          messageEl.className = 'form-message error';
+        })
+        .finally(function() {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

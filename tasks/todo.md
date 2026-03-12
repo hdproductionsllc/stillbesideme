@@ -101,6 +101,19 @@
 - [x] store.css: .collection-grid, .collection-card, .collection-card-mockup styles
 - [x] store.css: responsive collection grid (stacks on mobile)
 
+### Launch Readiness (Complete)
+- [x] GA4 real measurement ID (G-CM9DENCN96) on all pages
+- [x] Security hardening: helmet, rate limiting, upload restriction
+- [x] Legal pages: Privacy Policy, Terms, Refund Policy, Shipping Policy
+- [x] Footer legal links + Contact link on all pages
+- [x] Contact page with form + API endpoint
+- [x] Sentry error monitoring (awaiting SENTRY_DSN)
+- [x] Meta Pixel + Google Ads tag (placeholder IDs, ready to activate)
+- [x] Trust badges on homepage + all landing pages
+- [x] Email capture: exit-intent popup + footer signup form + Mailchimp API proxy
+- [x] Mobile UX improvements for customizer touch interactions
+- [x] GA4 e-commerce events (begin_checkout, purchase)
+
 ## Next
 
 ### Cart & Checkout

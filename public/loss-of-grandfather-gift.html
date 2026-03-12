@@ -4,8 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Google Analytics -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
-  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-XXXXXXXXXX');</script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CM9DENCN96"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-CM9DENCN96');</script>
+  <!-- Meta Pixel (activate by setting META_PIXEL_ID) -->
+  <script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');if(typeof META_PIXEL_ID!=='undefined'){fbq('init',META_PIXEL_ID);fbq('track','PageView');}</script>
   <title>Loss of Grandfather Gift – A Letter He Would Have Written | Still Beside Me</title>
   <meta name="description" content="A personalized letter written from your grandfather's perspective &ndash; in his voice, from your memories &ndash; printed alongside his photo in a handcrafted frame. The gift grandchildren keep forever. From $84.95.">
   <link rel="canonical" href="https://stillbesideme.com/loss-of-grandfather-gift">
@@ -398,6 +400,29 @@
     </div>
   </section>
 
+
+  <!-- Trust Badges -->
+  <div class="trust-badges">
+    <div class="container" style="display:flex;justify-content:center;gap:3rem;flex-wrap:wrap;">
+      <div class="trust-badge">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span class="trust-badge-label">Satisfaction Guarantee</span>
+      </div>
+      <div class="trust-badge">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a4 4 0 0 0-8 0v2"/></svg>
+        <span class="trust-badge-label">Secure Checkout</span>
+      </div>
+      <div class="trust-badge">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5a1 1 0 0 1-1 1h-1"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        <span class="trust-badge-label">Free Shipping</span>
+      </div>
+      <div class="trust-badge">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        <span class="trust-badge-label">Handcrafted in USA</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Footer -->
   <footer class="site-footer">
     <div class="container">
@@ -423,17 +448,46 @@
           <a href="/loss-of-sister-gift">Loss of Sister</a>
           <a href="/loss-of-best-friend-gift">Loss of Best Friend</a>
           <a href="/blog">Blog</a>
+          <a href="/contact">Contact</a>
         </div>
         <div class="footer-contact">
           <p>Questions about ordering? We're real people who care.</p>
           <a href="mailto:hello@stillbesideme.com">hello@stillbesideme.com</a>
+        <div class="footer-signup">
+            <p>Get gentle inspiration delivered to your inbox.</p>
+            <form class="footer-signup-form" data-signup-form>
+              <input type="email" placeholder="Your email" required>
+              <button type="submit" class="btn btn-warm btn-sm">Subscribe</button>
+            </form>
+          </div>
         </div>
       </div>
       <div class="footer-bottom">
         <p>&copy; 2026 Still Beside Me. All rights reserved.</p>
+        <div class="footer-legal">
+          <a href="/privacy-policy">Privacy Policy</a>
+          <a href="/terms">Terms of Service</a>
+          <a href="/refund-policy">Refund Policy</a>
+          <a href="/shipping-policy">Shipping Policy</a>
+        </div>
       </div>
     </div>
   </footer>
+
+
+  <!-- Email Capture Popup -->
+  <div class="email-popup-overlay" id="email-popup">
+    <div class="email-popup">
+      <button class="email-popup-close" aria-label="Close">&times;</button>
+      <h3>Before you go...</h3>
+      <p>Grief doesn't follow a schedule. Get gentle inspiration and be the first to know about new collections.</p>
+      <form class="email-popup-form" id="popup-signup-form">
+        <input type="email" placeholder="Your email address" required>
+        <button type="submit" class="btn btn-warm">Stay Connected</button>
+      </form>
+      <div class="email-popup-success" style="display:none;">Thank you. We'll be in touch.</div>
+    </div>
+  </div>
 
   <script src="/js/store.js"></script>
 </body>

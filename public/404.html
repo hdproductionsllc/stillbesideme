@@ -66,17 +66,46 @@
           <a href="/loss-of-sister-gift">Loss of Sister</a>
           <a href="/loss-of-best-friend-gift">Loss of Best Friend</a>
           <a href="/blog">Blog</a>
+          <a href="/contact">Contact</a>
         </div>
         <div class="footer-contact">
           <p>Questions about ordering? We&rsquo;re real people who care.</p>
           <a href="mailto:hello@stillbesideme.com">hello@stillbesideme.com</a>
+        <div class="footer-signup">
+            <p>Get gentle inspiration delivered to your inbox.</p>
+            <form class="footer-signup-form" data-signup-form>
+              <input type="email" placeholder="Your email" required>
+              <button type="submit" class="btn btn-warm btn-sm">Subscribe</button>
+            </form>
+          </div>
         </div>
       </div>
       <div class="footer-bottom">
         <p>&copy; 2026 Still Beside Me. All rights reserved.</p>
+        <div class="footer-legal">
+          <a href="/privacy-policy">Privacy Policy</a>
+          <a href="/terms">Terms of Service</a>
+          <a href="/refund-policy">Refund Policy</a>
+          <a href="/shipping-policy">Shipping Policy</a>
+        </div>
       </div>
     </div>
   </footer>
+
+
+  <!-- Email Capture Popup -->
+  <div class="email-popup-overlay" id="email-popup">
+    <div class="email-popup">
+      <button class="email-popup-close" aria-label="Close">&times;</button>
+      <h3>Before you go...</h3>
+      <p>Grief doesn't follow a schedule. Get gentle inspiration and be the first to know about new collections.</p>
+      <form class="email-popup-form" id="popup-signup-form">
+        <input type="email" placeholder="Your email address" required>
+        <button type="submit" class="btn btn-warm">Stay Connected</button>
+      </form>
+      <div class="email-popup-success" style="display:none;">Thank you. We'll be in touch.</div>
+    </div>
+  </div>
 
   <script src="/js/store.js"></script>
 </body>
