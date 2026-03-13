@@ -111,8 +111,14 @@
 
     if (!alreadySubscribed && !alreadyDismissed) {
       let shown = false;
+      let hasEngaged = false;
+
+      // Wait for real engagement before arming exit-intent
+      // (prevents popup on initial page load when cursor is near top)
+      document.addEventListener('mousemove', () => { hasEngaged = true; }, { once: true });
+
       document.addEventListener('mouseout', (e) => {
-        if (shown) return;
+        if (shown || !hasEngaged) return;
         if (e.clientY < 5 && e.relatedTarget === null) {
           shown = true;
           popup.classList.add('active');
