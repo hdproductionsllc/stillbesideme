@@ -210,6 +210,46 @@ router.post('/poems/generate', async (req, res) => {
   }
 });
 
+// ── Sympathy Messages ────────────────────────────────────────
+
+const sympathyGenerator = require('../services/sympathyGenerator');
+
+/**
+ * POST /api/sympathy/generate – AI sympathy message generation.
+ * Rate limited: 3 per session per hour.
+ */
+router.post('/sympathy/generate', async (req, res) => {
+  if (!req.session.sympathyGenerations) req.session.sympathyGenerations = [];
+
+  const oneHourAgo = Date.now() - 60 * 60 * 1000;
+  req.session.sympathyGenerations = req.session.sympathyGenerations.filter(t => t > oneHourAgo);
+
+  if (req.session.sympathyGenerations.length >= 3) {
+    return res.status(429).json({
+      error: 'You\'ve generated several messages recently. Please wait a bit before trying again.',
+      retryAfter: Math.ceil((req.session.sympathyGenerations[0] + 60 * 60 * 1000 - Date.now()) / 1000)
+    });
+  }
+
+  try {
+    const result = await sympathyGenerator.generate(req.body);
+
+    req.session.sympathyGenerations.push(Date.now());
+    if (!req.session.sympathyHistory) req.session.sympathyHistory = [];
+    req.session.sympathyHistory.push({
+      messages: result.messages,
+      generationId: result.generationId,
+      stubbed: result.stubbed,
+      createdAt: new Date().toISOString()
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error('Sympathy generation error:', err);
+    res.status(500).json({ error: 'Something went wrong creating the message. Please try again.' });
+  }
+});
+
 // Error handler for multer
 router.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {

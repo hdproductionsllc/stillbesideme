@@ -87,6 +87,7 @@ async function start() {
     legacyHeaders: false,
   });
   app.use('/api/poems', expensiveLimiter);
+  app.use('/api/sympathy', expensiveLimiter);
   app.use('/api/images/upload', expensiveLimiter);
   app.use('/api/checkout', rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -179,6 +180,18 @@ async function start() {
   app.get('/loss-of-best-friend-gift', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'loss-of-best-friend-gift.html'));
   });
+  app.get('/sympathy-gift-for-coworker', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'sympathy-gift-for-coworker.html'));
+  });
+  app.get('/memorial-gift-for-anniversary-of-death', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'memorial-gift-for-anniversary-of-death.html'));
+  });
+  app.get('/letter-from-heaven', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'letter-from-heaven.html'));
+  });
+  app.get('/sympathy-message-helper', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'sympathy-message-helper.html'));
+  });
 
   // Blog routes – clean URLs
   app.get('/blog', (req, res) => {
@@ -192,6 +205,18 @@ async function start() {
   });
   app.get('/blog/personalized-memorial-gifts-vs-flowers', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'blog', 'personalized-memorial-gifts-vs-flowers.html'));
+  });
+  app.get('/blog/what-to-get-someone-who-lost-a-dog', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'blog', 'what-to-get-someone-who-lost-a-dog.html'));
+  });
+  app.get('/blog/pet-memorial-poems', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'blog', 'pet-memorial-poems.html'));
+  });
+  app.get('/blog/what-to-send-instead-of-flowers', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'blog', 'what-to-send-instead-of-flowers.html'));
+  });
+  app.get('/blog/best-memorial-gifts-that-last', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'blog', 'best-memorial-gifts-that-last.html'));
   });
 
   // Legal pages – clean URLs
@@ -425,6 +450,54 @@ async function start() {
     <lastmod>${today}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/blog/what-to-get-someone-who-lost-a-dog</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/blog/pet-memorial-poems</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/blog/what-to-send-instead-of-flowers</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/blog/best-memorial-gifts-that-last</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/sympathy-gift-for-coworker</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/memorial-gift-for-anniversary-of-death</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/letter-from-heaven</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/sympathy-message-helper</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
 </urlset>`);
   });

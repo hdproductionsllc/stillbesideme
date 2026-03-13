@@ -1786,3 +1786,126 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
     margin-right: 0;
   }
 }
+
+/* ============================================================
+   Sympathy Message Helper Tool
+   ============================================================ */
+
+.sympathy-tool {
+  padding: var(--space-3xl) 0;
+  background: var(--color-bg);
+}
+
+.sympathy-tool form {
+  max-width: 540px;
+  margin: 0 auto;
+}
+
+.sympathy-form-group {
+  margin-bottom: var(--space-lg);
+}
+
+.sympathy-form-group label {
+  display: block;
+  font-family: var(--font-body);
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+  color: var(--color-primary);
+}
+
+.sympathy-form-group .optional {
+  font-weight: 400;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.sympathy-form-group select,
+.sympathy-form-group input,
+.sympathy-form-group textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  transition: border-color 0.2s ease;
+}
+
+.sympathy-form-group select:focus,
+.sympathy-form-group input:focus,
+.sympathy-form-group textarea:focus {
+  outline: none;
+  border-color: var(--color-warm);
+}
+
+.sympathy-form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.sympathy-tool .btn {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-xl);
+}
+
+.sympathy-loading {
+  text-align: center;
+  padding: var(--space-2xl) 0;
+}
+
+.sympathy-loading p {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.sympathy-results {
+  max-width: 640px;
+  margin: var(--space-2xl) auto 0;
+}
+
+.message-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+  position: relative;
+}
+
+.message-card-label {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-warm);
+  margin-bottom: var(--space-sm);
+}
+
+.message-card-text {
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: var(--color-primary);
+  white-space: pre-wrap;
+}
+
+.message-card-copy {
+  margin-top: var(--space-md);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .sympathy-tool form {
+    max-width: 100%;
+  }
+  .sympathy-results {
+    max-width: 100%;
+  }
+}
