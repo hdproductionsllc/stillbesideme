@@ -348,15 +348,16 @@
 
 .layout-selector {
   display: flex;
-  gap: var(--space-sm);
+  gap: var(--space-md);
   justify-content: center;
   margin-bottom: var(--space-md);
+  flex-wrap: wrap;
 }
 
 .layout-option {
-  width: 48px;
-  height: 38px;
-  border-radius: 4px;
+  width: 56px;
+  height: 44px;
+  border-radius: 6px;
   cursor: pointer;
   border: 2px solid transparent;
   transition: all 0.2s;
@@ -411,10 +412,45 @@
 }
 
 .layout-label {
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   color: #9B9590;
   text-align: center;
-  margin-top: 2px;
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+
+/* ============================================================
+   PHOTO SWAP + PANEL TOGGLE ACTIONS
+   ============================================================ */
+
+.panel-toggle-actions {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.swap-photos-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  background: transparent;
+  color: var(--color-warm);
+  border: 1px solid rgba(196, 168, 130, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.swap-photos-btn:hover {
+  background: rgba(196, 168, 130, 0.1);
+  border-color: var(--color-warm);
+}
+
+.swap-photos-btn .icon {
+  font-size: 1.1em;
 }
 
 /* ============================================================

@@ -83,13 +83,31 @@ router.post('/:token/approve', async (req, res) => {
     [order.id, 'proof_approved', JSON.stringify({ approvedAt: new Date().toISOString() })]
   );
 
+  // Generate print-ready file (full-resolution composite, no watermark)
+  const printRenderer = require('../services/printRenderer');
+  try {
+    const { printRelativeUrl } = await printRenderer.generatePrintFile(order);
+    db.run('UPDATE orders SET print_file_url = ?, updated_at = datetime(\'now\') WHERE id = ?',
+      [printRelativeUrl, order.id]);
+    console.log(`Print-ready file generated for order ${order.id}: ${printRelativeUrl}`);
+  } catch (err) {
+    console.error(`Failed to generate print-ready file for order ${order.id}:`, err.message);
+    db.run(
+      `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+      [order.id, 'print_render_failed', JSON.stringify({ error: err.message })]
+    );
+    return res.status(500).json({ error: 'Failed to generate your print file. Our team has been notified.' });
+  }
+
   // Submit to fulfillment provider
   const provider = order.fulfillment_provider || process.env.FULFILLMENT_PROVIDER || 'luma';
 
   try {
+    // Re-fetch order so placeOrder sees print_file_url
+    const updatedOrder = db.get('SELECT * FROM orders WHERE id = ?', [order.id]);
     if (provider === 'luma') {
       const lumaOrderApi = require('../services/lumaOrderApi');
-      const result = await lumaOrderApi.placeOrder(order.id, db);
+      const result = await lumaOrderApi.placeOrder(updatedOrder.id, db);
       console.log(`Proof approved — order ${order.id} submitted to Luma:`, result.orderNumber);
     } else {
       const whccOrderApi = require('../services/whccOrderApi');

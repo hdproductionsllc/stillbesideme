@@ -204,17 +204,17 @@ async function placeOrder(orderId, db) {
   const shipping = order.shipping_json ? JSON.parse(order.shipping_json) : null;
   if (!shipping) throw new Error(`Order ${orderId} has no shipping address`);
 
-  const photos = order.photos_json ? JSON.parse(order.photos_json) : {};
   const sku = order.product_sku;
   const fields = order.fields_json ? JSON.parse(order.fields_json) : {};
 
   // Parse dimensions from SKU
   const { width, height } = parseSizeFromSku(sku);
 
-  // Find the primary image (composite/print-ready file)
-  const primaryPhoto = Object.values(photos).find(p => p.originalPath) || Object.values(photos)[0];
-  if (!primaryPhoto) throw new Error(`Order ${orderId} has no photos`);
-  const imageUrl = buildImageUrl(primaryPhoto.originalPath);
+  // Use the print-ready composite (photo + tribute panel rendered at 300 DPI)
+  if (!order.print_file_url) {
+    throw new Error(`Order ${orderId} has no print-ready file. Generate it before placing the Luma order.`);
+  }
+  const imageUrl = `${BASE_URL()}${order.print_file_url}`;
 
   // Resolve storeId
   const storeId = LUMA_CONFIG.storeId;
@@ -226,7 +226,7 @@ async function placeOrder(orderId, db) {
   const lastName = nameParts.slice(1).join(' ') || '';
 
   // Resolve frame color via subcategory (Luma bakes frame into subcategory)
-  const styleVariant = fields.styleVariant || 'classic-dark';
+  const styleVariant = fields.style || 'classic-dark';
   const subcategoryId = resolveSubcategoryId(styleVariant);
 
   // Build Luma order payload

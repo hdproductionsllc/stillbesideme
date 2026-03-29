@@ -27,6 +27,7 @@
   const LAYOUTS = {
     // 2-panel
     'side-by-side': {
+      label: 'Landscape',
       panels: 2,
       columns: [1, 1],
       rows: [1],
@@ -34,14 +35,16 @@
       aspectRatio: '5/3.2'
     },
     'stacked': {
+      label: 'Portrait',
       panels: 2,
       columns: [1],
       rows: [1, 1],
       areas: [['photo'], ['tribute']],
       aspectRatio: '4/5'
     },
-    // 3-panel hero
+    // 3-panel
     'hero-left': {
+      label: 'Feature Left',
       panels: 3,
       columns: [1.15, 1],
       rows: [1, 1],
@@ -49,14 +52,15 @@
       aspectRatio: '5/3.8'
     },
     'hero-top': {
+      label: 'Feature Top',
       panels: 3,
       columns: [1, 1],
       rows: [1.3, 1],
       areas: [['photo', 'photo'], ['panel2', 'tribute']],
       aspectRatio: '4/5'
     },
-    // 3-panel photos+tribute
     'photos-left': {
+      label: 'Gallery Left',
       panels: 3,
       columns: [1, 1.15],
       rows: [1, 1],
@@ -64,6 +68,7 @@
       aspectRatio: '5/3.8'
     },
     'tribute-top': {
+      label: 'Poem First',
       panels: 3,
       columns: [1, 1],
       rows: [1, 1.3],
@@ -114,6 +119,7 @@
     resetCustomRatios,
     getCustomRatios: () => JSON.parse(JSON.stringify(customRatios)),
     getPanels: () => panels,
+    swapPhotos,
     getLayouts: () => LAYOUTS,
     getCurrentLayout: () => currentLayout,
     getContainer: () => container
@@ -318,6 +324,19 @@
     panelId = panelId || 'photo';
     const panel = panels.get(panelId);
     return panel ? panel.canvas : null;
+  }
+
+  /**
+   * Swap photos between the main photo panel and panel2.
+   * Swaps both the image data and crop settings.
+   */
+  function swapPhotos() {
+    const a = photos['photo'];
+    const b = photos['panel2'];
+    if (!a && !b) return;
+    photos['photo'] = b || null;
+    photos['panel2'] = a || null;
+    queueRender();
   }
 
   function setField(fieldId, value) {

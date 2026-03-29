@@ -668,9 +668,19 @@
     if (!wrap) return;
 
     if (thirdPanelEnabled) {
-      wrap.innerHTML = `<button class="add-panel-btn" id="remove-panel-btn"><span class="icon">&minus;</span> Remove second photo</button>`;
+      wrap.innerHTML = `
+        <div class="panel-toggle-actions">
+          <button class="add-panel-btn" id="remove-panel-btn"><span class="icon">&minus;</span> Remove second photo</button>
+          <button class="swap-photos-btn" id="swap-photos-btn"><span class="icon">&#8646;</span> Swap photos</button>
+        </div>`;
       wrap.querySelector('#remove-panel-btn').addEventListener('click', () => {
         removeThirdPanel();
+      });
+      wrap.querySelector('#swap-photos-btn').addEventListener('click', () => {
+        PreviewRenderer.swapPhotos();
+        // Swap the upload preview thumbnails too
+        swapUploadPreviews();
+        saveState();
       });
     } else {
       wrap.innerHTML = `<button class="add-panel-btn" id="add-panel-btn"><span class="icon">+</span> Add second photo</button>`;
@@ -678,6 +688,25 @@
         addThirdPanel();
       });
     }
+  }
+
+  function swapUploadPreviews() {
+    const mainWrapper = document.getElementById('upload-zone-wrapper-main');
+    const panel2Wrapper = document.getElementById('upload-zone-wrapper-panel2');
+    if (!mainWrapper || !panel2Wrapper) return;
+
+    const mainImg = mainWrapper.querySelector('.upload-preview img');
+    const panel2Img = panel2Wrapper.querySelector('.upload-preview img');
+    if (!mainImg || !panel2Img) return;
+
+    const tmpSrc = mainImg.src;
+    mainImg.src = panel2Img.src;
+    panel2Img.src = tmpSrc;
+
+    // Swap the uploaded state tracking too
+    const tmpUploaded = photoUploaded['photo'];
+    photoUploaded['photo'] = photoUploaded['panel2'];
+    photoUploaded['panel2'] = tmpUploaded;
   }
 
   function addThirdPanel() {
