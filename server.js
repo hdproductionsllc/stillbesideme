@@ -428,6 +428,12 @@ async function start() {
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>${baseUrl}/order</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>${baseUrl}/blog</loc>
     <lastmod>${today}</lastmod>
     <changefreq>weekly</changefreq>
@@ -528,6 +534,15 @@ async function start() {
   app.use('/api/proof', require('./src/routes/proofApproval'));
   app.get('/proof/:token', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'proof-approval.html'));
+  });
+
+  // Order status page (token-based deep link from email, plus lookup form)
+  app.use('/api/orders', require('./src/routes/orderStatus'));
+  app.get('/order', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'order-status.html'));
+  });
+  app.get('/order/:token', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'order-status.html'));
   });
 
   // Serve proof images from output directory

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Status | Still Beside Me</title>
+  <meta name="description" content="Check the status of your Still Beside Me order – payment, proof, printing, and shipping.">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/store.css">
+  <style>
+    .status-page {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: var(--space-2xl) var(--space-md);
+    }
+    .status-header {
+      text-align: center;
+      margin-bottom: var(--space-xl);
+    }
+    .status-header h1 {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 400;
+      margin-bottom: var(--space-xs);
+    }
+    .status-header .subtitle {
+      color: var(--color-muted);
+      font-size: 1.05rem;
+    }
+    .status-card {
+      background: var(--color-surface);
+      border-radius: 12px;
+      padding: var(--space-lg);
+      margin-bottom: var(--space-xl);
+      box-shadow: var(--shadow-sm);
+    }
+    .status-card h2 {
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-weight: 400;
+      margin: 0 0 var(--space-md);
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background: var(--color-bg);
+      color: var(--color-primary);
+      margin-bottom: var(--space-md);
+    }
+    .status-badge.action-required {
+      background: #FFF4E0;
+      color: #8B6914;
+    }
+    .status-badge.shipped {
+      background: #E0F2E8;
+      color: #2D6F4A;
+    }
+    .status-badge.cancelled {
+      background: #FBE5E5;
+      color: #8B2929;
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-label { color: var(--color-muted); }
+    .detail-value { font-weight: 600; text-align: right; }
+    .detail-value a { color: var(--color-secondary); text-decoration: none; }
+    .detail-value a:hover { text-decoration: underline; }
+
+    .proof-thumb {
+      display: block;
+      width: 100%;
+      max-width: 320px;
+      margin: var(--space-md) auto 0;
+      border-radius: 8px;
+      box-shadow: var(--shadow-md);
+    }
+
+    .timeline {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .timeline-item {
+      display: flex;
+      gap: var(--space-md);
+      padding: var(--space-sm) 0;
+      position: relative;
+    }
+    .timeline-item:not(:last-child)::before {
+      content: '';
+      position: absolute;
+      left: 11px;
+      top: 32px;
+      bottom: 0;
+      width: 2px;
+      background: var(--color-border);
+    }
+    .timeline-item.done:not(:last-child)::before { background: var(--color-secondary); }
+    .timeline-dot {
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--color-border);
+      border: 2px solid var(--color-surface);
+      box-shadow: 0 0 0 2px var(--color-border);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 0.75rem;
+    }
+    .timeline-item.done .timeline-dot {
+      background: var(--color-secondary);
+      box-shadow: 0 0 0 2px var(--color-secondary);
+    }
+    .timeline-item.done .timeline-dot::after { content: '\2713'; }
+    .timeline-item.current .timeline-dot {
+      background: var(--color-warm);
+      box-shadow: 0 0 0 2px var(--color-warm);
+      animation: pulse 2s infinite;
+    }
+    .timeline-item.cancelled .timeline-dot {
+      background: #c8a0a0;
+      box-shadow: 0 0 0 2px #c8a0a0;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 2px var(--color-warm); }
+      50% { box-shadow: 0 0 0 6px rgba(193, 122, 86, 0.2); }
+    }
+    .timeline-body {
+      flex: 1;
+      padding-bottom: var(--space-sm);
+    }
+    .timeline-label {
+      font-weight: 600;
+      color: var(--color-primary);
+      margin: 0;
+    }
+    .timeline-item.pending .timeline-label,
+    .timeline-item.pending .timeline-detail { color: var(--color-muted); }
+    .timeline-detail {
+      color: var(--color-muted);
+      font-size: 0.9rem;
+      margin: 2px 0 0;
+      line-height: 1.4;
+    }
+    .timeline-at {
+      color: var(--color-muted);
+      font-size: 0.8rem;
+      margin-top: 2px;
+    }
+
+    .lookup-form {
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .lookup-form label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      color: var(--color-primary);
+      font-size: 0.95rem;
+    }
+    .lookup-form .sublabel {
+      display: block;
+      color: var(--color-muted);
+      font-size: 0.85rem;
+      font-weight: 400;
+      margin-bottom: 6px;
+    }
+    .lookup-form input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      font-family: var(--font-body);
+      font-size: 1rem;
+      margin-bottom: var(--space-md);
+      box-sizing: border-box;
+    }
+    .lookup-form input:focus {
+      outline: none;
+      border-color: var(--color-secondary);
+    }
+    .lookup-form button {
+      width: 100%;
+      padding: 14px;
+      background: var(--color-warm);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 600;
+      font-family: var(--font-body);
+      cursor: pointer;
+    }
+    .lookup-form button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .lookup-error {
+      background: #FBE5E5;
+      color: #8B2929;
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius);
+      margin-bottom: var(--space-md);
+      font-size: 0.9rem;
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+      margin-top: var(--space-md);
+    }
+    .actions .btn { text-align: center; }
+
+    .loading-state, .error-state {
+      text-align: center;
+      padding: var(--space-2xl);
+      color: var(--color-muted);
+    }
+    .error-state { color: var(--color-error); }
+
+    @media (max-width: 600px) {
+      .status-header h1 { font-size: 1.6rem; }
+      .status-card { padding: var(--space-md); }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a href="/" class="site-logo">Still Beside Me</a>
+      <nav class="site-nav">
+        <a href="/">Back to Store</a>
+        <a href="/contact">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="status-page" id="statusPage">
+    <div class="loading-state" id="loading">Loading…</div>
+  </main>
+
+  <script>
+  (function () {
+    const container = document.getElementById('statusPage');
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    // /order        → []           after filter, last is 'order'
+    // /order/:token → ['order', token]
+    const token = pathParts.length > 1 ? pathParts[pathParts.length - 1] : null;
+
+    if (token) {
+      loadStatus(token);
+    } else {
+      renderLookupForm();
+    }
+
+    function renderLookupForm(errorMsg) {
+      container.innerHTML = `
+        <div class="status-header">
+          <h1>Check your order</h1>
+          <p class="subtitle">Enter the email you used at checkout and your order ID. Your order ID is in your confirmation email.</p>
+        </div>
+        <div class="status-card lookup-form">
+          ${errorMsg ? '<div class="lookup-error">' + escapeHtml(errorMsg) + '</div>' : ''}
+          <label for="lookupEmail">Email
+            <span class="sublabel">The address you used at checkout</span>
+          </label>
+          <input type="email" id="lookupEmail" placeholder="you@example.com" autocomplete="email" />
+
+          <label for="lookupShortId">Order ID
+            <span class="sublabel">8 characters, in your confirmation email</span>
+          </label>
+          <input type="text" id="lookupShortId" placeholder="A1B2C3D4" maxlength="8" autocomplete="off" style="text-transform:uppercase" />
+
+          <button id="lookupBtn">Find my order</button>
+        </div>
+      `;
+
+      const btn = document.getElementById('lookupBtn');
+      const emailInput = document.getElementById('lookupEmail');
+      const idInput = document.getElementById('lookupShortId');
+
+      function submit() {
+        const email = emailInput.value.trim();
+        const sid = idInput.value.trim();
+        if (!email || !sid) {
+          renderLookupForm('Please enter both your email and order ID.');
+          return;
+        }
+        btn.disabled = true;
+        btn.textContent = 'Looking up…';
+
+        fetch('/api/orders/lookup?email=' + encodeURIComponent(email) + '&shortId=' + encodeURIComponent(sid))
+          .then(function (r) {
+            if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || 'Order not found'); });
+            return r.json();
+          })
+          .then(function (data) {
+            window.location.href = '/order/' + encodeURIComponent(data.token);
+          })
+          .catch(function (err) {
+            renderLookupForm(err.message);
+          });
+      }
+
+      btn.addEventListener('click', submit);
+      [emailInput, idInput].forEach(function (el) {
+        el.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') submit();
+        });
+      });
+    }
+
+    function loadStatus(t) {
+      fetch('/api/orders/status/' + encodeURIComponent(t))
+        .then(function (r) {
+          if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || 'Order not found'); });
+          return r.json();
+        })
+        .then(renderStatus)
+        .catch(function (err) {
+          container.innerHTML = '<div class="error-state">' + escapeHtml(err.message || 'Order not found') +
+            '. <a href="/order">Look up another order</a> or <a href="/contact">contact support</a>.</div>';
+        });
+    }
+
+    function renderStatus(data) {
+      const badgeClass = data.status === 'shipped' || data.status === 'delivered' ? ' shipped'
+                      : data.status === 'cancelled' ? ' cancelled'
+                      : (data.status === 'proof_ready' || data.status === 'change_requested') ? ' action-required'
+                      : '';
+
+      const trackingHtml = data.tracking && data.tracking.number
+        ? '<div class="detail-row"><span class="detail-label">Tracking</span>' +
+          '<span class="detail-value">' +
+          (data.tracking.url
+            ? '<a href="' + escapeHtml(data.tracking.url) + '" target="_blank" rel="noopener">' + escapeHtml(data.tracking.number) + ' &#8599;</a>'
+            : escapeHtml(data.tracking.number)) +
+          (data.tracking.carrier ? ' (' + escapeHtml(data.tracking.carrier) + ')' : '') +
+          '</span></div>'
+        : '';
+
+      const shippingHtml = data.shipping && (data.shipping.city || data.shipping.state)
+        ? '<div class="detail-row"><span class="detail-label">Ships to</span><span class="detail-value">' +
+          escapeHtml([data.shipping.city, data.shipping.state, data.shipping.country].filter(Boolean).join(', ')) +
+          '</span></div>'
+        : '';
+
+      const total = data.totalCents ? '$' + (data.totalCents / 100).toFixed(2) : '';
+
+      const proofThumbHtml = data.proofUrl
+        ? '<img src="' + escapeHtml(data.proofUrl) + '" alt="Your proof" class="proof-thumb" onerror="this.style.display=\'none\'" />'
+        : '';
+
+      // Action buttons depending on status
+      const actions = [];
+      if (data.status === 'proof_ready' || data.status === 'change_requested') {
+        actions.push('<a class="btn btn-warm" href="/proof/' + encodeURIComponent(data.proofToken) + '">Review &amp; approve your proof</a>');
+      }
+      actions.push('<a class="btn btn-link" href="/contact">Contact support</a>');
+
+      const timelineHtml = data.timeline.map(function (m) {
+        return '<li class="timeline-item ' + escapeHtml(m.state) + '">' +
+          '<span class="timeline-dot"></span>' +
+          '<div class="timeline-body">' +
+            '<p class="timeline-label">' + escapeHtml(m.label) + '</p>' +
+            '<p class="timeline-detail">' + escapeHtml(m.detail) + '</p>' +
+            (m.at ? '<p class="timeline-at">' + formatDate(m.at) + '</p>' : '') +
+          '</div>' +
+        '</li>';
+      }).join('');
+
+      container.innerHTML =
+        '<div class="status-header">' +
+          '<h1>Your order</h1>' +
+          '<p class="subtitle">Order ' + escapeHtml(data.shortId) + (data.email ? ' &middot; ' + escapeHtml(data.email) : '') + '</p>' +
+        '</div>' +
+
+        '<div class="status-card">' +
+          '<span class="status-badge' + badgeClass + '">' + escapeHtml(data.statusLabel) + '</span>' +
+          '<div class="detail-row"><span class="detail-label">Product</span><span class="detail-value">' + escapeHtml(data.skuLabel) + '</span></div>' +
+          (total ? '<div class="detail-row"><span class="detail-label">Total</span><span class="detail-value">' + total + '</span></div>' : '') +
+          shippingHtml +
+          trackingHtml +
+          '<div class="detail-row"><span class="detail-label">Placed</span><span class="detail-value">' + formatDate(data.createdAt) + '</span></div>' +
+          proofThumbHtml +
+          '<div class="actions">' + actions.join('') + '</div>' +
+        '</div>' +
+
+        '<div class="status-card">' +
+          '<h2>Timeline</h2>' +
+          '<ul class="timeline">' + timelineHtml + '</ul>' +
+        '</div>';
+    }
+
+    function formatDate(s) {
+      if (!s) return '';
+      const d = new Date(s.includes('T') ? s : s.replace(' ', 'T') + 'Z');
+      if (isNaN(d.getTime())) return s;
+      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) +
+        ', ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    }
+
+    function escapeHtml(s) {
+      if (s == null) return '';
+      return String(s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+  })();
+  </script>
+</body>
+</html>

@@ -72,9 +72,52 @@ async function send(to, subject, html) {
 }
 
 /**
+ * Send an order-confirmation email immediately after Stripe webhook fires.
+ * This goes out within seconds of payment, before the proof is generated,
+ * so the customer is reassured that we received their order.
+ */
+async function sendOrderConfirmation(to, orderData, statusPageUrl) {
+  const { orderId, templateName, sku, totalCents } = orderData;
+  const shortId = orderId.substring(0, 8).toUpperCase();
+
+  const html = wrapHtml(`
+    <div style="background:#fff;border-radius:12px;padding:32px;margin-bottom:24px;">
+      <h1 style="font-family:Georgia,serif;font-size:1.6rem;font-weight:400;color:#2C2C2C;text-align:center;margin:0 0 8px;">
+        Thank you &mdash; we've received your order
+      </h1>
+      <p style="text-align:center;color:#9B9590;margin:0 0 24px;">
+        Order ${shortId} &middot; ${formatPrice(totalCents)}
+      </p>
+
+      <p style="color:#2C2C2C;line-height:1.6;margin-bottom:16px;">
+        Your payment was received successfully, and we've started designing your tribute.
+        Within the next few hours, you'll receive a second email with your design proof to review and approve.
+      </p>
+
+      <p style="color:#2C2C2C;line-height:1.6;margin-bottom:24px;">
+        Nothing goes to print until you've approved how it looks &mdash; so take your time when the proof arrives.
+      </p>
+
+      <div style="text-align:center;margin-bottom:16px;">
+        <a href="${statusPageUrl}"
+           style="display:inline-block;background:#8B9D83;color:#fff;text-decoration:none;padding:14px 40px;border-radius:8px;font-weight:600;font-size:1rem;">
+          View order status
+        </a>
+      </div>
+
+      <p style="text-align:center;color:#9B9590;font-size:0.85rem;margin-top:24px;">
+        Save this email &mdash; your order ID is <strong>${shortId}</strong>.
+      </p>
+    </div>
+  `);
+
+  return send(to, `Order confirmed — ${shortId}`, html);
+}
+
+/**
  * Send proof email to customer with proof image and approval link.
  */
-async function sendProofEmail(to, orderData, proofImageUrl, approvalPageUrl) {
+async function sendProofEmail(to, orderData, proofImageUrl, approvalPageUrl, statusPageUrl) {
   const { orderId, templateName, sku, totalCents } = orderData;
   const shortId = orderId.substring(0, 8).toUpperCase();
 
@@ -106,6 +149,10 @@ async function sendProofEmail(to, orderData, proofImageUrl, approvalPageUrl) {
       <p style="text-align:center;color:#9B9590;font-size:0.85rem;">
         Need changes? You can request revisions from the proof review page.
       </p>
+      ${statusPageUrl ? `
+      <p style="text-align:center;color:#9B9590;font-size:0.85rem;margin-top:16px;">
+        Or <a href="${statusPageUrl}" style="color:#8B9D83;">check your order status</a> anytime.
+      </p>` : ''}
     </div>
   `);
 
@@ -150,7 +197,7 @@ async function sendChangeRequestNotification(orderData, notes) {
 /**
  * Send confirmation to customer that their proof was approved and order is printing.
  */
-async function sendApprovalConfirmation(to, orderData) {
+async function sendApprovalConfirmation(to, orderData, statusPageUrl) {
   const { orderId, totalCents } = orderData;
   const shortId = orderId.substring(0, 8).toUpperCase();
 
@@ -170,10 +217,17 @@ async function sendApprovalConfirmation(to, orderData) {
       <p style="color:#9B9590;font-size:0.9rem;margin-top:24px;">
         Estimated delivery: 5&ndash;10 business days
       </p>
+      ${statusPageUrl ? `
+      <p style="margin-top:24px;">
+        <a href="${statusPageUrl}"
+           style="display:inline-block;background:transparent;color:#8B9D83;text-decoration:none;padding:10px 24px;border:1px solid #8B9D83;border-radius:8px;font-weight:600;font-size:0.9rem;">
+          View order status
+        </a>
+      </p>` : ''}
     </div>
   `);
 
   return send(to, `Your tribute is printing — Order ${shortId}`, html);
 }
 
-module.exports = { sendProofEmail, sendChangeRequestNotification, sendApprovalConfirmation };
+module.exports = { sendOrderConfirmation, sendProofEmail, sendChangeRequestNotification, sendApprovalConfirmation };

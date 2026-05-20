@@ -172,6 +172,7 @@ router.get('/orders/confirmation', async (req, res) => {
     sku: order.product_sku,
     totalCents: order.total_cents,
     email: order.email,
+    proofToken: order.proof_token || null,
     shipping,
     style: fieldsData.style,
     createdAt: order.created_at,

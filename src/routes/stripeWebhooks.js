@@ -126,7 +126,31 @@ async function handleCheckoutCompleted(session, db) {
     })]
   );
 
-  // Generate proof image and send email (non-blocking — order is safe even if this fails)
+  // Step 1: send immediate order-confirmation email — don't make the customer wait for proof
+  const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
+  const statusPageUrl = `${baseUrl}/order/${proofToken}`;
+  const emailService = require('../services/emailService');
+
+  if (email) {
+    try {
+      const refreshed = db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
+      await emailService.sendOrderConfirmation(email, {
+        orderId,
+        templateName: refreshed.template_id,
+        sku: refreshed.product_sku,
+        totalCents: refreshed.total_cents,
+      }, statusPageUrl);
+      db.run(
+        `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+        [orderId, 'order_confirmation_sent', JSON.stringify({ email })]
+      );
+    } catch (err) {
+      console.error(`Failed to send order confirmation for ${orderId}:`, err.message);
+      // Non-fatal — proof email comes next anyway
+    }
+  }
+
+  // Step 2: generate proof and send proof email (non-blocking — order is safe even if this fails)
   try {
     const proofGenerator = require('../services/proofGenerator');
     const updatedOrder = db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
@@ -135,18 +159,15 @@ async function handleCheckoutCompleted(session, db) {
     // Save proof URL to order
     db.run('UPDATE orders SET proof_url = ?, updated_at = datetime(\'now\') WHERE id = ?', [proofRelativeUrl, orderId]);
 
-    // Send proof email
-    const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
     const proofImageUrl = `${baseUrl}${proofRelativeUrl}`;
     const approvalPageUrl = `${baseUrl}/proof/${proofToken}`;
 
-    const emailService = require('../services/emailService');
     await emailService.sendProofEmail(email, {
       orderId,
       templateName: updatedOrder.template_id,
       sku: updatedOrder.product_sku,
       totalCents: updatedOrder.total_cents,
-    }, proofImageUrl, approvalPageUrl);
+    }, proofImageUrl, approvalPageUrl, statusPageUrl);
 
     db.run(
       `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,

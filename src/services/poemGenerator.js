@@ -8,7 +8,7 @@
 
 const Anthropic = require('@anthropic-ai/sdk');
 
-const MODEL = 'claude-sonnet-4-5-20250929';
+const MODEL = 'claude-sonnet-4-6';
 const MAX_TOKENS = 300;
 
 let client = null;
@@ -47,6 +47,7 @@ Write a 6-8 line poem that:
 - Has natural line breaks suitable for display on a memorial canvas
 - Could make someone smile through tears
 - Never uses em dashes
+- Never uses markdown formatting (no asterisks, underscores, or other special characters around words)
 
 Return ONLY the poem text. No title, no attribution, no explanation.`;
 }
@@ -80,8 +81,20 @@ Write a 10-14 line first-person letter that:
 - Has natural line breaks suitable for display on a memorial canvas
 - Could make someone smile through tears
 - Never uses em dashes
+- Never uses markdown formatting (no asterisks, underscores, or other special characters around words)
 
 Return ONLY the letter text. No title, no "Love," sign-off, no attribution, no explanation.`;
+}
+
+/**
+ * Strip any stray markdown formatting the model may have produced so it doesn't render on the print.
+ */
+function stripMarkdown(text) {
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/`([^`]+)`/g, '$1');
 }
 
 /**
@@ -109,7 +122,7 @@ async function generate(details) {
       ]
     });
 
-    const poem = response.content[0].text.trim();
+    const poem = stripMarkdown(response.content[0].text.trim());
 
     return {
       poem,

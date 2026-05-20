@@ -165,7 +165,12 @@
             </ol>
           </div>
 
-          <p><a href="/" class="btn btn-warm">Return to Store</a></p>
+          <p style="display:flex;gap:var(--space-sm);justify-content:center;flex-wrap:wrap">
+            ${order.proofToken
+              ? `<a href="/order/${order.proofToken}" class="btn btn-warm">Track your order</a>`
+              : `<a href="/order" class="btn btn-warm">Track your order</a>`}
+            <a href="/" class="btn btn-link">Return to Store</a>
+          </p>
         `;
       })
       .catch(() => {

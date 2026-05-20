@@ -126,12 +126,13 @@ router.post('/:token/approve', async (req, res) => {
   // Send approval confirmation email
   try {
     if (order.email) {
-      const fields = order.fields_json ? JSON.parse(order.fields_json) : {};
+      const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
+      const statusPageUrl = `${baseUrl}/order/${order.proof_token}`;
       await emailService.sendApprovalConfirmation(order.email, {
         orderId: order.id,
         totalCents: order.total_cents,
         templateName: order.template_id,
-      });
+      }, statusPageUrl);
     }
   } catch (err) {
     console.error(`Failed to send approval confirmation email for order ${order.id}:`, err.message);

@@ -1,5 +1,39 @@
 # Still Beside Me – Build Progress
 
+---
+
+## Pass 1 — Final Launch Blockers (2026-05-20)
+
+Most of the original launch-readiness items were already done. Real remaining gaps:
+
+### 1. Upgrade poem model to Sonnet 4.6 ✓ DONE
+- [x] `src/services/poemGenerator.js:11` — Sonnet 4.5 → Sonnet 4.6 (same price, better creative writing)
+- [x] Added markdown-strip safety net (prompt instruction + post-process regex)
+- [x] Verified with 4 real generations, all clean
+
+### 2. Order status page ✓ DONE
+- [x] `/order` lookup form + `/order/:token` direct deep link
+- [x] `src/routes/orderStatus.js` — APIs: `GET /api/orders/status/:token`, `GET /api/orders/lookup`
+- [x] `public/order-status.html` — page with order card + visual timeline
+- [x] Email + 8-char shortId lookup (no login required)
+- [x] Color-coded status badge (sage=shipped, amber=action-required, red=cancelled)
+- [x] Tracking link surfaces when Luma webhook fires
+- [x] Wired into `server.js` + sitemap
+- [x] Linked from `order-confirmed.html` (post-Stripe redirect)
+- [x] Verified visually with Puppeteer in 3 states (shipped / proof_ready / lookup form)
+
+### 3. Transactional email plumbing ✓ DONE (code) — pending user setup
+- [x] Added `sendOrderConfirmation()` — fires immediately on Stripe webhook (no more dead silence between payment and proof email)
+- [x] All 3 customer emails now include link to `/order/:token`
+- [x] `scripts/test-email.js` — script to verify SMTP wiring with one command
+- [x] `tasks/resend-setup.md` — step-by-step setup checklist
+- [ ] **USER: Resend signup + DNS records + Railway env vars** (see `tasks/resend-setup.md`)
+
+### 4. End-to-end live test (blocked on email setup)
+- [ ] Stripe test-mode buy → confirmation email → proof email → approve → Luma logs → status page reflects each step
+
+---
+
 ## Phases 1-3: COMPLETE
 
 ### Phase 1: Foundation
