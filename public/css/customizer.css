@@ -270,6 +270,87 @@
   background: #0a0908;
 }
 
+/* --- Auto Theme (UV-printed mat matched to the photo) --- */
+.frame-preview.theme-auto {
+  /* Proportional to the printed piece: 1.5" mat on an 11x14, 1" gutter */
+  --mat-padding: 10.5%;
+  --panel-gap: 8.5%;
+}
+.frame-preview.theme-auto .frame-border {
+  background: linear-gradient(145deg, #2c2018, #3a2a1c 15%, #1e1610 40%, #2a1e14 70%, #1a120c);
+  box-shadow:
+    0 10px 45px rgba(0, 0, 0, 0.55),
+    0 3px 15px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 1px 0 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    inset -1px 0 0 rgba(0, 0, 0, 0.2);
+}
+.frame-preview.theme-auto .mat-board {
+  background: var(--mat-color, #1a1a1a);
+  transition: background 0.4s ease;
+}
+.frame-preview.theme-auto .preview-panels {
+  background: var(--mat-color, #1a1a1a);
+  transition: background 0.4s ease;
+}
+/* No single-opening bevel — each opening gets its own printed bevel ring */
+.frame-preview.theme-auto .preview-panels::before {
+  content: none;
+}
+.frame-preview.theme-auto .panel {
+  box-shadow: 0 0 0 2px var(--bevel-color, #C4A882);
+  transition: box-shadow 0.4s ease;
+}
+
+/* --- Swatch Row (auto-matched colors with override) --- */
+.style-selector.swatch-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: var(--space-sm, 0.75rem);
+}
+.swatch-row-label {
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: var(--color-muted, #8a8378);
+  text-transform: uppercase;
+}
+.swatch-row-items {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.swatch-chip {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.swatch-chip:hover {
+  transform: scale(1.12);
+}
+.swatch-chip.active {
+  border-color: var(--color-warm, #C4A882);
+  box-shadow: 0 0 0 2px rgba(196, 168, 130, 0.35);
+}
+.swatch-chip.auto {
+  width: auto;
+  height: 32px;
+  border-radius: 16px;
+  padding: 0 0.8rem;
+  font-size: 0.78rem;
+  background: transparent;
+  color: var(--color-muted, #8a8378);
+}
+.swatch-chip.auto.active {
+  color: var(--color-warm, #C4A882);
+}
+
 /* --- Warm Natural Theme --- */
 .frame-preview.theme-warm-natural .frame-border {
   background: linear-gradient(145deg, #b8956a, #c9a87c 15%, #a0804f 40%, #c4a06d 70%, #96783f);

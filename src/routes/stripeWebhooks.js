@@ -97,8 +97,11 @@ async function handleCheckoutCompleted(session, db) {
     });
   }
 
-  // Generate proof token for approval URL
+  // Generate proof token (customer-facing) + admin token (fulfillment actions).
+  // These are deliberately separate — the customer link must never be able
+  // to mark an order shipped.
   const proofToken = uuidv4();
+  const adminToken = uuidv4();
 
   // Update order with payment + shipping info, set to proof_ready (NOT submitted)
   const provider = process.env.FULFILLMENT_PROVIDER || 'whcc';
@@ -109,10 +112,11 @@ async function handleCheckoutCompleted(session, db) {
        email = ?,
        shipping_json = COALESCE(?, shipping_json),
        proof_token = ?,
+       admin_token = ?,
        fulfillment_provider = ?,
        updated_at = datetime('now')
      WHERE id = ?`,
-    [paymentIntentId, email, shippingJson, proofToken, provider, orderId]
+    [paymentIntentId, email, shippingJson, proofToken, adminToken, provider, orderId]
   );
 
   // Log event

@@ -66,6 +66,7 @@ router.post('/images/upload', upload.single('photo'), async (req, res) => {
       dimensions: result.dimensions,
       quality: result.quality,
       crop: result.crop,
+      palette: result.palette,
       uploadedAt: new Date().toISOString()
     };
 
@@ -77,6 +78,7 @@ router.post('/images/upload', upload.single('photo'), async (req, res) => {
       dimensions: result.dimensions,
       quality: result.quality,
       crop: result.crop,
+      palette: result.palette,
       convertedFromHeic: result.convertedFromHeic
     });
   } catch (err) {

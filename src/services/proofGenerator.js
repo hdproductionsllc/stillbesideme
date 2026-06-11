@@ -12,7 +12,9 @@ const fs = require('fs');
 
 const {
   resolveOrderData, buildTributeSvg, isLandscapeLayout, calculateLayout,
+  calculateMatLayout, buildMatOverlaySvg, renderPhotoCover,
 } = require('./tributeRenderer');
+const { calculatePrintDimensions } = require('./printRenderer');
 
 const OUTPUT_ROOT = process.env.OUTPUT_DIR || path.join(__dirname, '..', '..', 'output');
 const PROOFS_DIR = path.join(OUTPUT_ROOT, 'proofs');
@@ -36,18 +38,10 @@ function buildWatermarkSvg(width, height) {
   return Buffer.from(svg);
 }
 
-/**
- * Resize and crop a photo to fill a region.
- */
-async function renderPhoto(photoPath, region, cropPosition, quality) {
-  return sharp(photoPath)
-    .resize(region.width, region.height, {
-      fit: 'cover',
-      position: cropPosition || 'centre',
-    })
-    .jpeg({ quality: quality || 90 })
-    .toBuffer();
-}
+// Photo cover-fit is shared via tributeRenderer.renderPhotoCover —
+// it honors percent smart-crop positions that sharp's `position` rejects.
+const renderPhoto = (photoPath, region, cropPosition, quality) =>
+  renderPhotoCover(photoPath, region, cropPosition, quality || 90);
 
 /**
  * Generate a proof image for an order.
@@ -61,11 +55,21 @@ async function generateProof(order) {
 
   if (!fs.existsSync(photoPath)) throw new Error(`Photo not found: ${photoPath}`);
 
-  // Proof dimensions (display-size, not print-size)
-  const totalW = isLandscapeLayout(layout) ? 1600 : 1000;
-  const totalH = isLandscapeLayout(layout) ? 1000 : 1600;
-
-  const panels = calculateLayout(layout, totalW, totalH);
+  // Proof dimensions (display-size, not print-size).
+  // Printed-mat proofs use the true print aspect ratio so the proof is an
+  // exact scaled-down preview of the final file.
+  let totalW, totalH, panels;
+  if (data.hasPrintedMat) {
+    const printDims = calculatePrintDimensions(order.product_sku, layout);
+    totalW = isLandscapeLayout(layout) ? 1600 : 1000;
+    totalH = Math.round(totalW * (printDims.height / printDims.width));
+    const dpiScale = totalW / printDims.width;
+    panels = calculateMatLayout(layout, totalW, totalH, data.printSpec, dpiScale);
+  } else {
+    totalW = isLandscapeLayout(layout) ? 1600 : 1000;
+    totalH = isLandscapeLayout(layout) ? 1000 : 1600;
+    panels = calculateLayout(layout, totalW, totalH);
+  }
 
   // Build composite layers
   const layers = [];
@@ -96,12 +100,24 @@ async function generateProof(order) {
   });
   layers.push({ input: tributeSvg, left: panels.tribute.left, top: panels.tribute.top });
 
+  // Bevel ring around openings (printed mat orders only)
+  if (data.hasPrintedMat) {
+    const matOverlay = buildMatOverlaySvg({
+      width: totalW,
+      height: totalH,
+      openings: [panels.photo, panels.tribute],
+      bevelColor: tributeColors.bevel,
+      bevelWidth: panels.bevelWidth,
+    });
+    layers.push({ input: matOverlay, left: 0, top: 0 });
+  }
+
   // Watermark overlay
   const watermarkSvg = buildWatermarkSvg(totalW, totalH);
   layers.push({ input: watermarkSvg, left: 0, top: 0 });
 
   // Composite everything
-  const background = tributeColors.background || '#1a1a1a';
+  const background = (data.hasPrintedMat && tributeColors.mat) || tributeColors.background || '#1a1a1a';
   const proofBuffer = await sharp({
     create: { width: totalW, height: totalH, channels: 3, background },
   })

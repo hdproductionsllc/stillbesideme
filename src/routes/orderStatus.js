@@ -15,10 +15,19 @@ function shortId(orderId) {
   return orderId.substring(0, 8).toUpperCase();
 }
 
-function trackingForOrder(db, orderId) {
+function trackingForOrder(db, order) {
+  // Partner-fulfilled orders carry tracking on the orders row itself
+  if (order.tracking_number) {
+    return {
+      number: order.tracking_number,
+      carrier: order.tracking_carrier || '',
+      url: order.tracking_url || '',
+    };
+  }
+
   const luma = db.get(
     'SELECT tracking_number, tracking_carrier, tracking_url FROM luma_orders WHERE order_id = ? ORDER BY created_at DESC LIMIT 1',
-    [orderId]
+    [order.id]
   );
   if (!luma || !luma.tracking_number) return null;
   return {
@@ -42,7 +51,7 @@ function buildTimeline(order, events) {
   const paymentAt = byType.payment_confirmed?.created_at;
   const proofSentAt = byType.proof_sent?.created_at;
   const proofApprovedAt = byType.proof_approved?.created_at || order.proof_approved_at;
-  const shippedAt = byType.luma_shipped?.created_at || byType.whcc_shipped?.created_at;
+  const shippedAt = byType.partner_shipped?.created_at || byType.luma_shipped?.created_at || byType.whcc_shipped?.created_at;
 
   const isPast = (status) => {
     const order_idx = ['draft', 'pending_payment', 'proof_ready', 'change_requested', 'proof_approved', 'in_production', 'shipped', 'delivered'].indexOf(status);
@@ -127,7 +136,7 @@ router.get('/status/:token', (req, res) => {
   );
 
   const shipping = order.shipping_json ? JSON.parse(order.shipping_json) : null;
-  const tracking = trackingForOrder(db, order.id);
+  const tracking = trackingForOrder(db, order);
 
   res.json({
     orderId: order.id,

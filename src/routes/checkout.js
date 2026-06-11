@@ -37,7 +37,15 @@ router.post('/checkout', async (req, res) => {
   const db = req.app.locals.db;
 
   try {
-    const { templateId, sku, fields, poemText, style, layout, orderType } = req.body;
+    const { templateId, sku, fields, poemText, style, layout, orderType, colors } = req.body;
+
+    // Validate auto-matched print colors (never trust client) — drop if malformed
+    const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+    let safeColors = null;
+    if (colors && HEX_RE.test(colors.mat) && HEX_RE.test(colors.bevel) && HEX_RE.test(colors.text)
+        && (colors.tone === 'dark' || colors.tone === 'light')) {
+      safeColors = { mat: colors.mat, bevel: colors.bevel, text: colors.text, tone: colors.tone };
+    }
 
     // Validate required fields
     if (!templateId || !sku) {
@@ -78,7 +86,7 @@ router.post('/checkout', async (req, res) => {
         req.sessionID,
         templateId,
         sku,
-        JSON.stringify({ ...fields, style, layout, orderType }),
+        JSON.stringify({ ...fields, style, layout, orderType, ...(safeColors ? { colors: safeColors } : {}) }),
         JSON.stringify(photos),
         poemText.trim(),
         totalCents

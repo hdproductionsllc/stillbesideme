@@ -2,9 +2,11 @@
   "id": "pet-tribute",
   "name": "Pet Tribute",
   "collection": "pet-memorial",
-  "description": "A personalized AI tribute poem, matted and framed with your pet's photo – museum-quality and one of a kind.",
+  "description": "A personalized tribute poem UV-printed beside your pet's photo – ink cured into the panel, framed, and made to last a lifetime.",
   "category": "pet",
   "poemSupport": "ai",
+  "colorMode": "auto",
+  "printSpec": { "matBorderIn": 1.5, "gutterIn": 1.0, "bevelWidthIn": 0.1 },
 
   "canvas": {
     "width": 4800,
@@ -28,38 +30,6 @@
       "columns": [1],
       "rows": [1, 1],
       "areas": [["photo"], ["tribute"]],
-      "aspectRatio": "4/5"
-    },
-    "hero-left": {
-      "label": "Feature Left",
-      "panels": 3,
-      "columns": [1.15, 1],
-      "rows": [1, 1],
-      "areas": [["photo", "panel2"], ["photo", "tribute"]],
-      "aspectRatio": "5/3.8"
-    },
-    "hero-top": {
-      "label": "Feature Top",
-      "panels": 3,
-      "columns": [1, 1],
-      "rows": [1.3, 1],
-      "areas": [["photo", "photo"], ["panel2", "tribute"]],
-      "aspectRatio": "4/5"
-    },
-    "photos-left": {
-      "label": "Gallery Left",
-      "panels": 3,
-      "columns": [1, 1.15],
-      "rows": [1, 1],
-      "areas": [["photo", "tribute"], ["panel2", "tribute"]],
-      "aspectRatio": "5/3.8"
-    },
-    "tribute-top": {
-      "label": "Poem First",
-      "panels": 3,
-      "columns": [1, 1],
-      "rows": [1, 1.3],
-      "areas": [["tribute", "tribute"], ["photo", "panel2"]],
       "aspectRatio": "4/5"
     }
   },
@@ -85,48 +55,6 @@
       "photo": {
         "borderColor": "#C4A882"
       }
-    },
-    "warm-natural": {
-      "label": "Warm Natural",
-      "description": "Natural oak frame, warm cream mat, dark text – modern and warm",
-      "frame": {
-        "gradient": "linear-gradient(145deg, #b8956a, #c9a87c 15%, #a0804f 40%, #c4a06d 70%, #96783f)",
-        "shadow": "0 4px 24px rgba(0,0,0,0.3)"
-      },
-      "mat": { "color": "#F5EDE0" },
-      "tribute": {
-        "background": "#F5EDE0",
-        "name": "#2C2420",
-        "dates": "#6B5D52",
-        "divider": "#C4A882",
-        "poem": "#4A3F36",
-        "nickname": "#6B5D52",
-        "family": "#6B5D52"
-      },
-      "photo": {
-        "borderColor": "#C4A882"
-      }
-    },
-    "soft-light": {
-      "label": "Soft Light",
-      "description": "White frame, white mat, muted text – gentle and contemporary",
-      "frame": {
-        "gradient": "linear-gradient(145deg, #e8e4e0, #f0ece8 15%, #d8d4d0 40%, #ece8e4 70%, #d0ccc8)",
-        "shadow": "0 4px 24px rgba(0,0,0,0.15)"
-      },
-      "mat": { "color": "#FFFFFF" },
-      "tribute": {
-        "background": "#FFFFFF",
-        "name": "#3a3a3a",
-        "dates": "#8a8a8a",
-        "divider": "#c0b8a8",
-        "poem": "#5a5a5a",
-        "nickname": "#8a8a8a",
-        "family": "#8a8a8a"
-      },
-      "photo": {
-        "borderColor": "#c0b8a8"
-      }
     }
   },
 
@@ -141,6 +69,11 @@
   },
 
   "poemLabel": "Poem",
+
+  "poemFormats": [
+    { "id": "poem", "label": "A poem about them", "poemLabel": "Poem" },
+    { "id": "letter", "label": "A letter from them", "poemLabel": "Letter" }
+  ],
 
   "giftLabels": {
     "gift": {
@@ -172,8 +105,7 @@
   "defaultLayout": "side-by-side",
 
   "photoSlots": [
-    { "id": "main", "label": "Share their photo", "sublabel": "The one that captures who they really were", "required": true },
-    { "id": "panel2", "label": "Second photo", "sublabel": "Another favorite moment", "required": false }
+    { "id": "main", "label": "Share their photo", "sublabel": "The one that captures who they really were", "required": true }
   ],
 
   "memoryFields": [
@@ -191,12 +123,6 @@
   ],
 
   "printProducts": [
-    { "sku": "framed-5x7", "label": "Framed 5×7\"", "price": 8495, "badge": "Gift Size" },
-    { "sku": "framed-8x10", "label": "Framed 8×10\"", "price": 10995 },
-    { "sku": "framed-11x14", "label": "Framed 11×14\"", "price": 15995, "default": true, "badge": "Most Popular" },
-    { "sku": "framed-16x20", "label": "Framed 16×20\"", "price": 24995 },
-    { "sku": "framed-20x24", "label": "Framed 20×24\"", "price": 34995 },
-    { "sku": "framed-20x30", "label": "Framed 20×30\"", "price": 42995, "badge": "Statement Piece" },
-    { "sku": "framed-30x40", "label": "Framed 30×40\"", "price": 69995 }
+    { "sku": "framed-11x14", "label": "11×14\" UV-Printed Framed Tribute", "price": 15995, "default": true }
   ]
 }

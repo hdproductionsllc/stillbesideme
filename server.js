@@ -536,6 +536,12 @@ async function start() {
     res.sendFile(path.join(__dirname, 'public', 'proof-approval.html'));
   });
 
+  // Partner fulfillment admin (tokenized link from the fulfillment email)
+  app.use('/api/admin', require('./src/routes/adminOrder'));
+  app.get('/admin/order/:token', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin-order.html'));
+  });
+
   // Order status page (token-based deep link from email, plus lookup form)
   app.use('/api/orders', require('./src/routes/orderStatus'));
   app.get('/order', (req, res) => {

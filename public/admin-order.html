@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Fulfillment | Still Beside Me</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/store.css">
+  <style>
+    .admin-wrap { max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    .admin-card { background: #fff; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-bottom: 1.5rem; }
+    .admin-card h2 { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 500; margin: 0 0 1rem; }
+    .admin-row { display: flex; justify-content: space-between; padding: 0.45rem 0; border-bottom: 1px solid #f0ece6; font-size: 0.95rem; }
+    .admin-row strong { color: #6b6359; font-weight: 600; }
+    .color-chip { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: middle; border: 1px solid #ccc; margin-right: 4px; }
+    .admin-form label { display: block; font-size: 0.85rem; font-weight: 600; color: #6b6359; margin: 0.9rem 0 0.25rem; }
+    .admin-form input { width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #ddd6cc; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
+    .admin-btn { margin-top: 1.25rem; width: 100%; padding: 0.85rem; background: #8B9D83; color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+    .admin-btn:disabled { opacity: 0.6; cursor: default; }
+    .admin-msg { margin-top: 0.9rem; text-align: center; font-size: 0.9rem; }
+    .admin-msg.ok { color: #5a7a52; }
+    .admin-msg.err { color: #b04a3a; }
+    .status-badge { display: inline-block; padding: 0.2rem 0.7rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; background: #f0ece6; color: #6b6359; }
+    .status-badge.shipped { background: #e4ecdf; color: #5a7a52; }
+    .proof-thumb { max-width: 100%; border-radius: 8px; border: 1px solid #e8e4df; margin-top: 0.75rem; }
+    .dl-btn { display: inline-block; margin-top: 0.75rem; padding: 0.55rem 1.2rem; border: 1px solid #8B9D83; color: #8B9D83; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+  </style>
+</head>
+<body style="background:#FAF8F5;">
+  <header class="site-header">
+    <div class="container">
+      <a href="/" class="site-logo">Still Beside Me</a>
+    </div>
+  </header>
+
+  <main class="admin-wrap">
+    <div id="loading" class="admin-card">Loading order…</div>
+    <div id="content" style="display:none">
+      <div class="admin-card" id="order-card"></div>
+      <div class="admin-card admin-form" id="ship-card">
+        <h2>Mark shipped</h2>
+        <label for="tracking-number">Tracking number *</label>
+        <input type="text" id="tracking-number" placeholder="1Z999AA10123456784">
+        <label for="tracking-carrier">Carrier (optional)</label>
+        <input type="text" id="tracking-carrier" placeholder="UPS, USPS, FedEx…">
+        <label for="tracking-url">Tracking link (optional)</label>
+        <input type="url" id="tracking-url" placeholder="https://…">
+        <button class="admin-btn" id="ship-btn">Mark shipped &amp; notify customer</button>
+        <div class="admin-msg" id="ship-msg"></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      const token = window.location.pathname.split('/').filter(Boolean).pop();
+      const loading = document.getElementById('loading');
+      const content = document.getElementById('content');
+
+      function esc(s) {
+        const d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
+      }
+
+      async function load() {
+        try {
+          const res = await fetch(`/api/admin/order/${token}`);
+          if (!res.ok) {
+            loading.textContent = 'Order not found. Check the link from the fulfillment email.';
+            return;
+          }
+          const o = await res.json();
+          render(o);
+        } catch (e) {
+          loading.textContent = 'Could not load order. Please try again.';
+        }
+      }
+
+      function render(o) {
+        loading.style.display = 'none';
+        content.style.display = '';
+
+        const ship = o.shipping || {};
+        const colors = o.colors;
+        const card = document.getElementById('order-card');
+        card.innerHTML = `
+          <h2>Order ${esc(o.shortId)} <span class="status-badge ${o.status === 'shipped' ? 'shipped' : ''}">${esc(o.status.replace(/_/g, ' '))}</span></h2>
+          <div class="admin-row"><strong>Product</strong><span>${esc(o.sku)} (${esc(o.layout === 'stacked' ? 'Portrait' : 'Landscape')})</span></div>
+          ${colors ? `<div class="admin-row"><strong>Mat / Bevel</strong><span><span class="color-chip" style="background:${esc(colors.mat)}"></span>${esc(colors.mat)} &nbsp; <span class="color-chip" style="background:${esc(colors.bevel)}"></span>${esc(colors.bevel)}</span></div>` : ''}
+          <div class="admin-row"><strong>Customer</strong><span>${esc(o.email || '—')}</span></div>
+          <div class="admin-row"><strong>Ship to</strong><span style="text-align:right">${esc(ship.name || '')}<br>${esc(ship.address1 || '')}${ship.address2 ? '<br>' + esc(ship.address2) : ''}<br>${esc(ship.city || '')}, ${esc(ship.state || '')} ${esc(ship.zip || '')}</span></div>
+          ${o.tracking ? `<div class="admin-row"><strong>Tracking</strong><span>${esc(o.tracking.number)}${o.tracking.carrier ? ' (' + esc(o.tracking.carrier) + ')' : ''}</span></div>` : ''}
+          ${o.printFileUrl ? `<a class="dl-btn" href="${esc(o.printFileUrl)}" download>Download print file (300 DPI)</a>` : ''}
+          ${o.proofUrl ? `<img class="proof-thumb" src="${esc(o.proofUrl)}" alt="Approved proof">` : ''}
+        `;
+
+        if (o.tracking) {
+          document.getElementById('tracking-number').value = o.tracking.number || '';
+          document.getElementById('tracking-carrier').value = o.tracking.carrier || '';
+          document.getElementById('tracking-url').value = o.tracking.url || '';
+        }
+      }
+
+      document.getElementById('ship-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('ship-btn');
+        const msg = document.getElementById('ship-msg');
+        const trackingNumber = document.getElementById('tracking-number').value.trim();
+
+        if (!trackingNumber) {
+          msg.className = 'admin-msg err';
+          msg.textContent = 'Please enter a tracking number.';
+          return;
+        }
+
+        btn.disabled = true;
+        msg.textContent = '';
+
+        try {
+          const res = await fetch(`/api/admin/order/${token}/ship`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              trackingNumber,
+              trackingCarrier: document.getElementById('tracking-carrier').value.trim(),
+              trackingUrl: document.getElementById('tracking-url').value.trim(),
+            }),
+          });
+          const data = await res.json();
+          msg.className = 'admin-msg ' + (res.ok ? 'ok' : 'err');
+          msg.textContent = res.ok ? data.message : (data.error || 'Something went wrong.');
+          if (res.ok) load();
+        } catch (e) {
+          msg.className = 'admin-msg err';
+          msg.textContent = 'Could not reach the server. Please try again.';
+        }
+
+        btn.disabled = false;
+      });
+
+      load();
+    })();
+  </script>
+</body>
+</html>

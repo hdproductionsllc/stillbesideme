@@ -2,6 +2,60 @@
 
 ---
 
+## Pass 2 — Pet Memorial Pivot: One Product, UV-Printed 11×14 (2026-06-11)
+
+Plan: `C:\Users\david\.claude\plans\polished-bubbling-wilkinson.md`
+
+### Phase A — Product simplification ✓ DONE
+- [x] pet-tribute.json: single 11×14 SKU $159.95, 2-panel layouts only, classic-dark only, colorMode:auto, printSpec
+- [x] customizer.js: static price line for single product, skip style picker on colorMode:auto, gate 3-panel UI, validate restored state
+- [x] preview.js: intersect LAYOUTS with template layouts (activeLayouts)
+- [x] Verify: template JSON parses; LFH unchanged (6 layouts / 3 styles / 7 products)
+
+### Phase B — Auto-matched mat/bevel colors ✓ DONE
+- [x] colorUtils.js (hex/HSL/mix/luminance/contrast)
+- [x] imageProcessor.js: extractPalette (median-cut) + deriveAutoColors (muted bevel clamp); wired into upload
+- [x] api.js: palette in upload response + session
+- [x] tributeRenderer.js: resolveColors() + calculateMatLayout() + buildMatOverlaySvg() + renderPhotoCover()
+- [x] printRenderer.js + proofGenerator.js: mat-aware branch on fields.colors
+- [x] preview.js setColors() + ColorMath; customizer.css theme-auto + swatch row; customizer.js swatch UI
+- [x] checkout.js: validate + store colors in fields_json
+- [x] **BONUS BUG FIX**: smart-crop "50% 50%" positions crashed sharp in proof/print renderers — every order with a smart crop would have failed at proof generation. Fixed with manual cover-crop (renderPhotoCover)
+- [x] buildTributeSvg: content now vertically centered (was top-anchored with dead space)
+- [x] Verify: print 4200×3300 w/ 450px mat + bevel rings; proof + portrait + legacy regression all render
+
+### Phase C — Partner UV fulfillment ✓ DONE
+- [x] Migration 006: admin_token + tracking columns on orders (applied)
+- [x] stripeWebhooks.js: generate admin_token alongside proof_token
+- [x] proofApproval.js: partner branch → partner email w/ print file + admin link, in_production
+- [x] emailService.js: sendPartnerOrderEmail (attachment <20MB + link) + sendShippedEmail
+- [x] adminOrder.js + admin-order.html (mark shipped + tracking, idempotent, ?resend=1)
+- [x] orderStatus.js: orders-level tracking first + partner_shipped timeline
+- [x] .env: FULFILLMENT_PROVIDER=partner — **DAVID: set PARTNER_PRINT_EMAIL (and same vars on Railway)**
+- [x] Verify: seeded order → admin GET → ship POST → customer email fired → status page shows shipped + tracking
+
+### Phase D — Poem generator → Fable 5 ✓ DONE
+- [x] poemGenerator.js: claude-fable-5 → sonnet-4-6 → stub chain, max_tokens 1024, elegist system prompt, refusal handling, favoriteThing bug fixed
+- [x] Fixed: Fable 5 thinking block is content[0] — find text block instead
+- [x] buildPetLetterPrompt + generatePetLetterStub ("A letter from them")
+- [x] pet-tribute.json poemFormats + customizer format toggle (persisted)
+- [x] Verify: LIVE — both formats generated on ai-fable-*; sonnet fallback exercised; quality excellent
+
+### Phase E — Pet-first marketing ✓ DONE
+- [x] index.html: pet hero ($159.95, direct CTA), single-Offer Product schema + free-shipping details, UV story + matched-colors showcase (replaces 3-styles), UV FAQ (schema + visible), LFH demoted to slim band, popup/footer/copy sweep, GA4 begin_checkout value → 159.95
+- [x] pet/dog/cat pages: $159.95, 11×14, UV language, single-Offer schema — zero stale 84.95 left
+- [x] Mixed pages (sympathy-gifts, memorial-gifts, blog): per-occurrence judgment — pet mentions updated, LFH/generic mentions kept truthful at $84.95
+- [x] Human-memorial pages untouched (their pricing is still correct)
+- [x] Verify: 14 key pages 200; all JSON-LD blocks parse; pet pages clean of old pricing
+
+### Post-ship (David)
+- [ ] Real product photos of UV frame
+- [ ] Pinterest account + pins
+- [ ] META_PIXEL_ID + Mailchimp keys in env
+- [ ] Review-request email, welcome sequence, Google Ads
+
+---
+
 ## Pass 1 — Final Launch Blockers (2026-05-20)
 
 Most of the original launch-readiness items were already done. Real remaining gaps:

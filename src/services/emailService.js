@@ -57,9 +57,9 @@ function wrapHtml(bodyHtml) {
 </html>`;
 }
 
-async function send(to, subject, html) {
+async function send(to, subject, html, extra = {}) {
   const t = getTransporter();
-  const mailOptions = { from: FROM, to, subject, html };
+  const mailOptions = { from: FROM, to, subject, html, ...extra };
 
   if (!t) {
     console.log(`Email (not sent — no SMTP): to=${to} subject="${subject}"`);
@@ -230,4 +230,128 @@ async function sendApprovalConfirmation(to, orderData, statusPageUrl) {
   return send(to, `Your tribute is printing — Order ${shortId}`, html);
 }
 
-module.exports = { sendOrderConfirmation, sendProofEmail, sendChangeRequestNotification, sendApprovalConfirmation };
+/**
+ * Email a new order to the partner UV print shop.
+ * Includes the print file (attached when under 20MB, always linked),
+ * order specs, shipping address, and a tokenized admin link for
+ * marking the order shipped.
+ */
+async function sendPartnerOrderEmail(order, { printFileUrl, printFilePath, adminUrl, proofImageUrl }) {
+  const partnerEmail = process.env.PARTNER_PRINT_EMAIL;
+  if (!partnerEmail) {
+    throw new Error('PARTNER_PRINT_EMAIL not configured');
+  }
+
+  const fs = require('fs');
+  const sid = order.id.substring(0, 8).toUpperCase();
+  const fields = order.fields_json ? JSON.parse(order.fields_json) : {};
+  const shipping = order.shipping_json ? JSON.parse(order.shipping_json) : {};
+  const colors = fields.colors || null;
+  const sizeMatch = (order.product_sku || '').match(/(\d+)x(\d+)/);
+  const sizeLabel = sizeMatch ? `${sizeMatch[1]}×${sizeMatch[2]}"` : order.product_sku;
+  const orientation = fields.layout === 'stacked' ? 'Portrait' : 'Landscape';
+
+  // Attach the print file only when it's a sane email size; the link always works
+  const attachments = [];
+  try {
+    if (printFilePath && fs.existsSync(printFilePath) && fs.statSync(printFilePath).size < 20 * 1024 * 1024) {
+      attachments.push({ filename: `${sid}-print-ready.jpg`, path: printFilePath });
+    }
+  } catch (e) {
+    // Attachment is best-effort; the download link is the source of truth
+  }
+
+  const colorChips = colors ? `
+      <p style="color:#2C2C2C;line-height:1.8;margin:0 0 16px;">
+        <strong>Printed mat:</strong> <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${colors.mat};vertical-align:middle;border:1px solid #ccc;"></span> ${colors.mat}
+        &nbsp;&nbsp;<strong>Bevel accent:</strong> <span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${colors.bevel};vertical-align:middle;border:1px solid #ccc;"></span> ${colors.bevel}
+      </p>` : '';
+
+  const html = wrapHtml(`
+    <div style="background:#fff;border-radius:12px;padding:32px;">
+      <h1 style="font-family:Georgia,serif;font-size:1.4rem;font-weight:400;color:#2C2C2C;margin:0 0 16px;">
+        New UV print order — ${sid}
+      </h1>
+
+      <p style="color:#2C2C2C;line-height:1.8;margin:0 0 16px;">
+        <strong>Product:</strong> ${sizeLabel} framed tribute, UV-printed (mat + bevel printed in-image, full bleed)<br>
+        <strong>Orientation:</strong> ${orientation}<br>
+        <strong>Print file:</strong> 300 DPI JPEG${attachments.length ? ' (attached)' : ''} — <a href="${printFileUrl}" style="color:#8B9D83;">download</a>
+      </p>
+      ${colorChips}
+
+      <div style="background:#FAF8F5;border-radius:8px;padding:16px;margin:16px 0;">
+        <strong>Ship to:</strong><br>
+        ${shipping.name || ''}<br>
+        ${shipping.address1 || ''}${shipping.address2 ? '<br>' + shipping.address2 : ''}<br>
+        ${shipping.city || ''}, ${shipping.state || ''} ${shipping.zip || ''}<br>
+        ${shipping.country || 'US'}
+      </div>
+
+      ${proofImageUrl ? `
+      <p style="color:#9B9590;font-size:0.85rem;margin:16px 0;">
+        Customer-approved proof: <a href="${proofImageUrl}" style="color:#8B9D83;">view</a>
+      </p>` : ''}
+
+      <div style="text-align:center;margin:24px 0 8px;">
+        <a href="${adminUrl}"
+           style="display:inline-block;background:#8B9D83;color:#fff;text-decoration:none;padding:14px 40px;border-radius:8px;font-weight:600;font-size:1rem;">
+          Mark shipped / add tracking
+        </a>
+      </div>
+      <p style="text-align:center;color:#9B9590;font-size:0.8rem;">
+        When the piece ships, open this link and enter the tracking number — the customer is notified automatically.
+      </p>
+    </div>
+  `);
+
+  const cc = ADMIN_EMAIL && ADMIN_EMAIL !== partnerEmail ? { cc: ADMIN_EMAIL } : {};
+  return send(partnerEmail, `New UV print order — ${sid} (${sizeLabel} ${orientation})`, html, { attachments, ...cc });
+}
+
+/**
+ * Notify the customer their tribute has shipped, with tracking.
+ */
+async function sendShippedEmail(to, orderData, tracking, statusPageUrl) {
+  const { orderId } = orderData;
+  const sid = orderId.substring(0, 8).toUpperCase();
+  const trackingLine = tracking && tracking.number
+    ? `<p style="color:#2C2C2C;line-height:1.6;text-align:center;margin:16px 0;">
+         <strong>Tracking:</strong> ${tracking.url
+           ? `<a href="${tracking.url}" style="color:#8B9D83;">${tracking.number}</a>`
+           : tracking.number}${tracking.carrier ? ` (${tracking.carrier})` : ''}
+       </p>`
+    : '';
+
+  const html = wrapHtml(`
+    <div style="background:#fff;border-radius:12px;padding:32px;text-align:center;">
+      <div style="font-size:2.5rem;margin-bottom:12px;">&#128230;</div>
+      <h1 style="font-family:Georgia,serif;font-size:1.6rem;font-weight:400;color:#2C2C2C;margin:0 0 8px;">
+        Their tribute is on its way
+      </h1>
+      <p style="color:#9B9590;margin:0 0 24px;">Order ${sid}</p>
+      <p style="color:#2C2C2C;line-height:1.6;">
+        Your framed tribute has shipped. We hope it brings you comfort every time you see it.
+      </p>
+      ${trackingLine}
+      ${statusPageUrl ? `
+      <p style="margin-top:24px;">
+        <a href="${statusPageUrl}"
+           style="display:inline-block;background:transparent;color:#8B9D83;text-decoration:none;padding:10px 24px;border:1px solid #8B9D83;border-radius:8px;font-weight:600;font-size:0.9rem;">
+          Track your order
+        </a>
+      </p>` : ''}
+    </div>
+  `);
+
+  return send(to, `Your tribute has shipped — Order ${sid}`, html);
+}
+
+module.exports = {
+  sendOrderConfirmation,
+  sendProofEmail,
+  sendChangeRequestNotification,
+  sendApprovalConfirmation,
+  sendPartnerOrderEmail,
+  sendShippedEmail,
+};

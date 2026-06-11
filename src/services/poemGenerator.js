@@ -1,15 +1,36 @@
 /**
  * poemGenerator.js – AI memorial poem/letter generation via Anthropic Claude API.
  *
- * Supports both pet tributes and human memorials (Letter From Heaven).
- * Falls back gracefully to a template-based poem when no API key is configured,
- * so the customizer never breaks regardless of environment.
+ * Primary model: Claude Fable 5 (claude-fable-5) — best available creative
+ * writing. Falls back to Sonnet 4.6 on a refusal/error, and finally to a
+ * template-based stub when no API key is configured, so the customizer
+ * never breaks regardless of environment.
+ *
+ * Supports pet tributes (poem OR first-person "letter from them" format)
+ * and human memorials (Letter From Heaven).
+ *
+ * Fable 5 API notes (verified against the Claude API reference):
+ * - Do NOT pass a `thinking` param (always-on; explicit config = 400)
+ * - Do NOT pass temperature/top_p/top_k (400)
+ * - New tokenizer ≈30% more tokens than Sonnet — hence MAX_TOKENS 1024
+ * - May return stop_reason 'refusal' with empty content — must check
+ *   before reading content[0]
  */
 
 const Anthropic = require('@anthropic-ai/sdk');
 
-const MODEL = 'claude-sonnet-4-6';
-const MAX_TOKENS = 300;
+const MODEL = 'claude-fable-5';
+const FALLBACK_MODEL = 'claude-sonnet-4-6';
+const MAX_TOKENS = 1024;
+
+const SYSTEM_PROMPT = `You are a master elegist who writes brief, luminous memorial verse and letters. Your work is UV-printed onto a framed tribute that will hang on a family's wall for decades, so every word must earn its place.
+
+Your craft principles:
+- Concrete detail over abstraction. One real remembered thing (a worn tennis ball, a spot of sun on the kitchen floor) moves people more than any general sentiment.
+- Warmth over grief. Write about love and presence, never absence and darkness.
+- Plain, timeless language. No clichés, no greeting-card phrasing, nothing that will feel dated in twenty years.
+- Restraint. Shorter and truer beats longer and ornate.
+- Never use em dashes. Never use markdown formatting of any kind.`;
 
 let client = null;
 
@@ -22,10 +43,10 @@ function getClient() {
 }
 
 /**
- * Build the pet memorial prompt.
+ * Build the pet memorial poem prompt.
  */
-function buildPrompt({ petName, petType, breed, nicknames, personality, favoriteMemory }) {
-  return `You are writing a short memorial poem for a beloved pet who has passed away. This poem will be printed on a beautiful wall art canvas that will hang in the owner's home for years.
+function buildPrompt({ petName, petType, breed, nicknames, personality, favoriteMemory, favoriteThing }) {
+  return `Write a memorial poem for a beloved pet. It will be printed beside their photo in a framed tribute.
 
 Pet Details:
 - Name: ${petName || 'their beloved companion'}
@@ -34,29 +55,51 @@ Pet Details:
 - Breed: ${breed || 'not specified'}
 - What made them special: ${personality || 'not provided'}
 - A favorite memory: ${favoriteMemory || 'not provided'}
+- Their favorite toy or treat: ${favoriteThing || 'not provided'}
 
-Write a 6-8 line poem that:
+Write an 8-12 line poem with one stanza break that:
 - References the pet by name at least once
-- Incorporates at least one specific detail the owner shared
-- Feels warm and comforting – about love and presence, not just grief
-- Is personal and unique, never generic
-- Is appropriate for permanent display as wall art (timeless, dignified)
+- Weaves in at least one specific detail the owner shared, transformed into imagery (don't just restate it)
+- Feels warm and comforting, about love and presence
 - Does NOT use clichés like "rainbow bridge" or "angel wings" unless the owner specifically referenced them
-- NEVER mentions death, dying, the devil, hell, darkness, morbid imagery, or anything unsettling. This is about love and presence, not loss and darkness
-- Keeps the tone warm, hopeful, and life-affirming. Focus on what the pet brought to the family, not on the absence
-- Has natural line breaks suitable for display on a memorial canvas
+- NEVER mentions death, dying, darkness, or anything morbid or unsettling
 - Could make someone smile through tears
-- Never uses em dashes
-- Never uses markdown formatting (no asterisks, underscores, or other special characters around words)
 
 Return ONLY the poem text. No title, no attribution, no explanation.`;
+}
+
+/**
+ * Build the pet "letter from them" prompt — first-person, in the pet's voice.
+ */
+function buildPetLetterPrompt({ petName, petType, breed, nicknames, personality, favoriteMemory, favoriteThing }) {
+  return `Write a short letter FROM a beloved pet TO their family, in the pet's own voice. It will be printed beside their photo in a framed tribute.
+
+About the pet writing this letter:
+- Name: ${petName || 'their beloved companion'}
+- Nicknames: ${nicknames || 'none provided'}
+- Type: ${petType || 'pet'}
+- Breed: ${breed || 'not specified'}
+- What made them special: ${personality || 'not provided'}
+- A favorite memory: ${favoriteMemory || 'not provided'}
+- Their favorite toy or treat: ${favoriteThing || 'not provided'}
+
+Write a 10-14 line first-person letter that:
+- Is written FROM the pet TO their family (uses "I" and "you")
+- Sounds like THIS pet: let their personality and quirks shape the voice (playful, dignified, mischievous, gentle)
+- Opens with something true to their daily life together, then turns gently comforting
+- Weaves in at least one specific detail shared above
+- Conveys "I was so happy with you, I'm okay, and I'm still close by"
+- NEVER mentions death, dying, darkness, or anything morbid or unsettling
+- Could make someone smile through tears
+
+Return ONLY the letter text. No title, no sign-off line like "Love, Max", no attribution, no explanation.`;
 }
 
 /**
  * Build the human memorial "Letter From Heaven" prompt.
  */
 function buildHumanPrompt({ name, relationship, nickname, personality, favoriteMemory, favoriteSaying, legacy }) {
-  return `You are writing a short letter from someone who has passed away, addressed to their loved ones. This is a "Letter From Heaven" – a first-person message from the deceased, as if they could write one last note to the people they love. It will be printed on a beautiful wall art canvas that will hang in someone's home for years.
+  return `Write a short letter from someone who has passed away, addressed to their loved ones. This is a "Letter From Heaven" – a first-person message from the deceased, as if they could write one last note to the people they love. It will be printed beside their photo in a framed tribute.
 
 About the person writing this letter:
 - Name: ${name || 'your loved one'}
@@ -73,15 +116,9 @@ Write a 10-14 line first-person letter that:
 - Weaves in at least one specific detail shared above (a saying, a memory, a personality trait)
 - Feels warm, reassuring, and loving – as if they're comforting the reader from beyond
 - Conveys "I'm okay, I'm still with you, don't be sad"
-- Is personal and unique, never generic
-- Is appropriate for permanent display as wall art (timeless, dignified)
-- NEVER mentions death, dying, the devil, hell, darkness, morbid imagery, or anything unsettling
+- NEVER mentions death, dying, darkness, or anything morbid or unsettling
 - Does NOT use clichés like "pearly gates" or "streets of gold" unless the family referenced them
-- Keeps the tone warm, hopeful, and life-affirming
-- Has natural line breaks suitable for display on a memorial canvas
 - Could make someone smile through tears
-- Never uses em dashes
-- Never uses markdown formatting (no asterisks, underscores, or other special characters around words)
 
 Return ONLY the letter text. No title, no "Love," sign-off, no attribution, no explanation.`;
 }
@@ -98,41 +135,77 @@ function stripMarkdown(text) {
 }
 
 /**
+ * Call one model and return the text, throwing on refusal or empty content.
+ */
+async function callModel(api, model, prompt) {
+  const response = await api.messages.create({
+    model,
+    max_tokens: MAX_TOKENS,
+    system: SYSTEM_PROMPT,
+    output_config: { effort: 'high' },
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  // Fable 5 safety classifiers can decline with stop_reason 'refusal' and an
+  // empty content array. Its always-on thinking also means content[0] is a
+  // thinking block — find the text block, never read content[0] directly.
+  const textBlock = Array.isArray(response.content)
+    ? response.content.find(b => b.type === 'text' && b.text)
+    : null;
+
+  if (response.stop_reason === 'refusal' || !textBlock) {
+    const err = new Error(`Model ${model} declined or returned no text (stop_reason: ${response.stop_reason})`);
+    err.refusal = true;
+    throw err;
+  }
+
+  return textBlock.text.trim();
+}
+
+/**
  * Generate a poem/letter via the Anthropic API.
- * Dispatches by category: 'human' → Letter From Heaven, else → pet poem.
- * Returns { poem, generationId, stubbed: false } on success.
- * Falls back to stub if no API key or on error.
+ *
+ * Dispatch:
+ *   category 'human'            → Letter From Heaven
+ *   category 'pet' + format 'letter' → letter from the pet's voice
+ *   else                        → pet poem
+ *
+ * Model chain: Fable 5 → Sonnet 4.6 → template stub. The generationId is
+ * tagged with the model that actually produced the text (ai-fable / ai-sonnet)
+ * so quality and fallback rates are observable in the session history.
  */
 async function generate(details) {
   const api = getClient();
   const isHuman = details.category === 'human';
+  const isPetLetter = !isHuman && details.format === 'letter';
 
-  if (!api) {
-    return isHuman ? generateHumanStub(details) : generateStub(details);
+  const stub = () => {
+    if (isHuman) return generateHumanStub(details);
+    if (isPetLetter) return generatePetLetterStub(details);
+    return generateStub(details);
+  };
+
+  if (!api) return stub();
+
+  const prompt = isHuman ? buildHumanPrompt(details)
+    : isPetLetter ? buildPetLetterPrompt(details)
+    : buildPrompt(details);
+
+  for (const model of [MODEL, FALLBACK_MODEL]) {
+    try {
+      const text = await callModel(api, model, prompt);
+      return {
+        poem: stripMarkdown(text),
+        generationId: `ai-${model === MODEL ? 'fable' : 'sonnet'}-${Date.now()}`,
+        stubbed: false,
+      };
+    } catch (err) {
+      console.error(`Anthropic API error (${model}):`, err.message);
+      // try the next model in the chain
+    }
   }
 
-  try {
-    const prompt = isHuman ? buildHumanPrompt(details) : buildPrompt(details);
-
-    const response = await api.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      messages: [
-        { role: 'user', content: prompt }
-      ]
-    });
-
-    const poem = stripMarkdown(response.content[0].text.trim());
-
-    return {
-      poem,
-      generationId: `ai-${Date.now()}`,
-      stubbed: false
-    };
-  } catch (err) {
-    console.error('Anthropic API error:', err.message);
-    return isHuman ? generateHumanStub(details) : generateStub(details);
-  }
+  return stub();
 }
 
 /**
@@ -171,6 +244,45 @@ still loved, still ours.
 ${name}, you are not gone.
 You are woven into everything beautiful
 we will ever know.`;
+
+  return {
+    poem,
+    generationId: `stub-${Date.now()}`,
+    stubbed: true
+  };
+}
+
+/**
+ * Template-based fallback letter in the pet's voice.
+ */
+function generatePetLetterStub({ petName, petType, favoriteMemory, favoriteThing }) {
+  const name = petName || 'Me';
+  const type = (petType || 'friend').toLowerCase();
+
+  const memoryLine = favoriteMemory
+    ? `\nRemember ${favoriteMemory.toLowerCase().startsWith('the ') || favoriteMemory.toLowerCase().startsWith('when ') ? favoriteMemory.charAt(0).toLowerCase() + favoriteMemory.slice(1) : 'the time ' + favoriteMemory.charAt(0).toLowerCase() + favoriteMemory.slice(1)}?\nThat was one of my favorite days too.`
+    : '';
+
+  const toyLine = favoriteThing
+    ? `\nLook after my ${favoriteThing.toLowerCase()} for me. It was always my favorite.`
+    : '';
+
+  const poem = `Hello, my family.
+
+It's me. I just wanted you to know
+that being your ${type} was the best thing
+I ever got to be.
+
+Every walk, every nap in the sun,
+every time you came through the door,
+my whole world lit up.${memoryLine}${toyLine}
+
+Don't be sad when you think of me.
+Think of me the way I always was:
+right beside you, happy,
+exactly where I belonged.
+
+I'm still there. I always will be.`;
 
   return {
     poem,

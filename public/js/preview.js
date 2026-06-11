@@ -18,6 +18,80 @@
 (function () {
   'use strict';
 
+  // ── Client Color Math ──────────────────────────────────────
+  // Mirror of src/services/colorUtils.js — keep the two in sync.
+
+  function hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+
+  function rgbToHex(rgb) {
+    const c = v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+    return '#' + c(rgb.r) + c(rgb.g) + c(rgb.b);
+  }
+
+  function hexToHsl(hex) {
+    let { r, g, b } = hexToRgb(hex);
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    let h = 0, s = 0;
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+      else if (max === g) h = ((b - r) / d + 2) / 6;
+      else h = ((r - g) / d + 4) / 6;
+    }
+    return { h, s, l };
+  }
+
+  function hslToHex(hsl) {
+    const { h, s, l } = hsl;
+    if (s === 0) {
+      const v = l * 255;
+      return rgbToHex({ r: v, g: v, b: v });
+    }
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    const hue = t => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+    return rgbToHex({ r: hue(h + 1 / 3) * 255, g: hue(h) * 255, b: hue(h - 1 / 3) * 255 });
+  }
+
+  function mixHex(hexA, hexB, amount) {
+    const a = hexToRgb(hexA), b = hexToRgb(hexB);
+    return rgbToHex({
+      r: a.r + (b.r - a.r) * amount,
+      g: a.g + (b.g - a.g) * amount,
+      b: a.b + (b.b - a.b) * amount
+    });
+  }
+
+  function luminance(hex) {
+    const { r, g, b } = hexToRgb(hex);
+    const lin = v => {
+      v /= 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  }
+
+  function contrast(hexA, hexB) {
+    const la = luminance(hexA), lb = luminance(hexB);
+    const hi = Math.max(la, lb), lo = Math.min(la, lb);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  window.ColorMath = { hexToRgb, rgbToHex, hexToHsl, hslToHex, mix: mixHex, luminance, contrast };
+
   // ── Layout Definitions ────────────────────────────────────
   //
   // Each layout specifies CSS Grid tracks and named areas.
@@ -81,6 +155,7 @@
 
   let container = null;       // #preview-panels DOM element
   let template = null;
+  let activeLayouts = LAYOUTS; // LAYOUTS filtered to what the template declares
   let currentLayout = 'side-by-side';
 
   // panels Map: areaName -> { canvas, ctx, type, panelEl }
@@ -110,6 +185,7 @@
     getPhotoCanvas,
     setField,
     setStyle,
+    setColors,
     setLayout,
     setFrameSize,
     getFields: () => ({ ...fields }),
@@ -120,7 +196,7 @@
     getCustomRatios: () => JSON.parse(JSON.stringify(customRatios)),
     getPanels: () => panels,
     swapPhotos,
-    getLayouts: () => LAYOUTS,
+    getLayouts: () => activeLayouts,
     getCurrentLayout: () => currentLayout,
     getContainer: () => container
   };
@@ -132,6 +208,19 @@
     if (!container) return;
 
     template = tmpl;
+
+    // Only expose layouts the template actually declares
+    if (tmpl && tmpl.layouts) {
+      activeLayouts = {};
+      for (const key of Object.keys(LAYOUTS)) {
+        if (tmpl.layouts[key]) activeLayouts[key] = LAYOUTS[key];
+      }
+    } else {
+      activeLayouts = LAYOUTS;
+    }
+    if (!activeLayouts[currentLayout]) {
+      currentLayout = (tmpl && tmpl.defaultLayout) || Object.keys(activeLayouts)[0];
+    }
 
     // Set default style colors
     if (tmpl && tmpl.styleVariants && tmpl.defaultStyle) {
@@ -181,7 +270,7 @@
   // ── Panel Building ─────────────────────────────────────────
 
   function buildPanels(layoutKey) {
-    const layout = LAYOUTS[layoutKey];
+    const layout = activeLayouts[layoutKey];
     if (!layout) return;
 
     currentLayout = layoutKey;
@@ -232,7 +321,7 @@
   }
 
   function applyGridStyles(layoutKey) {
-    const layout = LAYOUTS[layoutKey];
+    const layout = activeLayouts[layoutKey];
     if (!layout || !container) return;
 
     const ratios = customRatios[layoutKey];
@@ -252,6 +341,14 @@
       var isLandscape = parseFloat(parts[0]) > parseFloat(parts[1]);
       var w = isLandscape ? Math.max(frameDims[0], frameDims[1]) : Math.min(frameDims[0], frameDims[1]);
       var h = isLandscape ? Math.min(frameDims[0], frameDims[1]) : Math.max(frameDims[0], frameDims[1]);
+
+      // Printed-mat templates: the panels region represents the openings
+      // INSIDE the mat border, so subtract the border from each side.
+      // The mat itself is rendered by .mat-board padding around this region.
+      if (template && template.colorMode === 'auto' && template.printSpec) {
+        var b = template.printSpec.matBorderIn * 2;
+        if (w - b > 0 && h - b > 0) { w = w - b; h = h - b; }
+      }
       container.style.aspectRatio = w + '/' + h;
     } else {
       container.style.aspectRatio = layout.aspectRatio;
@@ -349,8 +446,40 @@
     queueRender();
   }
 
+  /**
+   * Apply auto-matched print colors { mat, bevel, text, tone }.
+   * Drives the frame CSS variables and derives the tribute text palette
+   * (mirror of resolveColors in src/services/tributeRenderer.js).
+   */
+  function setColors(c) {
+    if (!c || !c.mat) return;
+
+    const frameEl = document.getElementById('frame-preview');
+    if (frameEl) {
+      frameEl.className = 'frame-preview theme-auto';
+      frameEl.style.setProperty('--mat-color', c.mat);
+      frameEl.style.setProperty('--bevel-color', c.bevel || '#C4A882');
+    }
+
+    const text = c.text || (c.tone === 'light' ? '#2C2420' : '#FAF8F5');
+    const secondary = mixHex(text, c.mat, 0.45);
+    styleColors = {
+      ...(styleColors || {}),
+      tribute: {
+        background: c.mat,
+        name: text,
+        dates: secondary,
+        divider: c.bevel || '#C4A882',
+        poem: c.bevel || '#C4A882',
+        nickname: secondary,
+        family: secondary
+      }
+    };
+    queueRender();
+  }
+
   function setLayout(layoutKey) {
-    if (!LAYOUTS[layoutKey]) return;
+    if (!activeLayouts[layoutKey]) return;
     buildPanels(layoutKey);
 
     // Double rAF ensures CSS Grid reflow completes before measuring
@@ -381,7 +510,7 @@
   // ── Custom Ratio API (for divider drag) ────────────────────
 
   function getCurrentFrValues() {
-    const layout = LAYOUTS[currentLayout];
+    const layout = activeLayouts[currentLayout];
     if (!layout) return null;
     const ratios = customRatios[currentLayout];
     return {

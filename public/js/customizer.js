@@ -36,6 +36,15 @@
   let thirdPanelEnabled = false;
   let thirdPanelType = 'photo'; // 'photo' or 'text'
 
+  // Poem format ('poem' or 'letter') for templates with poemFormats
+  let poemFormat = 'poem';
+
+  // Auto-matched print colors (colorMode: 'auto' templates)
+  let currentColors = null;     // active { mat, bevel, text, tone }
+  let autoColors = null;        // server-derived match for the uploaded photo
+  let paletteSwatches = [];     // [{ hex, population }] from the photo
+  let activeSwatchIndex = -1;   // -1 = auto match
+
   // Track whether a photo has been uploaded per panel
   const photoUploaded = {};   // panelId -> boolean
 
@@ -51,7 +60,17 @@
 
   /** The label word for the generated content – "Poem" or "Letter" */
   function poemLabel() {
+    if (template && template.poemFormats) {
+      const f = template.poemFormats.find(f => f.id === poemFormat);
+      if (f && f.poemLabel) return f.poemLabel;
+    }
     return (template && template.poemLabel) || 'Poem';
+  }
+
+  /** Whether this template offers any 3-panel layouts (second photo) */
+  function hasThreePanelLayouts() {
+    if (!template || !template.layouts) return false;
+    return Object.values(template.layouts).some(def => def.panels === 3);
   }
 
   // ── Poem Version History (module-level so both wireUp and restore can use) ──
@@ -325,6 +344,16 @@
       if (data.success) {
         PreviewRenderer.setPhoto(panelId, data.thumbnailUrl, data.crop.position);
         showUploadPreview(slotId, data.thumbnailUrl, wrapper, null, data.quality);
+
+        // Auto-match mat/bevel colors to the uploaded photo
+        if (slotId === 'main' && template.colorMode === 'auto' && data.palette) {
+          paletteSwatches = data.palette.swatches || [];
+          autoColors = data.palette.auto || null;
+          activeSwatchIndex = -1;
+          if (autoColors) applyColors(autoColors);
+          buildSwatchRow();
+        }
+
         saveState();
       } else {
         showUploadPreview(slotId, localUrl, wrapper, data.error || 'Upload failed');
@@ -660,6 +689,11 @@
   function buildPanelToggle() {
     const wrap = document.getElementById('panel-toggle-wrap');
     if (!wrap) return;
+    // No second-photo option when the template has no 3-panel layouts
+    if (!hasThreePanelLayouts()) {
+      wrap.style.display = 'none';
+      return;
+    }
     updatePanelToggle(wrap);
   }
 
@@ -881,8 +915,17 @@
     const libraryLink = (template.formLabels && template.formLabels.poemLibraryLink) || 'Or choose from our poem library instead';
     const label = poemLabel();
 
+    // Format toggle (e.g. "A poem about them" vs "A letter from them")
+    const formatToggleHtml = template.poemFormats ? `
+      <div class="order-type-toggle" id="poem-format-toggle" style="margin-bottom:var(--space-md)">
+        ${template.poemFormats.map(f =>
+          `<button class="order-type-option${f.id === poemFormat ? ' active' : ''}" data-format="${f.id}">${f.label}</button>`
+        ).join('')}
+      </div>` : '';
+
     section.innerHTML = `
       <h2 class="form-section-title">${sectionTitle}</h2>
+      ${formatToggleHtml}
       <button class="poem-generate-btn" id="generate-poem-btn">
         Create Their ${label}
       </button>
@@ -933,15 +976,29 @@
     const librarySelect = document.getElementById('poem-library-select');
     const libraryPreview = document.getElementById('poem-library-preview');
 
-    const label = poemLabel();
     const nfId = nameFieldId();
 
     function updateGenerateButtonLabel() {
       const fields = PreviewRenderer.getFields();
       const name = fields[nfId];
       generateBtn.textContent = name
-        ? `Create ${name}'s ${label}`
-        : `Create Their ${label}`;
+        ? `Create ${name}'s ${poemLabel()}`
+        : `Create Their ${poemLabel()}`;
+    }
+
+    // Poem format toggle (poem vs letter from them)
+    const formatToggle = document.getElementById('poem-format-toggle');
+    if (formatToggle) {
+      formatToggle.querySelectorAll('.order-type-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+          poemFormat = btn.dataset.format;
+          formatToggle.querySelectorAll('.order-type-option').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          updateGenerateButtonLabel();
+          editBtn.textContent = `Edit ${poemLabel().toLowerCase()}`;
+          saveState();
+        });
+      });
     }
 
     const nameInput = document.getElementById(`field-${nfId}`);
@@ -956,12 +1013,12 @@
         loadingEl = document.createElement('div');
         loadingEl.className = 'poem-generating';
         loadingEl.innerHTML = `
-          <div class="poem-generating-text">Writing ${name ? name + "'s" : 'their'} ${label.toLowerCase()}...</div>
+          <div class="poem-generating-text">Writing ${name ? name + "'s" : 'their'} ${poemLabel().toLowerCase()}...</div>
           <div class="poem-generating-dots"><span></span><span></span><span></span></div>
         `;
       } else {
         loadingEl.querySelector('.poem-generating-text').textContent =
-          `Writing ${name ? name + "'s" : 'their'} ${label.toLowerCase()}...`;
+          `Writing ${name ? name + "'s" : 'their'} ${poemLabel().toLowerCase()}...`;
       }
       generateBtn.style.display = 'none';
       resultDiv.style.display = 'none';
@@ -1019,6 +1076,11 @@
       if (template.category === 'pet') {
         body.petName = fields.petName || '';
         body.nicknames = fields.petNicknames || '';
+      }
+
+      // Poem format (poem vs letter from them)
+      if (template.poemFormats) {
+        body.format = poemFormat;
       }
 
       return body;
@@ -1112,7 +1174,7 @@
     function updateRegenCount() {
       const remaining = MAX_REGENERATIONS - regenerationCount;
       if (remaining <= 0) {
-        regenCount.textContent = `No more regenerations \u2013 you can still edit the ${label.toLowerCase()}`;
+        regenCount.textContent = `No more regenerations \u2013 you can still edit the ${poemLabel().toLowerCase()}`;
         regenBtn.disabled = true;
       } else {
         regenCount.textContent = `${remaining} regeneration${remaining === 1 ? '' : 's'} remaining`;
@@ -1160,7 +1222,7 @@
 
     librarySelect.addEventListener('change', async () => {
       if (!librarySelect.value) {
-        libraryPreview.textContent = `Select a ${label.toLowerCase()} to see a preview`;
+        libraryPreview.textContent = `Select a ${poemLabel().toLowerCase()} to see a preview`;
         return;
       }
 
@@ -1177,7 +1239,7 @@
         PreviewRenderer.setField('poemText', poem.text);
         saveState();
       } catch (err) {
-        libraryPreview.textContent = `Failed to load ${label.toLowerCase()}`;
+        libraryPreview.textContent = `Failed to load ${poemLabel().toLowerCase()}`;
       }
     });
   }
@@ -1187,6 +1249,24 @@
   function createSizeSection() {
     const section = document.createElement('div');
     section.className = 'form-section';
+
+    // Single-product templates: no size choice, just a clear price line.
+    // A hidden selected .product-option keeps getSelectedProduct() working.
+    if (template.printProducts.length === 1) {
+      const product = template.printProducts[0];
+      section.innerHTML = `
+        <h2 class="form-section-title">Your tribute</h2>
+        <div class="product-option selected" data-sku="${product.sku}" data-price="${product.price}" style="display:none">
+          <span class="product-option-label">${product.label}</span>
+        </div>
+        <p class="single-product-line" style="font-size:1.05rem;line-height:1.5">
+          <strong>$${(product.price / 100).toFixed(2)}</strong> &mdash; ${product.label}<br>
+          <span style="font-size:0.88rem;color:var(--color-muted)">UV-printed directly onto the panel. No glass glare. Never fades. Free shipping.</span>
+        </p>
+      `;
+      return section;
+    }
+
     section.innerHTML = '<h2 class="form-section-title">Choose your size</h2>';
 
     const grid = document.createElement('div');
@@ -1262,17 +1342,95 @@
     }
   }
 
+  // ── Auto-Matched Colors (swatch row) ─────────────────────────
+
+  /** Apply a { mat, bevel, text, tone } set to the preview and remember it */
+  function applyColors(colors) {
+    if (!colors || !colors.mat) return;
+    currentColors = colors;
+    PreviewRenderer.setColors(colors);
+  }
+
+  /**
+   * Derive mat/text from a tapped swatch (bevel stays from the auto match).
+   * Mirror of deriveAutoColors in src/services/imageProcessor.js.
+   */
+  function deriveFromSwatch(hex) {
+    const CM = window.ColorMath;
+    const hsl = CM.hexToHsl(hex);
+    const tone = CM.luminance(hex) > 0.55 ? 'light' : 'dark';
+    const matL = tone === 'dark'
+      ? Math.max(0.10, Math.min(0.16, hsl.l * 0.35))
+      : Math.max(0.90, Math.min(0.95, 0.85 + hsl.l * 0.1));
+    const mat = CM.hslToHex({ h: hsl.h, s: hsl.s * 0.3, l: matL });
+    const bevel = (autoColors && autoColors.bevel) || '#C4A882';
+
+    let text = tone === 'dark' ? CM.mix('#FAF8F5', bevel, 0.08) : CM.mix('#2C2420', bevel, 0.08);
+    if (CM.contrast(text, mat) < 4.5) {
+      text = tone === 'dark' ? '#FAF8F5' : '#2C2420';
+    }
+    return { mat, bevel, text, tone };
+  }
+
+  /** Render the "Matched to your photo" swatch row into #style-selector */
+  function buildSwatchRow() {
+    const container = document.getElementById('style-selector');
+    if (!container || template.colorMode !== 'auto') return;
+    if (!paletteSwatches.length && !autoColors) return;
+
+    container.style.display = '';
+    container.classList.add('swatch-row');
+    container.innerHTML = `
+      <div class="swatch-row-label">Matched to your photo</div>
+      <div class="swatch-row-items">
+        <button class="swatch-chip auto${activeSwatchIndex === -1 ? ' active' : ''}" data-auto="1" title="Auto match">Auto</button>
+        ${paletteSwatches.map((s, i) =>
+          `<button class="swatch-chip${activeSwatchIndex === i ? ' active' : ''}" data-index="${i}" style="background:${s.hex}" title="Match the mat to this color"></button>`
+        ).join('')}
+      </div>
+    `;
+
+    container.querySelectorAll('.swatch-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        if (chip.dataset.auto) {
+          activeSwatchIndex = -1;
+          if (autoColors) applyColors(autoColors);
+        } else {
+          activeSwatchIndex = parseInt(chip.dataset.index, 10);
+          const swatch = paletteSwatches[activeSwatchIndex];
+          if (swatch) applyColors(deriveFromSwatch(swatch.hex));
+        }
+        container.querySelectorAll('.swatch-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        saveState();
+      });
+    });
+  }
+
   // ── Style Variant Selector ───────────────────────────────────
 
   function buildStyleSelector() {
     const container = document.getElementById('style-selector');
     if (!container || !template.styleVariants) return;
 
-    const variants = [
-      { key: 'classic-dark', label: 'Classic', thumbClass: 'style-thumb-dark' },
-      { key: 'warm-natural', label: 'Warm', thumbClass: 'style-thumb-warm' },
-      { key: 'soft-light', label: 'Light', thumbClass: 'style-thumb-light' }
-    ];
+    // Auto-color templates: mat/bevel colors are matched to the photo,
+    // so there is no style picker (swatch row appears after upload instead).
+    if (template.colorMode === 'auto') {
+      container.style.display = 'none';
+      return;
+    }
+
+    const thumbClasses = {
+      'classic-dark': { label: 'Classic', thumbClass: 'style-thumb-dark' },
+      'warm-natural': { label: 'Warm', thumbClass: 'style-thumb-warm' },
+      'soft-light': { label: 'Light', thumbClass: 'style-thumb-light' }
+    };
+
+    const variants = Object.keys(template.styleVariants).map(key => ({
+      key,
+      label: (thumbClasses[key] && thumbClasses[key].label) || template.styleVariants[key].label || key,
+      thumbClass: (thumbClasses[key] && thumbClasses[key].thumbClass) || 'style-thumb-dark'
+    }));
 
     container.innerHTML = variants.map(v => `
       <div class="style-thumb ${v.thumbClass}${v.key === currentStyle ? ' active' : ''}" data-style="${v.key}">
@@ -1360,6 +1518,7 @@
           style: currentStyle,
           layout: currentLayout,
           orderType,
+          colors: currentColors,
         }),
       });
 
@@ -1394,10 +1553,15 @@
         orderType,
         poemHistory,
         activePoemIndex,
+        poemFormat,
         photoCrop: PreviewRenderer.getPhotoCrop('photo'),
         panel2Crop: PreviewRenderer.getPhotoCrop('panel2'),
         thirdPanelEnabled,
         thirdPanelType,
+        currentColors,
+        autoColors,
+        paletteSwatches,
+        activeSwatchIndex,
         customRatios: PreviewRenderer.getCustomRatios(),
         selectedProduct: document.querySelector('.product-option.selected .product-option-label')?.textContent,
         selectedSku: document.querySelector('.product-option.selected')?.dataset?.sku,
@@ -1462,13 +1626,17 @@
         }
       }
 
-      // Restore third panel state
-      if (state.thirdPanelEnabled) {
+      // Restore third panel state (only if this template still supports it)
+      if (state.thirdPanelEnabled && hasThreePanelLayouts()) {
         thirdPanelEnabled = true;
         thirdPanelType = state.thirdPanelType || 'photo';
       }
 
-      // Restore layout
+      // Restore layout (validate against current template — saved state may
+      // reference a layout that no longer exists)
+      if (state.layout && !(template.layouts && template.layouts[state.layout])) {
+        state.layout = template.defaultLayout || null;
+      }
       if (state.layout) {
         currentLayout = state.layout;
         PreviewRenderer.setLayout(state.layout);
@@ -1498,7 +1666,30 @@
         );
       }
 
-      // Restore style
+      // Restore poem format (validate against template formats)
+      if (state.poemFormat && template.poemFormats
+          && template.poemFormats.some(f => f.id === state.poemFormat)) {
+        poemFormat = state.poemFormat;
+        const ft = document.getElementById('poem-format-toggle');
+        if (ft) {
+          ft.querySelectorAll('.order-type-option').forEach(b =>
+            b.classList.toggle('active', b.dataset.format === poemFormat));
+        }
+      }
+
+      // Restore auto-matched colors (colorMode: 'auto' templates)
+      if (template.colorMode === 'auto' && state.currentColors && state.currentColors.mat) {
+        autoColors = state.autoColors || null;
+        paletteSwatches = state.paletteSwatches || [];
+        activeSwatchIndex = typeof state.activeSwatchIndex === 'number' ? state.activeSwatchIndex : -1;
+        applyColors(state.currentColors);
+        buildSwatchRow();
+      }
+
+      // Restore style (validate against current template variants)
+      if (state.style && !(template.styleVariants && template.styleVariants[state.style])) {
+        state.style = null;
+      }
       if (state.style && state.style !== currentStyle) {
         setStyle(state.style);
         const thumbs = document.querySelectorAll('.style-thumb');

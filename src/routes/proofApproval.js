@@ -105,7 +105,30 @@ router.post('/:token/approve', async (req, res) => {
   try {
     // Re-fetch order so placeOrder sees print_file_url
     const updatedOrder = db.get('SELECT * FROM orders WHERE id = ?', [order.id]);
-    if (provider === 'luma') {
+    if (provider === 'partner') {
+      // Partner UV print shop: email them the print file + order details
+      // with a tokenized admin link to mark the order shipped.
+      const path = require('path');
+      const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
+      const outputRoot = process.env.OUTPUT_DIR || path.join(__dirname, '..', '..', 'output');
+
+      await emailService.sendPartnerOrderEmail(updatedOrder, {
+        printFileUrl: `${baseUrl}${updatedOrder.print_file_url}`,
+        printFilePath: path.join(outputRoot, 'print-ready', `${updatedOrder.id}.jpg`),
+        adminUrl: `${baseUrl}/admin/order/${updatedOrder.admin_token}`,
+        proofImageUrl: updatedOrder.proof_url ? `${baseUrl}${updatedOrder.proof_url}` : null,
+      });
+
+      db.run(
+        `UPDATE orders SET status = 'in_production', updated_at = datetime('now') WHERE id = ?`,
+        [order.id]
+      );
+      db.run(
+        `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+        [order.id, 'partner_order_sent', JSON.stringify({ sentAt: new Date().toISOString() })]
+      );
+      console.log(`Proof approved — order ${order.id} emailed to partner print shop`);
+    } else if (provider === 'luma') {
       const lumaOrderApi = require('../services/lumaOrderApi');
       const result = await lumaOrderApi.placeOrder(updatedOrder.id, db);
       console.log(`Proof approved — order ${order.id} submitted to Luma:`, result.orderNumber);

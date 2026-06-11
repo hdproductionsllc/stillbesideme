@@ -14,6 +14,7 @@ const fs = require('fs');
 
 const {
   resolveOrderData, buildTributeSvg, isLandscapeLayout, calculateLayout,
+  calculateMatLayout, buildMatOverlaySvg, renderPhotoCover,
 } = require('./tributeRenderer');
 
 const OUTPUT_ROOT = process.env.OUTPUT_DIR || path.join(__dirname, '..', '..', 'output');
@@ -45,17 +46,10 @@ function calculatePrintDimensions(sku, layout) {
     : { width: dim1, height: dim2 }; // e.g. 3300x4200 for 11x14 portrait
 }
 
-/**
- * Resize and crop a photo to fill a region.
- */
-async function renderPhoto(photoPath, region, cropPosition) {
-  return sharp(photoPath)
-    .resize(region.width, region.height, {
-      fit: 'cover',
-      position: cropPosition || 'centre',
-    })
-    .toBuffer();
-}
+// Photo cover-fit is shared via tributeRenderer.renderPhotoCover —
+// it honors percent smart-crop positions that sharp's `position` rejects.
+const renderPhoto = (photoPath, region, cropPosition) =>
+  renderPhotoCover(photoPath, region, cropPosition);
 
 /**
  * Generate a print-ready JPEG for an order.
@@ -71,9 +65,13 @@ async function generatePrintFile(order) {
     throw new Error(`Photo not found: ${photoPath}`);
   }
 
-  // Calculate dimensions at 300 DPI
+  // Calculate dimensions at 300 DPI.
+  // Auto-color orders get a UV-printed mat: openings are inset inside a
+  // mat border, with a bevel ring overlay. Legacy orders stay full-bleed.
   const { width: totalW, height: totalH } = calculatePrintDimensions(order.product_sku, layout);
-  const panels = calculateLayout(layout, totalW, totalH);
+  const panels = data.hasPrintedMat
+    ? calculateMatLayout(layout, totalW, totalH, data.printSpec, 1)
+    : calculateLayout(layout, totalW, totalH);
 
   // Build composite layers
   const layers = [];
@@ -104,8 +102,21 @@ async function generatePrintFile(order) {
   });
   layers.push({ input: tributeSvg, left: panels.tribute.left, top: panels.tribute.top });
 
-  // Composite all layers onto background (no watermark)
-  const background = tributeColors.background || '#1a1a1a';
+  // Bevel ring around openings (printed mat orders only) — composited last
+  if (data.hasPrintedMat) {
+    const matOverlay = buildMatOverlaySvg({
+      width: totalW,
+      height: totalH,
+      openings: [panels.photo, panels.tribute],
+      bevelColor: tributeColors.bevel,
+      bevelWidth: panels.bevelWidth,
+    });
+    layers.push({ input: matOverlay, left: 0, top: 0 });
+  }
+
+  // Composite all layers onto background (no watermark).
+  // For printed-mat orders the background IS the mat color (full bleed).
+  const background = (data.hasPrintedMat && tributeColors.mat) || tributeColors.background || '#1a1a1a';
   const printBuffer = await sharp({
     create: { width: totalW, height: totalH, channels: 3, background },
   })
