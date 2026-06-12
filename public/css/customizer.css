@@ -270,7 +270,7 @@
   background: #0a0908;
 }
 
-/* --- Auto Theme (UV-printed mat matched to the photo) --- */
+/* --- Auto Theme (frame/accent colors matched to the photo) --- */
 .frame-preview.theme-auto {
   /* Proportional to the printed piece: 1.5" mat on an 11x14, 1" gutter */
   --mat-padding: 10.5%;

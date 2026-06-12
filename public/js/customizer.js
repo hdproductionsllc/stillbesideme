@@ -1261,7 +1261,7 @@
         </div>
         <p class="single-product-line" style="font-size:1.05rem;line-height:1.5">
           <strong>$${(product.price / 100).toFixed(2)}</strong> &mdash; ${product.label}<br>
-          <span style="font-size:0.88rem;color:var(--color-muted)">UV-printed directly onto the panel. No glass glare. Never fades. Free shipping.</span>
+          <span style="font-size:0.88rem;color:var(--color-muted)">Their photo and poem in a frame 3D-printed in their colors, with their name on it. Free shipping.</span>
         </p>
       `;
       return section;
