@@ -46,10 +46,18 @@
   };
 
   // Auto-matched print colors (colorMode: 'auto' templates)
-  let currentColors = null;     // active { mat, bevel, text, tone }
+  let currentColors = null;     // active { frame, accent, ... }
   let autoColors = null;        // server-derived match for the uploaded photo
   let paletteSwatches = [];     // [{ hex, population }] from the photo
   let activeSwatchIndex = -1;   // -1 = auto match
+
+  // Engraved symbol beside the name: 'none' | 'paw' | 'heart'
+  let frameIcon = 'paw';
+  const ICON_OPTIONS = [
+    { id: 'none', label: 'None', svg: '' },
+    { id: 'paw', label: 'Paw', svg: '<svg viewBox="0 0 64 64"><ellipse cx="14" cy="29" rx="5.4" ry="7.6"/><ellipse cx="25" cy="20" rx="5.6" ry="8.4"/><ellipse cx="39" cy="20" rx="5.6" ry="8.4"/><ellipse cx="50" cy="29" rx="5.4" ry="7.6"/><path d="M32 33c-9 0-15 6.6-15 13.4 0 6.5 6.4 8.6 15 8.6s15-2.1 15-8.6C47 39.6 41 33 32 33z"/></svg>' },
+    { id: 'heart', label: 'Heart', svg: '<svg viewBox="0 0 64 64"><path d="M32 55C13 41 6 30 6 20.5 6 12.5 12 7 19 7c5.6 0 10.4 3.6 13 8 2.6-4.4 7.4-8 13-8 7 0 13 5.5 13 13.5C58 30 51 41 32 55z"/></svg>' }
+  ];
 
   // Track whether a photo has been uploaded per panel
   const photoUploaded = {};   // panelId -> boolean
@@ -148,6 +156,8 @@
       // A real photo upload or swatch tap replaces this with the matched colors.
       if (template.colorMode === 'auto') {
         PreviewRenderer.setColors(DEFAULT_AUTO_COLORS);
+        PreviewRenderer.setFrameIcon(frameIcon);
+        buildIconPicker();
       }
 
       // Restore saved state
@@ -1400,6 +1410,35 @@
     return { mat, bevel, text, tone, frame, accent };
   }
 
+  /** Render the engraved-symbol picker (none / paw / heart) into the preview pane */
+  function buildIconPicker() {
+    const pane = document.querySelector('.preview-pane');
+    if (!pane || template.colorMode !== 'auto') return;
+
+    let picker = document.getElementById('icon-picker');
+    if (!picker) {
+      picker = document.createElement('div');
+      picker.id = 'icon-picker';
+      picker.className = 'icon-picker';
+      pane.appendChild(picker);
+    }
+
+    picker.innerHTML = '<span class="icon-picker-label">Symbol</span>' +
+      ICON_OPTIONS.map(o =>
+        `<button type="button" class="icon-opt${o.id === frameIcon ? ' active' : ''}" data-icon="${o.id}">${o.svg}${o.label}</button>`
+      ).join('');
+
+    picker.querySelectorAll('.icon-opt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        frameIcon = btn.dataset.icon;
+        PreviewRenderer.setFrameIcon(frameIcon);
+        picker.querySelectorAll('.icon-opt').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        saveState();
+      });
+    });
+  }
+
   /** Render the "Matched to your photo" swatch row into #style-selector */
   function buildSwatchRow() {
     const container = document.getElementById('style-selector');
@@ -1547,6 +1586,7 @@
           layout: currentLayout,
           orderType,
           colors: currentColors,
+          frameIcon,
         }),
       });
 
@@ -1590,6 +1630,7 @@
         autoColors,
         paletteSwatches,
         activeSwatchIndex,
+        frameIcon,
         customRatios: PreviewRenderer.getCustomRatios(),
         selectedProduct: document.querySelector('.product-option.selected .product-option-label')?.textContent,
         selectedSku: document.querySelector('.product-option.selected')?.dataset?.sku,
@@ -1712,6 +1753,13 @@
         activeSwatchIndex = typeof state.activeSwatchIndex === 'number' ? state.activeSwatchIndex : -1;
         applyColors(state.currentColors);
         buildSwatchRow();
+      }
+
+      // Restore engraved symbol
+      if (template.colorMode === 'auto' && typeof state.frameIcon === 'string') {
+        frameIcon = state.frameIcon;
+        PreviewRenderer.setFrameIcon(frameIcon);
+        buildIconPicker();
       }
 
       // Restore style (validate against current template variants)

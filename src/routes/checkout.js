@@ -37,7 +37,8 @@ router.post('/checkout', async (req, res) => {
   const db = req.app.locals.db;
 
   try {
-    const { templateId, sku, fields, poemText, style, layout, orderType, colors } = req.body;
+    const { templateId, sku, fields, poemText, style, layout, orderType, colors, frameIcon } = req.body;
+    const safeFrameIcon = ['none', 'paw', 'heart'].includes(frameIcon) ? frameIcon : 'none';
 
     // Validate auto-matched colors (never trust client) — drop if malformed
     const HEX_RE = /^#[0-9a-fA-F]{6}$/;
@@ -89,7 +90,7 @@ router.post('/checkout', async (req, res) => {
         req.sessionID,
         templateId,
         sku,
-        JSON.stringify({ ...fields, style, layout, orderType, ...(safeColors ? { colors: safeColors } : {}) }),
+        JSON.stringify({ ...fields, style, layout, orderType, frameIcon: safeFrameIcon, ...(safeColors ? { colors: safeColors } : {}) }),
         JSON.stringify(photos),
         poemText.trim(),
         totalCents

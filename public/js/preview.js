@@ -173,8 +173,16 @@
   let fields = {};           // fieldId → value
   let styleColors = null;    // current style variant colors
   let nameOnFrame = false;   // true when name/dates are engraved on the frame (auto theme)
+  let frameIcon = 'paw';     // engraved symbol beside the name: 'none' | 'paw' | 'heart'
   let fontsLoaded = false;
   let renderQueued = false;
+
+  // Elegant single-color engraved symbols (inherit the accent color)
+  const FRAME_ICONS = {
+    none: '',
+    paw: '<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="14" cy="29" rx="5.4" ry="7.6"/><ellipse cx="25" cy="20" rx="5.6" ry="8.4"/><ellipse cx="39" cy="20" rx="5.6" ry="8.4"/><ellipse cx="50" cy="29" rx="5.4" ry="7.6"/><path d="M32 33c-9 0-15 6.6-15 13.4 0 6.5 6.4 8.6 15 8.6s15-2.1 15-8.6C47 39.6 41 33 32 33z"/></svg>',
+    heart: '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 55C13 41 6 30 6 20.5 6 12.5 12 7 19 7c5.6 0 10.4 3.6 13 8 2.6-4.4 7.4-8 13-8 7 0 13 5.5 13 13.5C58 30 51 41 32 55z"/></svg>'
+  };
 
   // ── Public API ─────────────────────────────────────────────
 
@@ -187,6 +195,8 @@
     setField,
     setStyle,
     setColors,
+    setFrameIcon,
+    getFrameIcon: () => frameIcon,
     setLayout,
     setFrameSize,
     getFields: () => ({ ...fields }),
@@ -473,6 +483,7 @@
     if (!nameEl) {
       nameEl = document.createElement('div');
       nameEl.className = 'frame-name';
+      nameEl.innerHTML = '<span class="frame-icon"></span><span class="frame-name-text"></span>';
       border.insertBefore(nameEl, matBoard);
     }
     if (!datesEl) {
@@ -480,7 +491,12 @@
       datesEl.className = 'frame-dates';
       border.appendChild(datesEl);
     }
-    return { nameEl, datesEl };
+    return {
+      nameEl,
+      datesEl,
+      iconEl: nameEl.querySelector('.frame-icon'),
+      nameTextEl: nameEl.querySelector('.frame-name-text')
+    };
   }
 
   function updateFrameText() {
@@ -495,13 +511,10 @@
     else if (birth) dateStr = birth;
     else if (pass) dateStr = pass;
 
-    if (name) {
-      els.nameEl.textContent = name;
-      els.nameEl.classList.remove('placeholder');
-    } else {
-      els.nameEl.textContent = 'Their name';
-      els.nameEl.classList.add('placeholder');
-    }
+    els.nameTextEl.textContent = name || 'Their name';
+    els.nameEl.classList.toggle('placeholder', !name);
+    els.iconEl.innerHTML = FRAME_ICONS[frameIcon] || '';
+
     if (dateStr) {
       els.datesEl.textContent = dateStr;
       els.datesEl.classList.remove('placeholder');
@@ -509,6 +522,11 @@
       els.datesEl.textContent = 'Birth – Passing';
       els.datesEl.classList.add('placeholder');
     }
+  }
+
+  function setFrameIcon(name) {
+    frameIcon = FRAME_ICONS[name] !== undefined ? name : 'none';
+    if (nameOnFrame) updateFrameText();
   }
 
   /**
@@ -528,6 +546,9 @@
     if (frameEl) {
       frameEl.className = 'frame-preview theme-auto';
       frameEl.style.setProperty('--frame-color', frame);
+      // Lighter/darker tones give the molding its gradient "light on the frame" look
+      frameEl.style.setProperty('--frame-hi', mixHex(frame, '#ffffff', 0.18));
+      frameEl.style.setProperty('--frame-lo', mixHex(frame, '#000000', 0.32));
       frameEl.style.setProperty('--accent-color', accent);
     }
 
@@ -772,9 +793,10 @@
 
     const nameSize = Math.round(30 * scale);
     const dateSize = Math.round(10.5 * scale);
-    const nickSize = Math.round(10 * scale);
-    const famSize = Math.round(9 * scale);
-    const poemBaseSize = 13 * scale;
+    const nickSize = Math.round(11 * scale);
+    const famSize = Math.round(9.5 * scale);
+    // Poem carries the insert now that name/dates are on the frame — give it presence
+    const poemBaseSize = (nameOnFrame ? 16 : 13) * scale;
 
     // ── Measure fixed element heights ──
 
