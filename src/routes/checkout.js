@@ -149,7 +149,7 @@ router.post('/checkout', async (req, res) => {
     res.json({ checkoutUrl: session.url });
   } catch (err) {
     console.error('Checkout error:', err);
-    res.status(500).json({ error: 'Failed to create checkout session. Please try again.' });
+    res.status(500).json({ error: 'Failed to create checkout session. Please try again.', _diag: err && err.message });
   }
 });
 
