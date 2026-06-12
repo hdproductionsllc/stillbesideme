@@ -99,6 +99,11 @@ async function start() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true }));
 
+  // Trust Railway's reverse proxy — required so the `secure` session cookie is
+  // actually set over HTTPS in production. Without this, every request starts a
+  // fresh session and uploaded photos are lost by checkout time.
+  app.set('trust proxy', 1);
+
   // Sessions – file-backed, 30-day expiry
   app.use(session({
     store: new FileStore({

@@ -174,6 +174,7 @@
   let styleColors = null;    // current style variant colors
   let nameOnFrame = false;   // true when name/dates are engraved on the frame (auto theme)
   let frameIcon = 'paw';     // engraved symbol beside the name: 'none' | 'paw' | 'heart'
+  let previewPoemText = '';  // sample poem shown before a real one is generated (display only)
   let fontsLoaded = false;
   let renderQueued = false;
 
@@ -197,6 +198,7 @@
     setColors,
     setFrameIcon,
     getFrameIcon: () => frameIcon,
+    setPreviewPoem,
     setLayout,
     setFrameSize,
     getFields: () => ({ ...fields }),
@@ -483,7 +485,11 @@
     if (!nameEl) {
       nameEl = document.createElement('div');
       nameEl.className = 'frame-name';
-      nameEl.innerHTML = '<span class="frame-icon"></span><span class="frame-name-text"></span>';
+      // Symbol sandwiches the name: [paw] Name [paw]
+      nameEl.innerHTML =
+        '<span class="frame-icon frame-icon-l"></span>' +
+        '<span class="frame-name-text"></span>' +
+        '<span class="frame-icon frame-icon-r"></span>';
       border.insertBefore(nameEl, matBoard);
     }
     if (!datesEl) {
@@ -494,7 +500,8 @@
     return {
       nameEl,
       datesEl,
-      iconEl: nameEl.querySelector('.frame-icon'),
+      iconL: nameEl.querySelector('.frame-icon-l'),
+      iconR: nameEl.querySelector('.frame-icon-r'),
       nameTextEl: nameEl.querySelector('.frame-name-text')
     };
   }
@@ -513,7 +520,9 @@
 
     els.nameTextEl.textContent = name || 'Their name';
     els.nameEl.classList.toggle('placeholder', !name);
-    els.iconEl.innerHTML = FRAME_ICONS[frameIcon] || '';
+    const iconSvg = FRAME_ICONS[frameIcon] || '';
+    els.iconL.innerHTML = iconSvg;
+    els.iconR.innerHTML = iconSvg;
 
     if (dateStr) {
       els.datesEl.textContent = dateStr;
@@ -527,6 +536,11 @@
   function setFrameIcon(name) {
     frameIcon = FRAME_ICONS[name] !== undefined ? name : 'none';
     if (nameOnFrame) updateFrameText();
+  }
+
+  function setPreviewPoem(text) {
+    previewPoemText = text || '';
+    queueRender();
   }
 
   /**
@@ -773,12 +787,19 @@
     const passField = tm.passDate || 'passDate';
     const poemField = tm.poemText || 'poemText';
 
-    // When name/dates are engraved on the frame (auto theme), the insert
-    // shows only the poem (and nickname/family) \u2014 name + dates are omitted here.
-    const petName = nameOnFrame ? '' : (fields[nameField] || '');
+    // The insert keeps the name as a printed title; dates live on the frame
+    // engraving (auto theme), so they're omitted from the insert.
+    const petName = fields[nameField] || '';
     const nickname = fields[nickField] || '';
     const familyName = fields[famField] || '';
-    const poemText = fields[poemField] || '';
+    let poemText = fields[poemField] || '';
+    // Sample poem so the frame isn't empty before one is generated (display only \u2014
+    // never the real poemText; checkout still requires a generated/selected poem).
+    let poemIsSample = false;
+    if (!poemText && nameOnFrame && previewPoemText) {
+      poemText = previewPoemText;
+      poemIsSample = true;
+    }
     const birthDate = nameOnFrame ? '' : (fields[birthField] || '');
     const passDate = nameOnFrame ? '' : (fields[passField] || '');
     let dateStr = '';
@@ -793,9 +814,9 @@
 
     const nameSize = Math.round(30 * scale);
     const dateSize = Math.round(10.5 * scale);
-    const nickSize = Math.round(11 * scale);
-    const famSize = Math.round(9.5 * scale);
-    // Poem carries the insert now that name/dates are on the frame — give it presence
+    const nickSize = Math.round(13.5 * scale);
+    const famSize = Math.round(10 * scale);
+    // Poem carries the insert now that dates are on the frame — give it presence
     const poemBaseSize = (nameOnFrame ? 16 : 13) * scale;
 
     // ── Measure fixed element heights ──
@@ -901,7 +922,8 @@
       var startY = y + Math.max(0, (zoneH - poem.totalH) / 2);
 
       ctx.font = '300 ' + Math.round(poem.fontSize) + 'px "Cormorant Garamond", serif';
-      ctx.fillStyle = colors.poem;
+      // Sample poem renders muted so it reads as a placeholder
+      ctx.fillStyle = poemIsSample ? mixHex(colors.poem, colors.bg, 0.55) : colors.poem;
 
       var py = startY;
       for (var i = 0; i < poem.lines.length; i++) {

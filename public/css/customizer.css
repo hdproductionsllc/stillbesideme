@@ -309,7 +309,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4em;
+  gap: 0.3em;
   text-align: center;
   font-family: 'Cormorant Garamond', Georgia, serif;
   color: var(--accent-color, #F4ECDD);
@@ -402,6 +402,37 @@
   background: #faf6ee;
   box-shadow: 0 0 0 1px rgba(196, 168, 130, 0.35);
 }
+
+/* Custom color override (frame + engraving) */
+.swatch-custom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 0.4rem;
+}
+.swatch-custom-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--color-muted, #8a8378);
+  cursor: pointer;
+}
+.swatch-custom-item input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #ddd6cc;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+}
+.swatch-custom-item input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+.swatch-custom-item input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
+.swatch-custom-item input[type="color"]::-moz-color-swatch { border: none; border-radius: 50%; }
 
 /* --- Swatch Row (auto-matched colors with override) --- */
 .style-selector.swatch-row {

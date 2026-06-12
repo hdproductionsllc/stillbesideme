@@ -51,6 +51,13 @@
   let paletteSwatches = [];     // [{ hex, population }] from the photo
   let activeSwatchIndex = -1;   // -1 = auto match
 
+  // Custom color override state
+  let accentOverride = null;   // null = auto-derive engraving color
+  let frameOverride = false;   // true once the user picks a custom frame color
+
+  // Sample poem shown in the frame before a real one is generated (display only)
+  const SAMPLE_POEM = 'This is where their poem will appear.\nShare a memory or two below,\nand we’ll write something\nonly you could have written.';
+
   // Engraved symbol beside the name: 'none' | 'paw' | 'heart'
   let frameIcon = 'paw';
   const ICON_OPTIONS = [
@@ -157,7 +164,9 @@
       if (template.colorMode === 'auto') {
         PreviewRenderer.setColors(DEFAULT_AUTO_COLORS);
         PreviewRenderer.setFrameIcon(frameIcon);
+        PreviewRenderer.setPreviewPoem(SAMPLE_POEM);
         buildIconPicker();
+        buildSwatchRow();
       }
 
       // Restore saved state
@@ -368,11 +377,13 @@
         PreviewRenderer.setPhoto(panelId, data.thumbnailUrl, data.crop.position);
         showUploadPreview(slotId, data.thumbnailUrl, wrapper, null, data.quality);
 
-        // Auto-match mat/bevel colors to the uploaded photo
+        // Auto-match frame colors to the uploaded photo
         if (slotId === 'main' && template.colorMode === 'auto' && data.palette) {
           paletteSwatches = data.palette.swatches || [];
           autoColors = data.palette.auto || null;
           activeSwatchIndex = -1;
+          frameOverride = false;
+          accentOverride = null;
           if (autoColors) applyColors(autoColors);
           buildSwatchRow();
         }
@@ -1439,26 +1450,65 @@
     });
   }
 
-  /** Render the "Matched to your photo" swatch row into #style-selector */
+  /** Pick a high-contrast engraving color (cream or charcoal) for a frame color */
+  function pickAccent(frame) {
+    const CM = window.ColorMath;
+    const cream = '#F4ECDD';
+    const dark = '#2A211B';
+    const base = CM.contrast(cream, frame) >= CM.contrast(dark, frame) ? cream : dark;
+    let a = CM.mix(base, frame, 0.1);
+    if (CM.contrast(a, frame) < 4.5) a = base;
+    return a;
+  }
+
+  /** Apply an exact custom frame color (+ optional engraving override) */
+  function applyCustomColors(frameHex, accentHex) {
+    const base = deriveFromSwatch(frameHex);            // legacy mat/bevel/text/tone
+    const accent = accentHex || pickAccent(frameHex);
+    applyColors({ ...base, frame: frameHex, accent });
+  }
+
+  /**
+   * Render the color controls into #style-selector: photo-matched swatches
+   * (when a photo is uploaded) plus always-available custom frame + engraving
+   * color pickers.
+   */
   function buildSwatchRow() {
     const container = document.getElementById('style-selector');
     if (!container || template.colorMode !== 'auto') return;
-    if (!paletteSwatches.length && !autoColors) return;
 
     container.style.display = '';
     container.classList.add('swatch-row');
-    container.innerHTML = `
-      <div class="swatch-row-label">Matched to your photo</div>
+
+    const photoCustom = !frameOverride && activeSwatchIndex >= 0;
+    const photoRow = paletteSwatches.length ? `
+      <div class="swatch-row-label">Matched to their photo</div>
       <div class="swatch-row-items">
-        <button class="swatch-chip auto${activeSwatchIndex === -1 ? ' active' : ''}" data-auto="1" title="Auto match">Auto</button>
+        <button class="swatch-chip auto${activeSwatchIndex === -1 && !frameOverride ? ' active' : ''}" data-auto="1" title="Auto match">Auto</button>
         ${paletteSwatches.map((s, i) =>
-          `<button class="swatch-chip${activeSwatchIndex === i ? ' active' : ''}" data-index="${i}" style="background:${s.hex}" title="Match the mat to this color"></button>`
+          `<button class="swatch-chip${i === activeSwatchIndex && photoCustom ? ' active' : ''}" data-index="${i}" style="background:${s.hex}" title="Use this color"></button>`
         ).join('')}
+      </div>` : '';
+
+    const frameVal = (currentColors && currentColors.frame) || DEFAULT_AUTO_COLORS.frame;
+    const accentVal = (currentColors && currentColors.accent) || DEFAULT_AUTO_COLORS.accent;
+
+    container.innerHTML = photoRow + `
+      <div class="swatch-row-label">Or choose your own</div>
+      <div class="swatch-custom">
+        <label class="swatch-custom-item">Frame
+          <input type="color" id="frame-color-input" value="${frameVal}">
+        </label>
+        <label class="swatch-custom-item">Engraving
+          <input type="color" id="accent-color-input" value="${accentVal}">
+        </label>
       </div>
     `;
 
     container.querySelectorAll('.swatch-chip').forEach(chip => {
       chip.addEventListener('click', () => {
+        frameOverride = false;
+        accentOverride = null;
         if (chip.dataset.auto) {
           activeSwatchIndex = -1;
           if (autoColors) applyColors(autoColors);
@@ -1467,11 +1517,30 @@
           const swatch = paletteSwatches[activeSwatchIndex];
           if (swatch) applyColors(deriveFromSwatch(swatch.hex));
         }
-        container.querySelectorAll('.swatch-chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
+        buildSwatchRow();
         saveState();
       });
     });
+
+    const frameInput = container.querySelector('#frame-color-input');
+    const accentInput = container.querySelector('#accent-color-input');
+    if (frameInput) {
+      frameInput.addEventListener('input', () => {
+        frameOverride = true;
+        activeSwatchIndex = -2;
+        applyCustomColors(frameInput.value, accentOverride);
+        container.querySelectorAll('.swatch-chip').forEach(c => c.classList.remove('active'));
+        saveState();
+      });
+    }
+    if (accentInput) {
+      accentInput.addEventListener('input', () => {
+        accentOverride = accentInput.value;
+        const frame = (currentColors && currentColors.frame) || (frameInput && frameInput.value) || DEFAULT_AUTO_COLORS.frame;
+        applyCustomColors(frame, accentOverride);
+        saveState();
+      });
+    }
   }
 
   // ── Style Variant Selector ───────────────────────────────────
@@ -1630,6 +1699,8 @@
         autoColors,
         paletteSwatches,
         activeSwatchIndex,
+        frameOverride,
+        accentOverride,
         frameIcon,
         customRatios: PreviewRenderer.getCustomRatios(),
         selectedProduct: document.querySelector('.product-option.selected .product-option-label')?.textContent,
@@ -1751,6 +1822,8 @@
         autoColors = state.autoColors || null;
         paletteSwatches = state.paletteSwatches || [];
         activeSwatchIndex = typeof state.activeSwatchIndex === 'number' ? state.activeSwatchIndex : -1;
+        frameOverride = !!state.frameOverride;
+        accentOverride = state.accentOverride || null;
         applyColors(state.currentColors);
         buildSwatchRow();
       }
