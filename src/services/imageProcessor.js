@@ -248,7 +248,7 @@ async function extractPalette(buffer) {
  */
 function deriveAutoColors(swatches) {
   if (!swatches || swatches.length === 0) {
-    return { mat: '#1a1a1a', bevel: BRAND_GOLD, text: '#FAF8F5', tone: 'dark' };
+    return { mat: '#1a1a1a', bevel: BRAND_GOLD, text: '#FAF8F5', tone: 'dark', frame: '#6E5C4E', accent: '#F4ECDD' };
   }
 
   const totalPop = swatches.reduce((sum, s) => sum + s.population, 0);
@@ -284,7 +284,25 @@ function deriveAutoColors(swatches) {
     text = tone === 'dark' ? '#FAF8F5' : '#2C2420';
   }
 
-  return { mat, bevel, text, tone };
+  // Frame: the visible 3D-printed frame color. Unlike the old "mat" (near-black),
+  // this is a rich, recognizable version of the pet's dominant color — honey for a
+  // golden, slate for a grey tabby, pale for a white cat.
+  const frameS = Math.max(0.22, Math.min(0.5, dominant.s));
+  const frameL = avgLum > 0.62
+    ? Math.max(0.70, Math.min(0.82, 0.70 + dominant.l * 0.12))  // light pets → pale frame
+    : Math.max(0.28, Math.min(0.44, 0.30 + dominant.l * 0.22)); // dark pets → rich frame
+  const frame = colorUtils.hslToHex({ h: dominant.h, s: frameS, l: frameL });
+
+  // Accent: the engraved name + dates on the frame. Cream or charcoal, whichever
+  // reads cleaner on the frame, lightly tinted toward the frame hue for cohesion.
+  const creamAccent = '#F4ECDD';
+  const darkAccent = '#2A211B';
+  const baseAccent = colorUtils.contrast(creamAccent, frame) >= colorUtils.contrast(darkAccent, frame)
+    ? creamAccent : darkAccent;
+  let accent = colorUtils.mix(baseAccent, frame, 0.1);
+  if (colorUtils.contrast(accent, frame) < 4.5) accent = baseAccent;
+
+  return { mat, bevel, text, tone, frame, accent };
 }
 
 /**

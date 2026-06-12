@@ -172,6 +172,7 @@
 
   let fields = {};           // fieldId → value
   let styleColors = null;    // current style variant colors
+  let nameOnFrame = false;   // true when name/dates are engraved on the frame (auto theme)
   let fontsLoaded = false;
   let renderQueued = false;
 
@@ -438,6 +439,14 @@
 
   function setField(fieldId, value) {
     fields[fieldId] = value;
+    // When the name/dates are engraved on the frame (auto theme), keep that
+    // HTML in sync as the user types — it lives outside the canvas.
+    if (nameOnFrame && template && template.tributeMapping) {
+      const tm = template.tributeMapping;
+      if (fieldId === tm.name || fieldId === tm.birthDate || fieldId === tm.passDate) {
+        updateFrameText();
+      }
+    }
     queueRender();
   }
 
@@ -446,35 +455,98 @@
     queueRender();
   }
 
+  // ── Engraved name + dates on the 3D-printed frame ──────────────
+  //
+  // For colorMode:'auto' templates the frame is a 3D-printed object in the
+  // pet's color, with the name engraved at the top and dates at the bottom.
+  // Those two lines are HTML on the frame border (not canvas), so they can
+  // carry the engraved text-shadow and update live as the user types.
+
+  function ensureFrameTextEls() {
+    const frameEl = document.getElementById('frame-preview');
+    if (!frameEl) return null;
+    const border = frameEl.querySelector('.frame-border');
+    if (!border) return null;
+    const matBoard = border.querySelector('.mat-board');
+    let nameEl = border.querySelector('.frame-name');
+    let datesEl = border.querySelector('.frame-dates');
+    if (!nameEl) {
+      nameEl = document.createElement('div');
+      nameEl.className = 'frame-name';
+      border.insertBefore(nameEl, matBoard);
+    }
+    if (!datesEl) {
+      datesEl = document.createElement('div');
+      datesEl.className = 'frame-dates';
+      border.appendChild(datesEl);
+    }
+    return { nameEl, datesEl };
+  }
+
+  function updateFrameText() {
+    const els = ensureFrameTextEls();
+    if (!els) return;
+    const tm = (template && template.tributeMapping) || {};
+    const name = (fields[tm.name || 'petName'] || '').trim();
+    const birth = (fields[tm.birthDate || 'birthDate'] || '').trim();
+    const pass = (fields[tm.passDate || 'passDate'] || '').trim();
+    let dateStr = '';
+    if (birth && pass) dateStr = birth + ' – ' + pass;
+    else if (birth) dateStr = birth;
+    else if (pass) dateStr = pass;
+
+    if (name) {
+      els.nameEl.textContent = name;
+      els.nameEl.classList.remove('placeholder');
+    } else {
+      els.nameEl.textContent = 'Their name';
+      els.nameEl.classList.add('placeholder');
+    }
+    if (dateStr) {
+      els.datesEl.textContent = dateStr;
+      els.datesEl.classList.remove('placeholder');
+    } else {
+      els.datesEl.textContent = 'Birth – Passing';
+      els.datesEl.classList.add('placeholder');
+    }
+  }
+
   /**
-   * Apply auto-matched print colors { mat, bevel, text, tone }.
-   * Drives the frame CSS variables and derives the tribute text palette
-   * (mirror of resolveColors in src/services/tributeRenderer.js).
+   * Apply auto-matched colors { frame, accent, ... } to the preview.
+   * The frame border becomes the pet-matched 3D-print color, the name/dates
+   * are engraved on it in the accent color, and the photo + poem sit on a
+   * light paper insert inside the opening.
    */
   function setColors(c) {
-    if (!c || !c.mat) return;
+    if (!c || (!c.frame && !c.mat)) return;
+    nameOnFrame = true;
+
+    const frame = c.frame || c.mat || '#6E5C4E';
+    const accent = c.accent || c.bevel || '#F4ECDD';
 
     const frameEl = document.getElementById('frame-preview');
     if (frameEl) {
       frameEl.className = 'frame-preview theme-auto';
-      frameEl.style.setProperty('--mat-color', c.mat);
-      frameEl.style.setProperty('--bevel-color', c.bevel || '#C4A882');
+      frameEl.style.setProperty('--frame-color', frame);
+      frameEl.style.setProperty('--accent-color', accent);
     }
 
-    const text = c.text || (c.tone === 'light' ? '#2C2420' : '#FAF8F5');
-    const secondary = mixHex(text, c.mat, 0.45);
+    // The insert is photo-paper: light background, dark ink for the poem.
+    const ink = '#332C26';
     styleColors = {
       ...(styleColors || {}),
       tribute: {
-        background: c.mat,
-        name: text,
-        dates: secondary,
-        divider: c.bevel || '#C4A882',
-        poem: c.bevel || '#C4A882',
-        nickname: secondary,
-        family: secondary
+        background: '#FAF7F2',
+        name: ink,
+        dates: ink,
+        divider: frame,
+        poem: ink,
+        nickname: mixHex(ink, '#FAF7F2', 0.18),
+        family: mixHex(ink, '#FAF7F2', 0.28)
       }
     };
+
+    updateFrameText();
     queueRender();
   }
 
@@ -603,14 +675,22 @@
   }
 
   function renderPhotoPlaceholder(ctx, w, h, panelId) {
-    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    // Choose ink that's visible on whatever the insert/panel background is
+    // (light paper for the auto theme, dark for the legacy themes).
+    const bg = styleColors?.tribute?.background || '#1a1a1a';
+    const lightBg = luminance(bg) > 0.5;
+    const stroke = lightBg ? 'rgba(60,52,44,0.22)' : 'rgba(255,255,255,0.12)';
+    const fillBg = lightBg ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)';
+    const labelColor = lightBg ? 'rgba(60,52,44,0.4)' : 'rgba(255,255,255,0.15)';
+
+    ctx.fillStyle = fillBg;
     ctx.fillRect(0, 0, w, h);
 
     const cx = w / 2;
     const cy = h / 2;
     const iconSize = Math.min(w, h) * 0.12;
 
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.strokeStyle = stroke;
     ctx.lineWidth = iconSize * 0.06;
 
     ctx.beginPath();
@@ -620,7 +700,7 @@
     ctx.arc(cx, cy, iconSize * 0.4, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillStyle = labelColor;
     ctx.font = `400 ${Math.round(iconSize * 0.3)}px "Source Sans 3", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
@@ -672,12 +752,14 @@
     const passField = tm.passDate || 'passDate';
     const poemField = tm.poemText || 'poemText';
 
-    const petName = fields[nameField] || '';
+    // When name/dates are engraved on the frame (auto theme), the insert
+    // shows only the poem (and nickname/family) \u2014 name + dates are omitted here.
+    const petName = nameOnFrame ? '' : (fields[nameField] || '');
     const nickname = fields[nickField] || '';
     const familyName = fields[famField] || '';
     const poemText = fields[poemField] || '';
-    const birthDate = fields[birthField] || '';
-    const passDate = fields[passField] || '';
+    const birthDate = nameOnFrame ? '' : (fields[birthField] || '');
+    const passDate = nameOnFrame ? '' : (fields[passField] || '');
     let dateStr = '';
     if (birthDate && passDate) dateStr = birthDate + ' \u2013 ' + passDate;
     else if (birthDate) dateStr = birthDate;

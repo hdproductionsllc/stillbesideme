@@ -39,12 +39,15 @@ router.post('/checkout', async (req, res) => {
   try {
     const { templateId, sku, fields, poemText, style, layout, orderType, colors } = req.body;
 
-    // Validate auto-matched print colors (never trust client) — drop if malformed
+    // Validate auto-matched colors (never trust client) — drop if malformed
     const HEX_RE = /^#[0-9a-fA-F]{6}$/;
     let safeColors = null;
     if (colors && HEX_RE.test(colors.mat) && HEX_RE.test(colors.bevel) && HEX_RE.test(colors.text)
         && (colors.tone === 'dark' || colors.tone === 'light')) {
       safeColors = { mat: colors.mat, bevel: colors.bevel, text: colors.text, tone: colors.tone };
+      // Frame + accent (the 3D-printed frame color and engraved name/dates)
+      if (HEX_RE.test(colors.frame)) safeColors.frame = colors.frame;
+      if (HEX_RE.test(colors.accent)) safeColors.accent = colors.accent;
     }
 
     // Validate required fields

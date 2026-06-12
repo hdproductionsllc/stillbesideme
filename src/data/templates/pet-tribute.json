@@ -123,6 +123,6 @@
   ],
 
   "printProducts": [
-    { "sku": "framed-11x14", "label": "11×14\" UV-Printed Framed Tribute", "price": 15995, "default": true }
+    { "sku": "framed-11x14", "label": "11×14\" Custom Framed Tribute", "price": 9700, "default": true }
   ]
 }

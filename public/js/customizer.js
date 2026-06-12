@@ -39,6 +39,12 @@
   // Poem format ('poem' or 'letter') for templates with poemFormats
   let poemFormat = 'poem';
 
+  // Default frame shown before a photo is uploaded (warm taupe + cream engraving)
+  const DEFAULT_AUTO_COLORS = {
+    frame: '#6E5C4E', accent: '#F4ECDD', tone: 'dark',
+    mat: '#1f1b17', bevel: '#C4A882', text: '#FAF8F5'
+  };
+
   // Auto-matched print colors (colorMode: 'auto' templates)
   let currentColors = null;     // active { mat, bevel, text, tone }
   let autoColors = null;        // server-derived match for the uploaded photo
@@ -136,6 +142,13 @@
       rebuildLayoutSelector();
       buildStyleSelector();
       buildPanelToggle();
+
+      // Auto-color templates: show a default 3D-printed frame immediately so the
+      // engraved name/dates appear and update as the user types (before any upload).
+      // A real photo upload or swatch tap replaces this with the matched colors.
+      if (template.colorMode === 'auto') {
+        PreviewRenderer.setColors(DEFAULT_AUTO_COLORS);
+      }
 
       // Restore saved state
       restoreState();
@@ -1344,32 +1357,47 @@
 
   // ── Auto-Matched Colors (swatch row) ─────────────────────────
 
-  /** Apply a { mat, bevel, text, tone } set to the preview and remember it */
+  /** Apply a color set to the preview and remember it for checkout */
   function applyColors(colors) {
-    if (!colors || !colors.mat) return;
+    if (!colors || (!colors.frame && !colors.mat)) return;
     currentColors = colors;
     PreviewRenderer.setColors(colors);
   }
 
   /**
-   * Derive mat/text from a tapped swatch (bevel stays from the auto match).
-   * Mirror of deriveAutoColors in src/services/imageProcessor.js.
+   * Derive a full color set from a tapped swatch — frame (the 3D-printed frame)
+   * and accent (the engraved name/dates), plus the legacy mat/bevel/text the
+   * server renderer still reads. Mirror of deriveAutoColors in imageProcessor.js.
    */
   function deriveFromSwatch(hex) {
     const CM = window.ColorMath;
     const hsl = CM.hexToHsl(hex);
     const tone = CM.luminance(hex) > 0.55 ? 'light' : 'dark';
+
+    // Legacy mat/bevel/text (kept for the server renderer until the file split)
     const matL = tone === 'dark'
       ? Math.max(0.10, Math.min(0.16, hsl.l * 0.35))
       : Math.max(0.90, Math.min(0.95, 0.85 + hsl.l * 0.1));
     const mat = CM.hslToHex({ h: hsl.h, s: hsl.s * 0.3, l: matL });
     const bevel = (autoColors && autoColors.bevel) || '#C4A882';
-
     let text = tone === 'dark' ? CM.mix('#FAF8F5', bevel, 0.08) : CM.mix('#2C2420', bevel, 0.08);
-    if (CM.contrast(text, mat) < 4.5) {
-      text = tone === 'dark' ? '#FAF8F5' : '#2C2420';
-    }
-    return { mat, bevel, text, tone };
+    if (CM.contrast(text, mat) < 4.5) text = tone === 'dark' ? '#FAF8F5' : '#2C2420';
+
+    // Frame: rich, recognizable version of the tapped color
+    const frameS = Math.max(0.22, Math.min(0.5, hsl.s));
+    const frameL = CM.luminance(hex) > 0.62
+      ? Math.max(0.70, Math.min(0.82, 0.70 + hsl.l * 0.12))
+      : Math.max(0.28, Math.min(0.44, 0.30 + hsl.l * 0.22));
+    const frame = CM.hslToHex({ h: hsl.h, s: frameS, l: frameL });
+
+    // Accent: engraved name/dates, cream or charcoal by contrast
+    const cream = '#F4ECDD';
+    const dark = '#2A211B';
+    const base = CM.contrast(cream, frame) >= CM.contrast(dark, frame) ? cream : dark;
+    let accent = CM.mix(base, frame, 0.1);
+    if (CM.contrast(accent, frame) < 4.5) accent = base;
+
+    return { mat, bevel, text, tone, frame, accent };
   }
 
   /** Render the "Matched to your photo" swatch row into #style-selector */
