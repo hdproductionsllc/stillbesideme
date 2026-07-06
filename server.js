@@ -547,6 +547,13 @@ async function start() {
     res.sendFile(path.join(__dirname, 'public', 'admin-order.html'));
   });
 
+  // Human review gate (tokenized link from the review-request email).
+  // Every proof is approved here before the customer proof email goes out.
+  app.use('/api/admin', require('./src/routes/adminReview'));
+  app.get('/admin/review/:token', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin-review.html'));
+  });
+
   // Order status page (token-based deep link from email, plus lookup form)
   app.use('/api/orders', require('./src/routes/orderStatus'));
   app.get('/order', (req, res) => {

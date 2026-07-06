@@ -54,9 +54,8 @@ function buildTimeline(order, events) {
   const shippedAt = byType.partner_shipped?.created_at || byType.luma_shipped?.created_at || byType.whcc_shipped?.created_at;
 
   const isPast = (status) => {
-    const order_idx = ['draft', 'pending_payment', 'proof_ready', 'change_requested', 'proof_approved', 'in_production', 'shipped', 'delivered'].indexOf(status);
-    const current_idx = ['draft', 'pending_payment', 'proof_ready', 'change_requested', 'proof_approved', 'in_production', 'shipped', 'delivered'].indexOf(order.status);
-    return current_idx > order_idx;
+    const flow = ['draft', 'pending_payment', 'awaiting_review', 'proof_ready', 'change_requested', 'proof_approved', 'in_production', 'shipped', 'delivered'];
+    return flow.indexOf(order.status) > flow.indexOf(status);
   };
 
   const milestones = [
@@ -77,12 +76,14 @@ function buildTimeline(order, events) {
     {
       key: 'proof',
       label: 'Design proof ready for review',
-      detail: order.status === 'proof_ready' ? 'Please review and approve your proof.'
+      detail: order.status === 'awaiting_review' ? 'Our team is preparing and reviewing your design by hand. Your proof will arrive by email soon.'
+            : order.status === 'proof_ready' ? 'Please review and approve your proof.'
             : order.status === 'change_requested' ? 'You requested changes – we\'re working on a revised proof.'
             : proofSentAt ? 'Proof was sent for your review.'
             : 'We\'re creating your design proof now.',
       at: proofSentAt,
-      state: order.status === 'proof_ready' ? 'current'
+      state: order.status === 'awaiting_review' ? 'current'
+           : order.status === 'proof_ready' ? 'current'
            : order.status === 'change_requested' ? 'current'
            : proofSentAt ? 'done' : 'pending',
     },
@@ -197,6 +198,7 @@ function humanStatus(status) {
     draft: 'Draft',
     pending_payment: 'Awaiting payment',
     submitted: 'Submitted',
+    awaiting_review: 'Design in progress',
     proof_ready: 'Proof ready for your review',
     change_requested: 'Working on revised proof',
     proof_approved: 'Being printed',

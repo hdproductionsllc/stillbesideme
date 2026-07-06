@@ -1,7 +1,9 @@
 /**
  * Stripe Webhook Handler
  * Processes checkout.session.completed and checkout.session.expired events.
- * On successful payment: saves shipping, generates proof, emails customer for approval.
+ * On successful payment: saves shipping, generates proof, and asks David/Rebecca
+ * to review it. The customer proof email is only sent from the review page
+ * (adminReview.js) — never from here.
  */
 
 const express = require('express');
@@ -70,7 +72,7 @@ async function handleCheckoutCompleted(session, db) {
   }
 
   // Idempotency – don't process twice
-  if (['proof_ready', 'proof_approved', 'change_requested', 'in_production', 'shipped'].includes(order.status)) {
+  if (['awaiting_review', 'proof_ready', 'proof_approved', 'change_requested', 'in_production', 'shipped'].includes(order.status)) {
     console.log(`Stripe webhook: order ${orderId} already processed (status: ${order.status})`);
     return;
   }
@@ -103,11 +105,12 @@ async function handleCheckoutCompleted(session, db) {
   const proofToken = uuidv4();
   const adminToken = uuidv4();
 
-  // Update order with payment + shipping info, set to proof_ready (NOT submitted)
+  // Update order with payment + shipping info, set to awaiting_review:
+  // a human approves every proof before the customer sees it.
   const provider = process.env.FULFILLMENT_PROVIDER || 'whcc';
   db.run(
     `UPDATE orders SET
-       status = 'proof_ready',
+       status = 'awaiting_review',
        stripe_payment_intent_id = ?,
        email = ?,
        shipping_json = COALESCE(?, shipping_json),
@@ -154,7 +157,13 @@ async function handleCheckoutCompleted(session, db) {
     }
   }
 
-  // Step 2: generate proof and send proof email (non-blocking — order is safe even if this fails)
+  // Step 2: generate the proof and ask a human to review it.
+  //
+  // BRAND RULE: the proof email is NEVER sent to the customer automatically.
+  // Every proof passes David/Rebecca's review first — the only path to
+  // emailService.sendProofEmail runs through the approve action in
+  // adminReview.js. Do not add a bypass flag, an env switch, or an
+  // auto-send fallback here. This is a product promise, not a tech gap.
   try {
     const proofGenerator = require('../services/proofGenerator');
     const updatedOrder = db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
@@ -164,23 +173,21 @@ async function handleCheckoutCompleted(session, db) {
     db.run('UPDATE orders SET proof_url = ?, updated_at = datetime(\'now\') WHERE id = ?', [proofRelativeUrl, orderId]);
 
     const proofImageUrl = `${baseUrl}${proofRelativeUrl}`;
-    const approvalPageUrl = `${baseUrl}/proof/${proofToken}`;
+    const reviewUrl = `${baseUrl}/admin/review/${adminToken}`;
 
-    await emailService.sendProofEmail(email, {
-      orderId,
-      templateName: updatedOrder.template_id,
-      sku: updatedOrder.product_sku,
-      totalCents: updatedOrder.total_cents,
-    }, proofImageUrl, approvalPageUrl, statusPageUrl);
+    await emailService.sendReviewRequest(
+      db.get('SELECT * FROM orders WHERE id = ?', [orderId]),
+      { reviewUrl, proofImageUrl }
+    );
 
     db.run(
       `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
-      [orderId, 'proof_sent', JSON.stringify({ proofUrl: proofRelativeUrl, email })]
+      [orderId, 'review_requested', JSON.stringify({ proofUrl: proofRelativeUrl })]
     );
 
-    console.log(`Order ${orderId}: proof generated and emailed to ${email}`);
+    console.log(`Order ${orderId}: proof generated — awaiting human review at /admin/review/${adminToken}`);
   } catch (err) {
-    console.error(`Failed to generate/send proof for order ${orderId}:`, err.message);
+    console.error(`Failed to generate proof for order ${orderId}:`, err.message);
     // Order is saved and paid — proof can be generated/sent manually
     db.run(
       `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,

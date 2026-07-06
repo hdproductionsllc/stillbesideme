@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proof Review | Still Beside Me</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/store.css">
+  <style>
+    .admin-wrap { max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    .admin-card { background: #fff; border-radius: 12px; padding: 2rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-bottom: 1.5rem; }
+    .admin-card h2 { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 500; margin: 0 0 1rem; }
+    .admin-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.45rem 0; border-bottom: 1px solid #f0ece6; font-size: 0.95rem; }
+    .admin-row strong { color: #6b6359; font-weight: 600; flex-shrink: 0; }
+    .admin-row span { text-align: right; }
+    .status-badge { display: inline-block; padding: 0.2rem 0.7rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; background: #f5e9d8; color: #8a6d3b; }
+    .status-badge.sent { background: #e4ecdf; color: #5a7a52; }
+    .frame-line { background: #FAF8F5; border-radius: 8px; padding: 0.9rem 1rem; margin: 1rem 0 0; font-size: 0.95rem; }
+    .frame-line .inscription { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.2rem; }
+    .change-notes { background: #fdf3ee; border-left: 3px solid #c98a6d; border-radius: 8px; padding: 0.9rem 1rem; margin: 1rem 0 0; font-size: 0.95rem; white-space: pre-wrap; }
+    .proof-img { max-width: 100%; border-radius: 8px; border: 1px solid #e8e4df; }
+    .poem-box { width: 100%; min-height: 220px; padding: 0.85rem; border: 1px solid #ddd6cc; border-radius: 8px; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.1rem; line-height: 1.6; box-sizing: border-box; resize: vertical; }
+    .admin-btn { margin-top: 1rem; width: 100%; padding: 0.85rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+    .admin-btn:disabled { opacity: 0.6; cursor: default; }
+    .btn-save { background: transparent; color: #8B9D83; border: 1px solid #8B9D83; }
+    .btn-approve { background: #8B9D83; color: #fff; }
+    .admin-msg { margin-top: 0.9rem; text-align: center; font-size: 0.9rem; }
+    .admin-msg.ok { color: #5a7a52; }
+    .admin-msg.err { color: #b04a3a; }
+    .hint { color: #9B9590; font-size: 0.85rem; margin-top: 0.75rem; text-align: center; }
+  </style>
+</head>
+<body style="background:#FAF8F5;">
+  <header class="site-header">
+    <div class="container">
+      <a href="/" class="site-logo">Still Beside Me</a>
+    </div>
+  </header>
+
+  <main class="admin-wrap">
+    <div id="loading" class="admin-card">Loading order…</div>
+    <div id="content" style="display:none">
+      <div class="admin-card" id="order-card"></div>
+
+      <div class="admin-card">
+        <h2>Their answers</h2>
+        <div id="answers"></div>
+      </div>
+
+      <div class="admin-card">
+        <h2>Proof</h2>
+        <img class="proof-img" id="proof-img" alt="Proof awaiting review">
+      </div>
+
+      <div class="admin-card" id="poem-card">
+        <h2>Poem</h2>
+        <textarea class="poem-box" id="poem-text"></textarea>
+        <button class="admin-btn btn-save" id="save-btn">Save poem &amp; regenerate proof</button>
+        <div class="admin-msg" id="save-msg"></div>
+      </div>
+
+      <div class="admin-card" id="approve-card">
+        <h2>Send to customer</h2>
+        <p style="margin:0;color:#6b6359;font-size:0.95rem;">
+          Approving sends the proof email. The customer reviews and approves it themselves before anything is printed.
+        </p>
+        <button class="admin-btn btn-approve" id="approve-btn">Approve &amp; send proof to customer</button>
+        <div class="admin-msg" id="approve-msg"></div>
+        <p class="hint">Nothing reaches the customer until you click approve. There is no automatic send.</p>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      const token = window.location.pathname.split('/').filter(Boolean).pop();
+      const loading = document.getElementById('loading');
+      const content = document.getElementById('content');
+
+      const FIELD_LABELS = {
+        petName: 'Pet name', petNicknames: 'Nicknames', petType: 'Type', breed: 'Breed',
+        birthDate: 'Born', passDate: 'Passed', personality: 'Personality',
+        favoriteMemory: 'Favorite memory', favoriteThing: 'Favorite thing',
+        familyName: 'Family', name: 'Name',
+      };
+
+      function esc(s) {
+        const d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
+      }
+
+      async function load() {
+        try {
+          const res = await fetch(`/api/admin/review/${token}/data`);
+          if (!res.ok) {
+            loading.textContent = 'Order not found. Check the link from the review email.';
+            return;
+          }
+          render(await res.json());
+        } catch (e) {
+          loading.textContent = 'Could not load order. Please try again.';
+        }
+      }
+
+      function render(o) {
+        loading.style.display = 'none';
+        content.style.display = '';
+
+        const badge = o.reviewable
+          ? '<span class="status-badge">needs review</span>'
+          : `<span class="status-badge sent">${esc(o.status.replace(/_/g, ' '))}</span>`;
+
+        document.getElementById('order-card').innerHTML = `
+          <h2>Order ${esc(o.shortId)} ${badge}</h2>
+          <div class="admin-row"><strong>Customer</strong><span>${esc(o.email || '—')}</span></div>
+          <div class="admin-row"><strong>Product</strong><span>${esc(o.sku || o.templateId)}</span></div>
+          ${o.frameText ? `
+          <div class="frame-line">
+            Frame will read: <span class="inscription">${esc(o.frameText)}</span><br>
+            <span style="color:#9B9590;font-size:0.85rem;">Pulled from the order record. Check it against their answers below.</span>
+          </div>` : ''}
+          ${o.changeRequestNotes ? `
+          <div class="change-notes"><strong>Customer requested changes:</strong>\n${esc(o.changeRequestNotes)}</div>` : ''}
+        `;
+
+        document.getElementById('answers').innerHTML = Object.entries(FIELD_LABELS)
+          .filter(([key]) => o.fields && o.fields[key])
+          .map(([key, label]) => `<div class="admin-row"><strong>${label}</strong><span>${esc(o.fields[key])}</span></div>`)
+          .join('') || '<p style="color:#9B9590;">No answers on this order.</p>';
+
+        document.getElementById('proof-img').src = o.proofUrl ? `${o.proofUrl}?t=${Date.now()}` : '';
+        document.getElementById('poem-text').value = o.poemText || '';
+
+        const editable = o.reviewable;
+        document.getElementById('poem-text').disabled = !editable;
+        document.getElementById('save-btn').disabled = !editable;
+        document.getElementById('approve-btn').disabled = !editable;
+        if (!editable) {
+          document.getElementById('approve-msg').className = 'admin-msg ok';
+          document.getElementById('approve-msg').textContent =
+            o.status === 'proof_ready' ? 'Proof has been sent — waiting on the customer.' : 'This order is past the review stage.';
+        }
+      }
+
+      async function post(url, body) {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body || {}),
+        });
+        const data = await res.json().catch(() => ({}));
+        return { ok: res.ok, data };
+      }
+
+      document.getElementById('save-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('save-btn');
+        const msg = document.getElementById('save-msg');
+        btn.disabled = true;
+        msg.textContent = 'Saving and regenerating…';
+        msg.className = 'admin-msg';
+        try {
+          const { ok, data } = await post(`/api/admin/review/${token}/poem`, {
+            poemText: document.getElementById('poem-text').value,
+          });
+          msg.className = 'admin-msg ' + (ok ? 'ok' : 'err');
+          msg.textContent = ok ? data.message : (data.error || 'Something went wrong.');
+          if (ok && data.proofUrl) {
+            document.getElementById('proof-img').src = `${data.proofUrl}?t=${Date.now()}`;
+          }
+        } catch (e) {
+          msg.className = 'admin-msg err';
+          msg.textContent = 'Could not reach the server. Please try again.';
+        }
+        btn.disabled = false;
+      });
+
+      document.getElementById('approve-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('approve-btn');
+        const msg = document.getElementById('approve-msg');
+        btn.disabled = true;
+        msg.textContent = 'Sending…';
+        msg.className = 'admin-msg';
+        try {
+          const { ok, data } = await post(`/api/admin/review/${token}/approve`);
+          msg.className = 'admin-msg ' + (ok ? 'ok' : 'err');
+          msg.textContent = ok ? data.message : (data.error || 'Something went wrong.');
+          if (ok) load();
+        } catch (e) {
+          msg.className = 'admin-msg err';
+          msg.textContent = 'Could not reach the server. Please try again.';
+          btn.disabled = false;
+        }
+      });
+
+      load();
+    })();
+  </script>
+</body>
+</html>

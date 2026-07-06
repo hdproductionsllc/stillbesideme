@@ -1,0 +1,22 @@
+{
+  "_comment": "UV frame inscription spec. ONE element: pet name + years. One font, one size, one placement — no customer options, no variants. David tunes canvas/placement numbers to match the E1 jig; the code never grows choices. Text always comes from the order record (fields_json), never retyped.",
+  "canvas": {
+    "widthIn": 12,
+    "heightIn": 1.25,
+    "dpi": 300,
+    "background": "transparent"
+  },
+  "text": {
+    "fontFamily": "Georgia, 'Times New Roman', serif",
+    "fontSizeIn": 0.42,
+    "color": "#C4A882",
+    "letterSpacingPx": 2
+  },
+  "placement": {
+    "align": "center",
+    "verticalCenter": true
+  },
+  "output": {
+    "format": "png"
+  }
+}

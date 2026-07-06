@@ -2,6 +2,38 @@
 
 ---
 
+## Pass 3 — Review Gate + Programmatic UV Name File (2026-07-06)
+
+Plan: `C:\Users\david\.claude\plans\dreamy-singing-wilkes.md`
+
+### Phase A — Review gate (brand rule: no proof email without human approval) ✓ DONE
+- [x] A1. Migration 007: `awaiting_review` status + `reviewed_at`, `uv_file_url` columns (FK-safe recreate — PRAGMA foreign_keys OFF during rebuild since 3 child tables reference orders)
+- [x] A2. stripeWebhooks.js: payment → `awaiting_review`, review-request email replaces auto proof email; `awaiting_review` added to webhook idempotency list (retry would have double-processed)
+- [x] A3. emailService.js: `sendReviewRequest()` to ADMIN_EMAIL (comma-separated works natively in nodemailer)
+- [x] A4. adminReview.js: GET data / POST poem (edit + regenerate) / POST approve (send proof); handles `change_requested` too — closes the previously dead-ended change-request loop
+- [x] A5. public/admin-review.html + server.js wiring (`/admin/review/:token`)
+- [x] A6. orderStatus.js: "Design in progress" label + hand-review timeline copy
+
+### Phase B — UV frame name file (programmatic, never retyped) ✓ DONE
+- [x] B1. uv-frame-spec.json: one font, one size, one placement — David tunes to E1 jig
+- [x] B2. uvFrameRenderer.js: fields_json → PNG, auto-fit long names, returns null for non-pet orders
+- [x] B3. Generated on customer proof approval; attached + linked in partner email, download button on admin order page
+- [x] B4. Proof email shows "On the frame: {name} · {years}" — customer approval covers frame spelling
+
+### Verification ✓ ALL PASSED (30/30 e2e checks)
+- [x] Migration clean against copy of store.db — rows/events survive, FK check + integrity_check ok, bogus statuses still rejected
+- [x] Signed Stripe webhook → `awaiting_review`; review email to david+rebecca; NO customer proof email; retry idempotent; customer proof page 410s pre-approval
+- [x] Review page: edit poem → proof regenerated; approve → proof email sent, `proof_ready`, `reviewed_at` stamped; double-approve doesn't re-send
+- [x] Customer approve → print JPEG + uv-frame PNG ("Banjo · 2014 - 2026", 3600×375, verified visually)
+- [x] Change-request round trip: notes on review page → edit → re-approve → notes cleared
+- [x] Review page screenshot-verified at 390px and 1200px (Puppeteer)
+
+### David to do before this goes live
+- [ ] Set `ADMIN_EMAIL` on Railway (comma-separated for you + Rebecca) — without it, paid orders wait in review with no notification
+- [ ] Tune `src/data/uv-frame-spec.json` (canvas size, font size, color) to the real E1 jig, print one test frame
+
+---
+
 ## Pass 2 — Pet Memorial Pivot: One Product, UV-Printed 11×14 (2026-06-11)
 
 Plan: `C:\Users\david\.claude\plans\polished-bubbling-wilkinson.md`

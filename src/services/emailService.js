@@ -118,8 +118,17 @@ async function sendOrderConfirmation(to, orderData, statusPageUrl) {
  * Send proof email to customer with proof image and approval link.
  */
 async function sendProofEmail(to, orderData, proofImageUrl, approvalPageUrl, statusPageUrl) {
-  const { orderId, templateName, sku, totalCents } = orderData;
+  const { orderId, templateName, sku, totalCents, frameText } = orderData;
   const shortId = orderId.substring(0, 8).toUpperCase();
+
+  // The frame inscription comes straight from the order record. Showing it
+  // here means the customer's approval also confirms the spelling that gets
+  // UV-printed on the frame itself.
+  const frameLine = frameText ? `
+      <p style="text-align:center;color:#2C2C2C;line-height:1.6;margin:0 0 24px;">
+        On the frame: <strong style="font-family:Georgia,serif;">${frameText}</strong><br>
+        <span style="color:#9B9590;font-size:0.85rem;">Please check the spelling carefully. This is printed on the frame itself.</span>
+      </p>` : '';
 
   const html = wrapHtml(`
     <div style="background:#fff;border-radius:12px;padding:32px;margin-bottom:24px;">
@@ -133,7 +142,7 @@ async function sendProofEmail(to, orderData, proofImageUrl, approvalPageUrl, sta
       <div style="text-align:center;margin-bottom:24px;">
         <img src="${proofImageUrl}" alt="Your tribute proof" style="max-width:100%;border-radius:8px;border:1px solid #E8E4DF;" />
       </div>
-
+      ${frameLine}
       <p style="color:#2C2C2C;line-height:1.6;margin-bottom:24px;">
         We've created your personalized ${templateName || 'tribute'}. Please review the design carefully — once approved,
         it will be printed on archival paper and professionally framed.
@@ -160,9 +169,94 @@ async function sendProofEmail(to, orderData, proofImageUrl, approvalPageUrl, sta
 }
 
 /**
+ * Ask David/Rebecca to review a freshly generated proof before it goes to
+ * the customer. This is the review gate: the ONLY path to the customer
+ * proof email runs through the /admin/review page this email links to.
+ * ADMIN_EMAIL may be a comma-separated list (David + Rebecca).
+ */
+async function sendReviewRequest(order, { reviewUrl, proofImageUrl }) {
+  if (!ADMIN_EMAIL) {
+    console.warn(`Email: ADMIN_EMAIL not configured — order ${order.id} is waiting in review with no notification. Set ADMIN_EMAIL.`);
+    return;
+  }
+
+  const esc = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  const shortId = order.id.substring(0, 8).toUpperCase();
+  const fields = order.fields_json ? JSON.parse(order.fields_json) : {};
+  const { frameInscription } = require('./uvFrameRenderer');
+  const frameText = frameInscription(fields);
+
+  const FIELD_LABELS = {
+    petName: 'Pet name',
+    petNicknames: 'Nicknames',
+    petType: 'Type',
+    breed: 'Breed',
+    birthDate: 'Born',
+    passDate: 'Passed',
+    personality: 'Personality',
+    favoriteMemory: 'Favorite memory',
+    favoriteThing: 'Favorite thing',
+    familyName: 'Family',
+    name: 'Name',
+  };
+  const answerRows = Object.entries(FIELD_LABELS)
+    .filter(([key]) => fields[key])
+    .map(([key, label]) => `
+      <tr>
+        <td style="padding:6px 12px 6px 0;color:#6b6359;font-weight:600;vertical-align:top;white-space:nowrap;">${label}</td>
+        <td style="padding:6px 0;color:#2C2C2C;">${esc(fields[key])}</td>
+      </tr>`)
+    .join('');
+
+  const html = wrapHtml(`
+    <div style="background:#fff;border-radius:12px;padding:32px;">
+      <h1 style="font-family:Georgia,serif;font-size:1.4rem;font-weight:400;color:#2C2C2C;margin:0 0 4px;">
+        Review needed &mdash; Order ${shortId}
+      </h1>
+      <p style="color:#9B9590;margin:0 0 20px;">
+        ${esc(order.email || 'No email')} &middot; ${formatPrice(order.total_cents)} &middot; paid, waiting on your approval
+      </p>
+
+      ${frameText ? `
+      <p style="color:#2C2C2C;line-height:1.6;margin:0 0 16px;">
+        Frame will read: <strong style="font-family:Georgia,serif;">${esc(frameText)}</strong>
+        <span style="color:#9B9590;font-size:0.85rem;">(pulled from the order record, spell-check against their answers below)</span>
+      </p>` : ''}
+
+      ${proofImageUrl ? `
+      <div style="text-align:center;margin:0 0 20px;">
+        <img src="${proofImageUrl}" alt="Proof awaiting review" style="max-width:100%;border-radius:8px;border:1px solid #E8E4DF;" />
+      </div>` : ''}
+
+      <div style="background:#FAF8F5;border-radius:8px;padding:16px;margin:0 0 16px;border-left:3px solid #C4A882;">
+        <strong>Poem as the customer approved it at checkout:</strong>
+        <div style="font-family:Georgia,serif;white-space:pre-wrap;line-height:1.6;margin-top:8px;">${esc(order.poem_text || '(no poem on order)')}</div>
+      </div>
+
+      <table style="border-collapse:collapse;font-size:0.9rem;margin:0 0 20px;">${answerRows}</table>
+
+      <div style="text-align:center;margin:24px 0 8px;">
+        <a href="${reviewUrl}"
+           style="display:inline-block;background:#8B9D83;color:#fff;text-decoration:none;padding:14px 40px;border-radius:8px;font-weight:600;font-size:1rem;">
+          Review &amp; approve proof
+        </a>
+      </div>
+      <p style="text-align:center;color:#9B9590;font-size:0.8rem;">
+        The customer does not see their proof until you approve it here.
+      </p>
+    </div>
+  `);
+
+  const petName = fields.petName || fields.name || '';
+  return send(ADMIN_EMAIL, `Review needed — Order ${shortId}${petName ? ` (${petName})` : ''}`, html);
+}
+
+/**
  * Notify admin when a customer requests changes to their proof.
  */
-async function sendChangeRequestNotification(orderData, notes) {
+async function sendChangeRequestNotification(orderData, notes, reviewUrl) {
   if (!ADMIN_EMAIL) {
     console.warn('Email: ADMIN_EMAIL not configured — change request notification skipped');
     return;
@@ -185,9 +279,16 @@ async function sendChangeRequestNotification(orderData, notes) {
         <strong>Customer notes:</strong><br>
         ${(notes || 'No details provided').replace(/\n/g, '<br>')}
       </div>
+      ${reviewUrl ? `
+      <div style="text-align:center;margin:24px 0 8px;">
+        <a href="${reviewUrl}"
+           style="display:inline-block;background:#8B9D83;color:#fff;text-decoration:none;padding:14px 40px;border-radius:8px;font-weight:600;font-size:1rem;">
+          Edit poem &amp; resend proof
+        </a>
+      </div>` : `
       <p style="color:#9B9590;font-size:0.85rem;">
-        Log in to the admin dashboard to review and regenerate the proof.
-      </p>
+        Open the review link from the original order email to regenerate the proof.
+      </p>`}
     </div>
   `);
 
@@ -236,7 +337,7 @@ async function sendApprovalConfirmation(to, orderData, statusPageUrl) {
  * order specs, shipping address, and a tokenized admin link for
  * marking the order shipped.
  */
-async function sendPartnerOrderEmail(order, { printFileUrl, printFilePath, adminUrl, proofImageUrl }) {
+async function sendPartnerOrderEmail(order, { printFileUrl, printFilePath, adminUrl, proofImageUrl, uvFileUrl, uvFilePath, uvInscription }) {
   const partnerEmail = process.env.PARTNER_PRINT_EMAIL;
   if (!partnerEmail) {
     throw new Error('PARTNER_PRINT_EMAIL not configured');
@@ -260,6 +361,13 @@ async function sendPartnerOrderEmail(order, { printFileUrl, printFilePath, admin
   } catch (e) {
     // Attachment is best-effort; the download link is the source of truth
   }
+  try {
+    if (uvFilePath && fs.existsSync(uvFilePath)) {
+      attachments.push({ filename: `${sid}-uv-frame-inscription.png`, path: uvFilePath });
+    }
+  } catch (e) {
+    // Same best-effort rule as the print file
+  }
 
   const colorChips = colors ? `
       <p style="color:#2C2C2C;line-height:1.8;margin:0 0 16px;">
@@ -279,6 +387,12 @@ async function sendPartnerOrderEmail(order, { printFileUrl, printFilePath, admin
         <strong>Print file:</strong> 300 DPI JPEG${attachments.length ? ' (attached)' : ''} — <a href="${printFileUrl}" style="color:#8B9D83;">download</a>
       </p>
       ${colorChips}
+      ${uvFileUrl ? `
+      <div style="background:#FAF8F5;border-radius:8px;padding:16px;margin:16px 0;border-left:3px solid #C4A882;">
+        <strong>UV frame inscription:</strong> <span style="font-family:Georgia,serif;">${uvInscription || ''}</span><br>
+        <span style="color:#9B9590;font-size:0.85rem;">Generated from the order record — use the file as-is, never retype the name.</span><br>
+        <a href="${uvFileUrl}" style="color:#8B9D83;">Download inscription PNG</a>
+      </div>` : ''}
 
       <div style="background:#FAF8F5;border-radius:8px;padding:16px;margin:16px 0;">
         <strong>Ship to:</strong><br>
@@ -350,6 +464,7 @@ async function sendShippedEmail(to, orderData, tracking, statusPageUrl) {
 module.exports = {
   sendOrderConfirmation,
   sendProofEmail,
+  sendReviewRequest,
   sendChangeRequestNotification,
   sendApprovalConfirmation,
   sendPartnerOrderEmail,
