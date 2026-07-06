@@ -144,7 +144,7 @@
       if (typeof gtag === 'function') {
         gtag('event', 'begin_checkout', {
           currency: 'USD',
-          value: 97.00,
+          value: 119.00,
         });
       }
       // Meta Pixel

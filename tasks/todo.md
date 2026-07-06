@@ -2,6 +2,27 @@
 
 ---
 
+## Pass 5 — Pet tribute size ladder + real Luma COGS pricing (2026-07-06 night)
+
+David's pricing call (grounded in real Luma API costs, memory: `luma-cogs-2026-07.md`):
+8×10 $79 / 11×14 $119 (default, Most Popular) / 16×20 $169 / 20×30 $249. LFH untouched.
+Margins after Stripe: 48% / 62% / 66% / 68%. Landed COGS: $36 / $42 / $52 / $71.
+
+- [x] pet-tribute.json: 4-rung printProducts ladder (customizer size grid renders automatically for multi-product templates)
+- [x] Public pages: all `$97` copy → `From $79` (index, pet/dog/cat-memorial, sympathy-gifts, 3 blog posts)
+- [x] JSON-LD: pet Product Offer → AggregateOffer $79–$249 (5 pages); dropped "11×14" from schema name
+- [x] store.js: GA4 begin_checkout value 97 → 119 (default rung)
+- [x] Verified: checkout prices by SKU server-side; printRenderer + lumaOrderApi parse size from SKU generically; no hardcoded 9700/SKU in backend
+
+### Pre-flight for live self-test order (BANJO100 dress rehearsal)
+- [x] Railway `FULFILLMENT_PROVIDER=luma` + production Luma creds confirmed
+- [x] BANJO100 live in Stripe: 100% off, 0/5 redeemed, active
+- [x] $0-checkout safe: webhook stores `payment_intent` but never requires it
+- [ ] NEXT: deploy, then David places test order; watch Luma submission in prod logs
+- [ ] BEFORE ADS: copy audit — "3D-printed in their colors / name on frame" claims are stale sitewide (product is now Luma framed print, elegant dark frame)
+
+---
+
 ## Pass 4 — Disable text-on-frame, revert to elegant classic dark frame (2026-07-06 eve)
 
 Decision memory: `uv-frame-text-disabled-2026-07.md`. David: no text printed on the frame itself; elegant classic dark frame every order; mat/bevel still color-matched in the print; name/dates/poem stay in the tribute panel. Keep review gate. Keep UV code dormant for revival.
