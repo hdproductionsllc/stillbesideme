@@ -26,26 +26,32 @@ const LUMA_CONFIG = {
   storeId: process.env.LUMA_STORE_ID ? Number(process.env.LUMA_STORE_ID) : 81799,
 
   // Subcategory = frame color. Using 1.25" profile (supports 5" to 60x40).
-  // Our style variants map to these subcategories:
+  // The pet tribute ships in the elegant dark frame → Black.
   subcategories: {
     'classic-dark': 105005,  // 1.25w x 0.875h Black Frame
     'warm-natural': 105007,  // 1.25w x 0.875h Oak Frame
     'soft-light':   105006,  // 1.25w x 0.875h White Frame
   },
 
-  // Mat color per style variant (matches what the customer sees in the preview)
+  // We send Luma a FULL-BLEED print: the mat and bevel are already printed
+  // into the image (auto-matched to the pet's photo), so Luma adds NO mat of
+  // its own — it just frames the print edge to edge. This preserves the
+  // photo-matched mat, which Luma's own fixed mat colors can't reproduce.
+  // Mat Color is therefore intentionally omitted (see matColors below, kept
+  // only for a possible future "Luma adds the mat" path).
   matColors: {
-    'classic-dark': 98,   // Smooth Black (preview: #1a1a1a)
-    'warm-natural': 102,  // Cream (preview: #F5EDE0)
-    'soft-light':   96,   // White (preview: #FFFFFF)
+    'classic-dark': 98,   // Smooth Black — UNUSED while Mat Size = No Mat
+    'warm-natural': 102,  // Cream
+    'soft-light':   96,   // White
   },
 
-  // Options shared across all styles (one per option group, excludes mat color)
+  // One option per group (discovered via GET /api/luma/subcategory/105005/options).
+  // Mat Color is deliberately not listed — with "No Mat" there is no mat to color.
   sharedOptions: [
-    65,   // Mat Size: 1.0 inch on each side
+    64,   // Mat Size: No Mat (full-bleed — frame goes straight around the print)
     78,   // Paper Type: Semi-Glossy Photo Paper
     146,  // Glazing: Acrylic Glass
-    83,   // Hanging Hardware: Hanging Wire
+    83,   // Hanging Hardware: Hanging Wire installed on frame
     95,   // Backing: Kraft Paper
     148,  // Print Mounting: Dry Mounted to Foam Core
   ],
@@ -172,12 +178,12 @@ function parseSizeFromSku(sku) {
 }
 
 /**
- * Build order item options for a style variant.
- * Combines shared options with the style-specific mat color.
+ * Build order item options. We send a full-bleed print with "No Mat", so no
+ * mat color is included — the mat is already printed into the image. (styleVariant
+ * is accepted for signature stability / future mat-color path.)
  */
 function buildOrderItemOptions(styleVariant) {
-  const matColorId = LUMA_CONFIG.matColors[styleVariant] || LUMA_CONFIG.matColors['classic-dark'];
-  return [...LUMA_CONFIG.sharedOptions, matColorId].map(id => ({ optionId: id }));
+  return LUMA_CONFIG.sharedOptions.map(id => ({ optionId: id }));
 }
 
 /**
@@ -207,8 +213,18 @@ async function placeOrder(orderId, db) {
   const sku = order.product_sku;
   const fields = order.fields_json ? JSON.parse(order.fields_json) : {};
 
-  // Parse dimensions from SKU
-  const { width, height } = parseSizeFromSku(sku);
+  // Parse dimensions from SKU and orient them to match the print image.
+  // SKU lists the two sides (e.g. 11x14); the actual orientation depends on
+  // the layout (landscape side-by-side vs portrait stacked), matching the
+  // print file that printRenderer produced. Sending the wrong orientation to
+  // Luma would rotate or crop the print.
+  const { isLandscapeLayout } = require('./tributeRenderer');
+  const sides = parseSizeFromSku(sku);
+  const shortSide = Math.min(sides.width, sides.height);
+  const longSide = Math.max(sides.width, sides.height);
+  const landscape = isLandscapeLayout(fields.layout || 'side-by-side');
+  const width = landscape ? longSide : shortSide;
+  const height = landscape ? shortSide : longSide;
 
   // Use the print-ready composite (photo + tribute panel rendered at 300 DPI)
   if (!order.print_file_url) {
