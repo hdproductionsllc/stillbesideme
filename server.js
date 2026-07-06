@@ -620,11 +620,20 @@ async function start() {
     res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
   });
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`\n  Still Beside Me – Memorial Art Store`);
     console.log(`  http://localhost:${PORT}`);
     console.log(`  http://localhost:${PORT}/customize\n`);
   });
+
+  // Railway sends SIGTERM when a redeploy replaces this container. Exit 0 so
+  // routine shutdowns aren't classified (and emailed) as crashes.
+  const shutdown = () => {
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 8000).unref();
+  };
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 }
 
 start().catch(err => {
