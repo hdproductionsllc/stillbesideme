@@ -22,11 +22,13 @@ if (!to || !to.includes('@')) {
   process.exit(1);
 }
 
+// Deliberately fake data — "Order 00000000" so a smoke test is never
+// mistaken for a real order.
 const fakeOrder = {
   orderId: '00000000-1111-2222-3333-444455556666',
   templateName: 'pet-tribute',
   sku: 'framed-11x14',
-  totalCents: 15995,
+  totalCents: 9700,
 };
 
 const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
