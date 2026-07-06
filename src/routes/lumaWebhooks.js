@@ -8,6 +8,15 @@ const express = require('express');
 const router = express.Router();
 
 /**
+ * GET /api/luma-webhooks
+ * Reachability check — Luma pings the URL with a GET when registering the
+ * webhook and needs a 200 before it will accept the subscription.
+ */
+router.get('/', (req, res) => {
+  res.status(200).json({ ok: true, service: 'luma-webhook' });
+});
+
+/**
  * POST /api/luma-webhooks
  * Receives shipping events from Luma Prints.
  * Raw body is parsed here (configured in server.js via express.raw()).

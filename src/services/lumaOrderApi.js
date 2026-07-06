@@ -154,10 +154,11 @@ async function getShipments(orderNumber) {
  * POST /api/v1/webhook - Subscribe to webhook events.
  */
 async function subscribeWebhook(storeId, callbackUrl) {
+  // Luma's webhook API expects `url` (not `callbackUrl`).
   return apiRequest('POST', '/api/v1/webhook', {
     storeId,
     event: 'shipping',
-    callbackUrl,
+    url: callbackUrl,
   });
 }
 
