@@ -538,35 +538,56 @@
     if (nameOnFrame) updateFrameText();
   }
 
+  // Remove any engraved name/dates elements so the frame stays clean.
+  // (Text-on-frame is disabled — name/dates read in the tribute panel.)
+  function removeFrameText() {
+    const frameEl = document.getElementById('frame-preview');
+    if (!frameEl) return;
+    const border = frameEl.querySelector('.frame-border');
+    if (!border) return;
+    const nameEl = border.querySelector('.frame-name');
+    const datesEl = border.querySelector('.frame-dates');
+    if (nameEl) nameEl.remove();
+    if (datesEl) datesEl.remove();
+  }
+
   function setPreviewPoem(text) {
     previewPoemText = text || '';
     queueRender();
   }
 
   /**
-   * Apply auto-matched colors { frame, accent, ... } to the preview.
-   * The frame border becomes the pet-matched 3D-print color, the name/dates
-   * are engraved on it in the accent color, and the photo + poem sit on a
-   * light paper insert inside the opening.
+   * Apply auto-matched colors { accent, bevel, ... } to the preview.
+   *
+   * The frame itself is always the elegant classic dark wood molding — no text
+   * printed on it, no photo-matched frame color. The photo + poem sit on a
+   * light paper insert, and the name/dates/nickname read as printed text in
+   * the tribute panel (see the main render path). The auto-matched bevel/accent
+   * still tints the divider so the color-matching carries into the print.
    */
   function setColors(c) {
     if (!c || (!c.frame && !c.mat)) return;
-    nameOnFrame = true;
+    // Name/dates live in the printed panel, never engraved on the frame.
+    nameOnFrame = false;
 
-    const frame = c.frame || c.mat || '#6E5C4E';
-    const accent = c.accent || c.bevel || '#F4ECDD';
+    const accent = c.accent || c.bevel || '#C4A882';
+    // Fixed elegant dark wood — the frame is not color-matched to the photo.
+    const darkWood = '#2a1e14';
 
     const frameEl = document.getElementById('frame-preview');
     if (frameEl) {
       frameEl.className = 'frame-preview theme-auto';
-      frameEl.style.setProperty('--frame-color', frame);
+      frameEl.style.setProperty('--frame-color', darkWood);
       // Lighter/darker tones give the molding its gradient "light on the frame" look
-      frameEl.style.setProperty('--frame-hi', mixHex(frame, '#ffffff', 0.18));
-      frameEl.style.setProperty('--frame-lo', mixHex(frame, '#000000', 0.32));
+      frameEl.style.setProperty('--frame-hi', mixHex(darkWood, '#ffffff', 0.14));
+      frameEl.style.setProperty('--frame-lo', mixHex(darkWood, '#000000', 0.35));
       frameEl.style.setProperty('--accent-color', accent);
     }
 
-    // The insert is photo-paper: light background, dark ink for the poem.
+    // Any frame text from a prior render is removed — the frame stays clean.
+    removeFrameText();
+
+    // The insert is photo-paper: light background, dark ink for the text.
     const ink = '#332C26';
     styleColors = {
       ...(styleColors || {}),
@@ -574,14 +595,13 @@
         background: '#FAF7F2',
         name: ink,
         dates: ink,
-        divider: frame,
+        divider: accent,
         poem: ink,
         nickname: mixHex(ink, '#FAF7F2', 0.18),
         family: mixHex(ink, '#FAF7F2', 0.28)
       }
     };
 
-    updateFrameText();
     queueRender();
   }
 
@@ -787,21 +807,20 @@
     const passField = tm.passDate || 'passDate';
     const poemField = tm.poemText || 'poemText';
 
-    // The insert keeps the name as a printed title; dates live on the frame
-    // engraving (auto theme), so they're omitted from the insert.
+    // Name, dates, nickname and poem all read in the printed tribute panel.
     const petName = fields[nameField] || '';
     const nickname = fields[nickField] || '';
     const familyName = fields[famField] || '';
     let poemText = fields[poemField] || '';
-    // Sample poem so the frame isn't empty before one is generated (display only \u2014
+    // Sample poem so the panel isn't empty before one is generated (display only \u2014
     // never the real poemText; checkout still requires a generated/selected poem).
     let poemIsSample = false;
-    if (!poemText && nameOnFrame && previewPoemText) {
+    if (!poemText && previewPoemText) {
       poemText = previewPoemText;
       poemIsSample = true;
     }
-    const birthDate = nameOnFrame ? '' : (fields[birthField] || '');
-    const passDate = nameOnFrame ? '' : (fields[passField] || '');
+    const birthDate = fields[birthField] || '';
+    const passDate = fields[passField] || '';
     let dateStr = '';
     if (birthDate && passDate) dateStr = birthDate + ' \u2013 ' + passDate;
     else if (birthDate) dateStr = birthDate;

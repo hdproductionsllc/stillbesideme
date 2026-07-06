@@ -158,14 +158,12 @@
       buildStyleSelector();
       buildPanelToggle();
 
-      // Auto-color templates: show a default 3D-printed frame immediately so the
-      // engraved name/dates appear and update as the user types (before any upload).
-      // A real photo upload or swatch tap replaces this with the matched colors.
+      // Auto-color templates: show the elegant dark frame immediately with a
+      // sample poem so the panel isn't empty before an upload. A real photo
+      // upload or swatch tap replaces this with the auto-matched mat colors.
       if (template.colorMode === 'auto') {
         PreviewRenderer.setColors(DEFAULT_AUTO_COLORS);
-        PreviewRenderer.setFrameIcon(frameIcon);
         PreviewRenderer.setPreviewPoem(SAMPLE_POEM);
-        buildIconPicker();
         buildSwatchRow();
       }
 
@@ -1490,20 +1488,10 @@
         ).join('')}
       </div>` : '';
 
-    const frameVal = (currentColors && currentColors.frame) || DEFAULT_AUTO_COLORS.frame;
-    const accentVal = (currentColors && currentColors.accent) || DEFAULT_AUTO_COLORS.accent;
-
-    container.innerHTML = photoRow + `
-      <div class="swatch-row-label">Or choose your own</div>
-      <div class="swatch-custom">
-        <label class="swatch-custom-item">Frame
-          <input type="color" id="frame-color-input" value="${frameVal}">
-        </label>
-        <label class="swatch-custom-item">Engraving
-          <input type="color" id="accent-color-input" value="${accentVal}">
-        </label>
-      </div>
-    `;
+    // The frame is a fixed elegant dark wood; only the photo-matched mat colors
+    // remain customer-selectable. (Freeform frame/engraving pickers removed with
+    // the text-on-frame feature.)
+    container.innerHTML = photoRow;
 
     container.querySelectorAll('.swatch-chip').forEach(chip => {
       chip.addEventListener('click', () => {
@@ -1826,13 +1814,6 @@
         accentOverride = state.accentOverride || null;
         applyColors(state.currentColors);
         buildSwatchRow();
-      }
-
-      // Restore engraved symbol
-      if (template.colorMode === 'auto' && typeof state.frameIcon === 'string') {
-        frameIcon = state.frameIcon;
-        PreviewRenderer.setFrameIcon(frameIcon);
-        buildIconPicker();
       }
 
       // Restore style (validate against current template variants)

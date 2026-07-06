@@ -2,6 +2,32 @@
 
 ---
 
+## Pass 4 — Disable text-on-frame, revert to elegant classic dark frame (2026-07-06 eve)
+
+Decision memory: `uv-frame-text-disabled-2026-07.md`. David: no text printed on the frame itself; elegant classic dark frame every order; mat/bevel still color-matched in the print; name/dates/poem stay in the tribute panel. Keep review gate. Keep UV code dormant for revival.
+
+### Backend — remove UV inscription surfaces ✓ DONE
+- [x] proofApproval.js: dropped generateUvFile + uv_file_url + uv fields in partner email
+- [x] emailService.js: removed "On the frame:" (proof), frame line (review email), UV section + attachment (partner email)
+- [x] adminReview.js: dropped frameText from response
+- [x] adminOrder.js: dropped uvFileUrl; admin-order.html: dropped UV download button
+- [x] admin-review.html: dropped "Frame will read" block
+- [x] uvFrameRenderer.js + uv-frame-spec.json: left on disk, un-imported (dormant, revivable)
+
+### Client — elegant classic dark frame, name/dates in panel ✓ DONE
+- [x] preview.js setColors: fixed dark wood frame (#2a1e14), no engraving, nameOnFrame stays false; removeFrameText() clears stale rails
+- [x] preview.js: dates/name/poem all render in panel; sample poem no longer gated on nameOnFrame
+- [x] customizer.js: removed obsolete frame-icon (paw/heart) picker + Frame/Engraving color overrides (kept photo-match swatches → printed mat)
+- [x] customizer.css: mat-board margin all sides (top/bottom molding restored after removing text rails)
+- [x] Mobile: preview pane floats (sticky below 64px header) + frame fully visible/centered; thinner molding so it fits
+
+### Verify ✓ DONE
+- [x] Customizer preview screenshot: elegant dark frame, NO text on frame, Banjo+2014-2026+nickname+poem in panel (desktop 1200 + mobile 390)
+- [x] Mobile float confirmed: frame stays pinned below header while form scrolls; measured boxes (frame fully within pane)
+- [x] Backend modules load; full e2e (webhook→review→approve→customer approve→partner email, no UV) ALL CHECKS PASSED
+
+---
+
 ## Pass 3 — Review Gate + Programmatic UV Name File (2026-07-06)
 
 Plan: `C:\Users\david\.claude\plans\dreamy-singing-wilkes.md`

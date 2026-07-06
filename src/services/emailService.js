@@ -118,17 +118,8 @@ async function sendOrderConfirmation(to, orderData, statusPageUrl) {
  * Send proof email to customer with proof image and approval link.
  */
 async function sendProofEmail(to, orderData, proofImageUrl, approvalPageUrl, statusPageUrl) {
-  const { orderId, templateName, sku, totalCents, frameText } = orderData;
+  const { orderId, templateName, sku, totalCents } = orderData;
   const shortId = orderId.substring(0, 8).toUpperCase();
-
-  // The frame inscription comes straight from the order record. Showing it
-  // here means the customer's approval also confirms the spelling that gets
-  // UV-printed on the frame itself.
-  const frameLine = frameText ? `
-      <p style="text-align:center;color:#2C2C2C;line-height:1.6;margin:0 0 24px;">
-        On the frame: <strong style="font-family:Georgia,serif;">${frameText}</strong><br>
-        <span style="color:#9B9590;font-size:0.85rem;">Please check the spelling carefully. This is printed on the frame itself.</span>
-      </p>` : '';
 
   const html = wrapHtml(`
     <div style="background:#fff;border-radius:12px;padding:32px;margin-bottom:24px;">
@@ -142,7 +133,6 @@ async function sendProofEmail(to, orderData, proofImageUrl, approvalPageUrl, sta
       <div style="text-align:center;margin-bottom:24px;">
         <img src="${proofImageUrl}" alt="Your tribute proof" style="max-width:100%;border-radius:8px;border:1px solid #E8E4DF;" />
       </div>
-      ${frameLine}
       <p style="color:#2C2C2C;line-height:1.6;margin-bottom:24px;">
         We've created your personalized ${templateName || 'tribute'}. Please review the design carefully — once approved,
         it will be printed on archival paper and professionally framed.
@@ -185,8 +175,6 @@ async function sendReviewRequest(order, { reviewUrl, proofImageUrl }) {
 
   const shortId = order.id.substring(0, 8).toUpperCase();
   const fields = order.fields_json ? JSON.parse(order.fields_json) : {};
-  const { frameInscription } = require('./uvFrameRenderer');
-  const frameText = frameInscription(fields);
 
   const FIELD_LABELS = {
     petName: 'Pet name',
@@ -218,12 +206,6 @@ async function sendReviewRequest(order, { reviewUrl, proofImageUrl }) {
       <p style="color:#9B9590;margin:0 0 20px;">
         ${esc(order.email || 'No email')} &middot; ${formatPrice(order.total_cents)} &middot; paid, waiting on your approval
       </p>
-
-      ${frameText ? `
-      <p style="color:#2C2C2C;line-height:1.6;margin:0 0 16px;">
-        Frame will read: <strong style="font-family:Georgia,serif;">${esc(frameText)}</strong>
-        <span style="color:#9B9590;font-size:0.85rem;">(pulled from the order record, spell-check against their answers below)</span>
-      </p>` : ''}
 
       ${proofImageUrl ? `
       <div style="text-align:center;margin:0 0 20px;">
@@ -337,7 +319,7 @@ async function sendApprovalConfirmation(to, orderData, statusPageUrl) {
  * order specs, shipping address, and a tokenized admin link for
  * marking the order shipped.
  */
-async function sendPartnerOrderEmail(order, { printFileUrl, printFilePath, adminUrl, proofImageUrl, uvFileUrl, uvFilePath, uvInscription }) {
+async function sendPartnerOrderEmail(order, { printFileUrl, printFilePath, adminUrl, proofImageUrl }) {
   const partnerEmail = process.env.PARTNER_PRINT_EMAIL;
   if (!partnerEmail) {
     throw new Error('PARTNER_PRINT_EMAIL not configured');
@@ -361,13 +343,6 @@ async function sendPartnerOrderEmail(order, { printFileUrl, printFilePath, admin
   } catch (e) {
     // Attachment is best-effort; the download link is the source of truth
   }
-  try {
-    if (uvFilePath && fs.existsSync(uvFilePath)) {
-      attachments.push({ filename: `${sid}-uv-frame-inscription.png`, path: uvFilePath });
-    }
-  } catch (e) {
-    // Same best-effort rule as the print file
-  }
 
   const colorChips = colors ? `
       <p style="color:#2C2C2C;line-height:1.8;margin:0 0 16px;">
@@ -387,12 +362,6 @@ async function sendPartnerOrderEmail(order, { printFileUrl, printFilePath, admin
         <strong>Print file:</strong> 300 DPI JPEG${attachments.length ? ' (attached)' : ''} — <a href="${printFileUrl}" style="color:#8B9D83;">download</a>
       </p>
       ${colorChips}
-      ${uvFileUrl ? `
-      <div style="background:#FAF8F5;border-radius:8px;padding:16px;margin:16px 0;border-left:3px solid #C4A882;">
-        <strong>UV frame inscription:</strong> <span style="font-family:Georgia,serif;">${uvInscription || ''}</span><br>
-        <span style="color:#9B9590;font-size:0.85rem;">Generated from the order record — use the file as-is, never retype the name.</span><br>
-        <a href="${uvFileUrl}" style="color:#8B9D83;">Download inscription PNG</a>
-      </div>` : ''}
 
       <div style="background:#FAF8F5;border-radius:8px;padding:16px;margin:16px 0;">
         <strong>Ship to:</strong><br>

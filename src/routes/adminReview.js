@@ -20,7 +20,6 @@
 const express = require('express');
 const router = express.Router();
 const emailService = require('../services/emailService');
-const { frameInscription } = require('../services/uvFrameRenderer');
 
 const REVIEWABLE_STATUSES = ['awaiting_review', 'change_requested'];
 
@@ -52,7 +51,6 @@ router.get('/review/:token/data', (req, res) => {
     email: order.email,
     poemText: order.poem_text || '',
     proofUrl: order.proof_url,
-    frameText: frameInscription(fields),
     fields,
     changeRequestNotes: order.change_request_notes || null,
     reviewedAt: order.reviewed_at || null,
@@ -132,7 +130,6 @@ router.post('/review/:token/approve', async (req, res) => {
   }
 
   const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
-  const fields = order.fields_json ? JSON.parse(order.fields_json) : {};
 
   try {
     await emailService.sendProofEmail(order.email, {
@@ -140,7 +137,6 @@ router.post('/review/:token/approve', async (req, res) => {
       templateName: order.template_id,
       sku: order.product_sku,
       totalCents: order.total_cents,
-      frameText: frameInscription(fields),
     },
     `${baseUrl}${order.proof_url}`,
     `${baseUrl}/proof/${order.proof_token}`,

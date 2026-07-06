@@ -349,9 +349,10 @@
   fill: currentColor;
 }
 .frame-preview.theme-auto .frame-icon:empty { display: none; }
-/* The print: light paper recessed into the frame opening (rabbet shadow) */
+/* The print: light paper recessed into the frame opening (rabbet shadow).
+   Uniform molding on all four sides (top/bottom no longer come from text rails). */
 .frame-preview.theme-auto .mat-board {
-  margin: 0 var(--molding);
+  margin: var(--molding);
   padding: 5px;
   background: #FAF7F2;
   box-shadow:
@@ -1317,20 +1318,30 @@
     flex-direction: column;
   }
 
+  /* The preview floats (sticky) while the form scrolls beneath it. It pins
+     just below the sticky site header (which is ~64px on mobile) so the frame
+     top is never hidden behind it. The pane sizes to its content — no height
+     cap — so the frame is always fully visible and horizontally centered. */
   .preview-pane {
     flex: none;
     position: sticky;
-    top: 0;
+    top: 64px;
     height: auto;
-    z-index: 10;
-    padding: var(--space-md);
-    max-height: 50vh;
+    z-index: 20;
+    padding: var(--space-lg) var(--space-md);
+    justify-content: center;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
   }
 
   .frame-preview {
     --frame-width: 12px;
     --mat-padding: 14px;
-    max-width: 360px;
+    max-width: 280px;
+  }
+
+  /* Thinner molding on small screens so the frame stays compact in the sticky pane. */
+  .frame-preview.theme-auto {
+    --molding: 24px;
   }
 
   .form-pane {
@@ -1392,13 +1403,16 @@
 @media (max-width: 480px) {
   .preview-pane {
     padding: var(--space-sm);
-    max-height: 40vh;
   }
 
   .frame-preview {
     --frame-width: 8px;
     --mat-padding: 10px;
-    max-width: 280px;
+    max-width: 230px;
+  }
+
+  .frame-preview.theme-auto {
+    --molding: 18px;
   }
 
   .form-pane {

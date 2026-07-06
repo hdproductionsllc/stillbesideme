@@ -95,7 +95,6 @@
           <div class="admin-row"><strong>Ship to</strong><span style="text-align:right">${esc(ship.name || '')}<br>${esc(ship.address1 || '')}${ship.address2 ? '<br>' + esc(ship.address2) : ''}<br>${esc(ship.city || '')}, ${esc(ship.state || '')} ${esc(ship.zip || '')}</span></div>
           ${o.tracking ? `<div class="admin-row"><strong>Tracking</strong><span>${esc(o.tracking.number)}${o.tracking.carrier ? ' (' + esc(o.tracking.carrier) + ')' : ''}</span></div>` : ''}
           ${o.printFileUrl ? `<a class="dl-btn" href="${esc(o.printFileUrl)}" download>Download print file (300 DPI)</a>` : ''}
-          ${o.uvFileUrl ? ` <a class="dl-btn" href="${esc(o.uvFileUrl)}" download>Download UV frame inscription</a>` : ''}
           ${o.proofUrl ? `<img class="proof-thumb" src="${esc(o.proofUrl)}" alt="Approved proof">` : ''}
         `;
 

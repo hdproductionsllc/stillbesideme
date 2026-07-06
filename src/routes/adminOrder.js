@@ -45,7 +45,6 @@ router.get('/order/:token', (req, res) => {
     shipping,
     proofUrl: order.proof_url,
     printFileUrl: order.print_file_url,
-    uvFileUrl: order.uv_file_url,
     tracking: order.tracking_number ? {
       number: order.tracking_number,
       carrier: order.tracking_carrier || '',

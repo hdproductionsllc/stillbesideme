@@ -99,25 +99,6 @@ router.post('/:token/approve', async (req, res) => {
     return res.status(500).json({ error: 'Failed to generate your print file. Our team has been notified.' });
   }
 
-  // Generate the UV frame inscription file from the order record.
-  // The pet's name is never retyped between checkout and the printer —
-  // this file is the only source David prints from. Non-fatal on failure:
-  // the fallback is a printed plate inside the frame, not a hand-typed name.
-  try {
-    const uvFrameRenderer = require('../services/uvFrameRenderer');
-    const uv = await uvFrameRenderer.generateUvFile(order);
-    if (uv) {
-      db.run('UPDATE orders SET uv_file_url = ?, updated_at = datetime(\'now\') WHERE id = ?',
-        [uv.uvRelativeUrl, order.id]);
-    }
-  } catch (err) {
-    console.error(`Failed to generate UV inscription for order ${order.id}:`, err.message);
-    db.run(
-      `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
-      [order.id, 'uv_render_failed', JSON.stringify({ error: err.message })]
-    );
-  }
-
   // Submit to fulfillment provider
   const provider = order.fulfillment_provider || process.env.FULFILLMENT_PROVIDER || 'luma';
 
@@ -131,17 +112,11 @@ router.post('/:token/approve', async (req, res) => {
       const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
       const outputRoot = process.env.OUTPUT_DIR || path.join(__dirname, '..', '..', 'output');
 
-      const { frameInscription } = require('../services/uvFrameRenderer');
-      const orderFields = updatedOrder.fields_json ? JSON.parse(updatedOrder.fields_json) : {};
-
       await emailService.sendPartnerOrderEmail(updatedOrder, {
         printFileUrl: `${baseUrl}${updatedOrder.print_file_url}`,
         printFilePath: path.join(outputRoot, 'print-ready', `${updatedOrder.id}.jpg`),
         adminUrl: `${baseUrl}/admin/order/${updatedOrder.admin_token}`,
         proofImageUrl: updatedOrder.proof_url ? `${baseUrl}${updatedOrder.proof_url}` : null,
-        uvFileUrl: updatedOrder.uv_file_url ? `${baseUrl}${updatedOrder.uv_file_url}` : null,
-        uvFilePath: updatedOrder.uv_file_url ? path.join(outputRoot, 'uv-frame', `${updatedOrder.id}.png`) : null,
-        uvInscription: frameInscription(orderFields),
       });
 
       db.run(
