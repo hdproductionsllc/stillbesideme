@@ -18,7 +18,9 @@ Margins after Stripe: 48% / 62% / 66% / 68%. Landed COGS: $36 / $42 / $52 / $71.
 - [x] Railway `FULFILLMENT_PROVIDER=luma` + production Luma creds confirmed
 - [x] BANJO100 live in Stripe: 100% off, 0/5 redeemed, active
 - [x] $0-checkout safe: webhook stores `payment_intent` but never requires it
-- [ ] NEXT: deploy, then David places test order; watch Luma submission in prod logs
+- [x] Deployed + verified live (prod API serves 79/119/169/249 ladder)
+- [x] Fixed phantom "Deployment crashed" emails (npm start SIGTERM → non-zero exit; railway.toml deleted, graceful shutdown added, healthcheck 120s; verified clean teardown + no email)
+- [ ] NEXT: David places test order (11×14 + BANJO100); watch Luma submission in prod logs
 - [ ] BEFORE ADS: copy audit — "3D-printed in their colors / name on frame" claims are stale sitewide (product is now Luma framed print, elegant dark frame)
 
 ---

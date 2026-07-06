@@ -28,11 +28,13 @@ function loadTemplates() {
 }
 
 /**
- * GET /api/templates – Returns array of all template summaries
+ * GET /api/templates – Returns array of all template summaries.
+ * Templates with "hidden": true (e.g. Letter From Heaven while off sale)
+ * are excluded from the listing and unavailable via GET /:id.
  */
 router.get('/', (req, res) => {
   const cache = loadTemplates();
-  const summaries = Object.values(cache).map(t => ({
+  const summaries = Object.values(cache).filter(t => !t.hidden).map(t => ({
     id: t.id,
     name: t.name,
     description: t.description,
@@ -52,7 +54,7 @@ router.get('/:id', (req, res) => {
   const cache = loadTemplates();
   const template = cache[req.params.id];
 
-  if (!template) {
+  if (!template || template.hidden) {
     return res.status(404).json({ error: 'Template not found' });
   }
 

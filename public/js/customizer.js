@@ -1292,8 +1292,8 @@
           <span class="product-option-label">${product.label}</span>
         </div>
         <p class="single-product-line" style="font-size:1.05rem;line-height:1.5">
-          <strong>$${(product.price / 100).toFixed(2)}</strong> &mdash; ${product.label}<br>
-          <span style="font-size:0.88rem;color:var(--color-muted)">Their photo and poem in a frame 3D-printed in their colors, with their name on it. Free shipping.</span>
+          <strong>$${(product.price / 100).toFixed(2)}</strong> &ndash; ${product.label}<br>
+          <span style="font-size:0.88rem;color:var(--color-muted)">Their photo and poem, beautifully framed. Free shipping.</span>
         </p>
       `;
       return section;
@@ -1384,8 +1384,8 @@
   }
 
   /**
-   * Derive a full color set from a tapped swatch — frame (the 3D-printed frame)
-   * and accent (the engraved name/dates), plus the legacy mat/bevel/text the
+   * Derive a full color set from a tapped swatch – frame and accent
+   * (the name/dates), plus the legacy mat/bevel/text the
    * server renderer still reads. Mirror of deriveAutoColors in imageProcessor.js.
    */
   function deriveFromSwatch(hex) {

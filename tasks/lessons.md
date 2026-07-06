@@ -80,3 +80,9 @@ Every landing page should follow this structure in order:
 6. **COMPARE** – Two options: (a) pitch against competitors, or (b) pitch against generalizations (broader market trends, general consumer expectations). Use comparison tables/cards.
 7. **OBJECTIONS (FAQ)** – If they've scrolled this far they're interested but have questions. Use simple FAQ to address ordering, returns, outcomes, and "what if" concerns.
 8. **FINAL CTA** – Close the sale with urgency and confidence.
+
+## Product Claims Consistency (2026-07-06, David caught stale copy mid-checkout)
+- When the product definition OR pricing changes, sweep ALL customer-facing surfaces in the SAME pass: meta tags, og/twitter tags, JSON-LD, page copy, alt text, JS-rendered strings, email templates. Never defer factual claims as "copy audit later" - a customer reads them today.
+- **Price-size pairing rule**: never let a "From $X" price sit next to a specific size unless X is that size's price. "11x14 frame ... From $79" implies $79 buys an 11x14. Say "Four sizes from $79" or name the size WITH its own price.
+- Proactively grep for claim drift after any product pivot; David should never find stale copy before we do.
+- **Never mention "mat" in customer-facing copy** (2026-07-06). The mat/bevel is printed into the artwork, not a physical mat. Naming it invites scrutiny and disappointment. Approved framing: "colors drawn from their photo", "their name and years set into the design", "archival, museum-quality print", "elegant dark wood frame". Sell the design, not the materials mechanics.

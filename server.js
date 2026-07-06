@@ -128,6 +128,34 @@ async function start() {
   // Make db available to routes
   app.locals.db = db;
 
+  // ── TEMPORARY: Letter From Heaven is off sale ─────────────────────────
+  // 302 (temporary) redirects for LFH and its human-loss landing pages.
+  // Registered before express.static so the .html files are not served.
+  // To restore LFH: delete this block and remove "hidden": true from
+  // src/data/templates/letter-from-heaven.json.
+  const lfhOffSaleRedirects = [
+    '/letter-from-heaven',
+    '/loss-of-mother-gift',
+    '/loss-of-father-gift',
+    '/loss-of-husband-gift',
+    '/loss-of-wife-gift',
+    '/loss-of-sister-gift',
+    '/loss-of-brother-gift',
+    '/loss-of-child-gift',
+    '/loss-of-grandmother-gift',
+    '/loss-of-grandfather-gift',
+    '/loss-of-best-friend-gift',
+    '/memorial-gift-for-anniversary-of-death',
+    '/sympathy-gift-for-coworker'
+  ];
+  for (const p of lfhOffSaleRedirects) {
+    app.get([p, `${p}.html`], (req, res) => res.redirect(302, '/'));
+  }
+  app.get(['/customize/letter-from-heaven', '/customize/letter-from-heaven.html'], (req, res) => {
+    res.redirect(302, '/customize/pet-tribute');
+  });
+  // ── end temporary LFH block ───────────────────────────────────────────
+
   // Static files
   app.use(express.static(path.join(__dirname, 'public')));
 
@@ -331,73 +359,7 @@ async function start() {
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>${baseUrl}/loss-of-mother-gift</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/loss-of-father-gift</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/loss-of-husband-gift</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/loss-of-wife-gift</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/loss-of-grandmother-gift</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/loss-of-grandfather-gift</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/loss-of-child-gift</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/loss-of-brother-gift</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/loss-of-sister-gift</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/loss-of-best-friend-gift</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>${baseUrl}/customize/pet-tribute</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/customize/letter-from-heaven</loc>
     <lastmod>${today}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
@@ -485,24 +447,6 @@ async function start() {
     <lastmod>${today}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/sympathy-gift-for-coworker</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/memorial-gift-for-anniversary-of-death</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/letter-from-heaven</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
   </url>
   <url>
     <loc>${baseUrl}/sympathy-message-helper</loc>
