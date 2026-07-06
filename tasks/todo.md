@@ -28,9 +28,17 @@ Plan: `C:\Users\david\.claude\plans\dreamy-singing-wilkes.md`
 - [x] Change-request round trip: notes on review page → edit → re-approve → notes cleared
 - [x] Review page screenshot-verified at 390px and 1200px (Puppeteer)
 
-### David to do before this goes live
-- [ ] Set `ADMIN_EMAIL` on Railway (comma-separated for you + Rebecca) — without it, paid orders wait in review with no notification
+### Shipped to production 2026-07-06 (commit 6cbbeff)
+- [x] `ADMIN_EMAIL` set on Railway (david.stillbesideme@gmail.com)
+- [x] Stripe webhook fixed: endpoint rotated, secret set properly on Railway (old var had a leading space in the NAME — broke every Nixpacks build), signed probe returns 200 from production
+- [x] Persistent volume mounted at /data — before this, prod DB/uploads were wiped on every deploy
+- [x] FULFILLMENT_PROVIDER=partner + PARTNER_PRINT_EMAIL set on Railway
+- [x] Migration 007 applied in production
+
+### David to do before first real order
+- [ ] **SMTP on Railway (LAUNCH BLOCKER)** — no SMTP_HOST set, so order confirmations, review requests, and proof emails only print to server logs. Follow `tasks/resend-setup.md`, then set SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/EMAIL_FROM on Railway
 - [ ] Tune `src/data/uv-frame-spec.json` (canvas size, font size, color) to the real E1 jig, print one test frame
+- [ ] Add Rebecca to ADMIN_EMAIL when she's ready (comma-separated)
 
 ---
 

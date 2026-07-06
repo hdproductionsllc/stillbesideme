@@ -136,6 +136,7 @@ router.post('/checkout', async (req, res) => {
         },
       }],
       metadata: { orderId },
+      allow_promotion_codes: true,
       success_url: `${baseUrl}/order-confirmed?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/customize/${templateId}`,
     });
