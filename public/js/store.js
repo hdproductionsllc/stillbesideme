@@ -147,24 +147,14 @@
           value: 119.00,
         });
       }
-      // Meta Pixel
-      if (typeof fbq === 'function') {
+      // Meta Pixel (only when the pixel is live via /js/env.js)
+      if (typeof fbq === 'function' && window.SBM_ENV && window.SBM_ENV.metaPixelId) {
         fbq('track', 'InitiateCheckout');
       }
     });
   });
 
-  // Track purchase on order-confirmed page
-  if (window.location.pathname === '/order-confirmed') {
-    if (typeof gtag === 'function') {
-      gtag('event', 'purchase', {
-        currency: 'USD',
-        transaction_id: new URLSearchParams(window.location.search).get('session_id') || '',
-      });
-    }
-    if (typeof fbq === 'function') {
-      fbq('track', 'Purchase', { currency: 'USD' });
-    }
-  }
+  // NOTE: the purchase event fires from order-confirmed.html (inline script,
+  // deduped per order with the real order total). Do not add it here.
 
 })();

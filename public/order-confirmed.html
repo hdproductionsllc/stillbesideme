@@ -6,8 +6,9 @@
   <!-- Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-CM9DENCN96"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-CM9DENCN96');</script>
-  <!-- Meta Pixel (activate by setting META_PIXEL_ID) -->
-  <script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');if(typeof META_PIXEL_ID!=='undefined'){fbq('init',META_PIXEL_ID);fbq('track','PageView');}</script>
+  <script src="/js/env.js"></script>
+  <!-- Meta Pixel (config from /js/env.js; inert until metaPixelId is set) -->
+  <script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');if(window.SBM_ENV&&window.SBM_ENV.metaPixelId){fbq('init',window.SBM_ENV.metaPixelId);fbq('track','PageView');}</script>
   <title>Order Confirmed | Still Beside Me</title>
   <meta name="robots" content="noindex, nofollow">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -103,6 +104,63 @@
     const sessionId = params.get('session_id');
     const container = document.getElementById('confirmation');
 
+    // Conversion tracking. Fires once per order (localStorage dedup keyed by
+    // order id), never on refresh, and never breaks the page if it fails.
+    // Readable GA4 item_name derived from the SKU so digital, print-only, and
+    // framed rungs each report distinctly. Falls back gracefully.
+    function itemNameForSku(sku) {
+      if (!sku) return 'Pet Tribute';
+      if (sku.indexOf('digital-') === 0) return 'Digital Keepsake';
+      if (sku.indexOf('print-') === 0) return 'Print only (' + sku.replace('print-', '') + ')';
+      if (sku.indexOf('framed-') === 0) return 'Framed Pet Tribute (' + sku.replace('framed-', '') + ')';
+      return sku;
+    }
+
+    function trackPurchase(order) {
+      try {
+        if (!order || !order.orderId) return;
+        const dedupKey = 'sbm_purchase_' + order.orderId;
+        if (localStorage.getItem(dedupKey)) return;
+        localStorage.setItem(dedupKey, '1');
+
+        const value = order.totalCents ? Math.round(order.totalCents) / 100 : 0;
+        const env = window.SBM_ENV || {};
+
+        // GA4 purchase
+        if (typeof gtag === 'function') {
+          gtag('event', 'purchase', {
+            transaction_id: order.orderId,
+            value: value,
+            currency: 'USD',
+            items: order.sku ? [{
+              item_id: order.sku,
+              item_name: itemNameForSku(order.sku),
+              price: value,
+              quantity: 1,
+            }] : [],
+          });
+
+          // Google Ads conversion (only when configured via /js/env.js)
+          if (env.googleAdsId && env.googleAdsLabel) {
+            gtag('config', env.googleAdsId);
+            gtag('event', 'conversion', {
+              send_to: env.googleAdsId + '/' + env.googleAdsLabel,
+              value: value,
+              currency: 'USD',
+              transaction_id: order.orderId,
+            });
+          }
+        }
+
+        // Meta Pixel purchase (only when the pixel is live)
+        if (env.metaPixelId && typeof fbq === 'function') {
+          fbq('track', 'Purchase', { value: value, currency: 'USD' });
+        }
+      } catch (e) {
+        // Tracking must never interfere with the confirmation page.
+      }
+    }
+
     if (!sessionId) {
       container.innerHTML = '<div class="error-state">No order found. <a href="/">Return to store</a></div>';
       return;
@@ -172,6 +230,8 @@
             <a href="/" class="btn btn-link">Return to Store</a>
           </p>
         `;
+
+        trackPurchase(order);
       })
       .catch(() => {
         container.innerHTML = `

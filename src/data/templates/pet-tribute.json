@@ -126,7 +126,9 @@
     { "sku": "framed-8x10", "label": "Framed 8×10\"", "price": 7900, "badge": "Gift Size" },
     { "sku": "framed-11x14", "label": "Framed 11×14\"", "price": 11900, "default": true, "badge": "Most Popular" },
     { "sku": "framed-16x20", "label": "Framed 16×20\"", "price": 16900 },
-    { "sku": "framed-20x30", "label": "Framed 20×30\"", "price": 24900, "badge": "Statement Piece" }
+    { "sku": "framed-20x30", "label": "Framed 20×30\"", "price": 24900, "badge": "Statement Piece" },
+    { "sku": "print-11x14", "label": "Print only 11×14\"", "sublabel": "The same archival print, ready for your own frame", "price": 3900 },
+    { "sku": "digital-11x14", "label": "Digital Keepsake", "sublabel": "A printable high-resolution file of their tribute", "price": 1995, "fulfillment": "digital" }
   ],
 
   "frameOptions": {

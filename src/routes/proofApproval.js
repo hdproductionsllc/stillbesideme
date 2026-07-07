@@ -96,54 +96,58 @@ router.post('/:token/approve', async (req, res) => {
       `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
       [order.id, 'print_render_failed', JSON.stringify({ error: err.message })]
     );
+
+    // Alert the admin — the customer approved but nothing can print
+    try {
+      const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
+      const shortId = order.id.substring(0, 8).toUpperCase();
+      await emailService.sendAdminAlert(
+        `Order ${shortId} stalled: print render failed`,
+        `Order ${shortId} was approved by the customer but the print-ready file could not be generated.\n\n` +
+        `Order ID: ${order.id}\n` +
+        `Step: print render (proof approval)\n` +
+        `Error: ${err.message}\n\n` +
+        `Review page: ${baseUrl}/admin/review/${order.admin_token}`
+      );
+    } catch (alertErr) {
+      console.error(`Failed to send admin alert for order ${order.id}:`, alertErr.message);
+    }
+
     return res.status(500).json({ error: 'Failed to generate your print file. Our team has been notified.' });
   }
 
-  // Submit to fulfillment provider
-  const provider = order.fulfillment_provider || process.env.FULFILLMENT_PROVIDER || 'luma';
+  // Submit to fulfillment provider (shared with the admin resubmit route)
+  const { submitFulfillment, resolveProvider } = require('../services/fulfillmentSubmitter');
+  // Re-fetch order so the submitter sees print_file_url
+  const updatedOrder = db.get('SELECT * FROM orders WHERE id = ?', [order.id]);
+  const provider = resolveProvider(updatedOrder);
 
   try {
-    // Re-fetch order so placeOrder sees print_file_url
-    const updatedOrder = db.get('SELECT * FROM orders WHERE id = ?', [order.id]);
-    if (provider === 'partner') {
-      // Partner UV print shop: email them the print file + order details
-      // with a tokenized admin link to mark the order shipped.
-      const path = require('path');
-      const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
-      const outputRoot = process.env.OUTPUT_DIR || path.join(__dirname, '..', '..', 'output');
-
-      await emailService.sendPartnerOrderEmail(updatedOrder, {
-        printFileUrl: `${baseUrl}${updatedOrder.print_file_url}`,
-        printFilePath: path.join(outputRoot, 'print-ready', `${updatedOrder.id}.jpg`),
-        adminUrl: `${baseUrl}/admin/order/${updatedOrder.admin_token}`,
-        proofImageUrl: updatedOrder.proof_url ? `${baseUrl}${updatedOrder.proof_url}` : null,
-      });
-
-      db.run(
-        `UPDATE orders SET status = 'in_production', updated_at = datetime('now') WHERE id = ?`,
-        [order.id]
-      );
-      db.run(
-        `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
-        [order.id, 'partner_order_sent', JSON.stringify({ sentAt: new Date().toISOString() })]
-      );
-      console.log(`Proof approved — order ${order.id} emailed to partner print shop`);
-    } else if (provider === 'luma') {
-      const lumaOrderApi = require('../services/lumaOrderApi');
-      const result = await lumaOrderApi.placeOrder(updatedOrder.id, db);
-      console.log(`Proof approved — order ${order.id} submitted to Luma:`, result.orderNumber);
-    } else {
-      const whccOrderApi = require('../services/whccOrderApi');
-      const result = await whccOrderApi.placeOrder(order.id, db);
-      console.log(`Proof approved — order ${order.id} submitted to WHCC:`, result.confirmationId);
-    }
+    const result = await submitFulfillment(updatedOrder, db);
+    console.log(`Proof approved — order ${order.id} submitted to ${result.provider}${result.reference ? `: ${result.reference}` : ''}`);
   } catch (err) {
     console.error(`Failed to submit order ${order.id} to ${provider} after proof approval:`, err.message);
     db.run(
       `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
       [order.id, `${provider}_submit_failed`, JSON.stringify({ error: err.message })]
     );
-    // Order is still saved as proof_approved — fulfillment can be retried manually
+    // Order is still saved as proof_approved — fulfillment can be retried
+    // from the admin order page (Resubmit fulfillment button).
+
+    try {
+      const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
+      const shortId = order.id.substring(0, 8).toUpperCase();
+      await emailService.sendAdminAlert(
+        `Order ${shortId} stalled: ${provider} submit failed`,
+        `Order ${shortId} was approved by the customer but could not be submitted to ${provider}.\n\n` +
+        `Order ID: ${order.id}\n` +
+        `Step: fulfillment submit (proof approval)\n` +
+        `Error: ${err.message}\n\n` +
+        `Resubmit from the admin order page: ${baseUrl}/admin/order/${order.admin_token}`
+      );
+    } catch (alertErr) {
+      console.error(`Failed to send admin alert for order ${order.id}:`, alertErr.message);
+    }
   }
 
   // Send approval confirmation email

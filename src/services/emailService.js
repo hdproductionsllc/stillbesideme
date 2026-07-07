@@ -72,6 +72,29 @@ async function send(to, subject, html, extra = {}) {
 }
 
 /**
+ * Plain-text operational alert to ADMIN_EMAIL.
+ * Used when an order stalls (proof generation, print render, or fulfillment
+ * submit failed) so David can act from his phone. Follows the same
+ * log-fallback pattern as every other email: without SMTP it logs instead.
+ */
+async function sendAdminAlert(subject, textBody) {
+  if (!ADMIN_EMAIL) {
+    console.warn(`Email: ADMIN_EMAIL not configured — admin alert not sent: "${subject}"`);
+    return { skipped: true };
+  }
+
+  const t = getTransporter();
+  if (!t) {
+    console.log(`Email (not sent — no SMTP): to=${ADMIN_EMAIL} subject="${subject}"\n${textBody}`);
+    return { preview: true };
+  }
+
+  const result = await t.sendMail({ from: FROM, to: ADMIN_EMAIL, subject, text: textBody });
+  console.log(`Email sent: to=${ADMIN_EMAIL} subject="${subject}" messageId=${result.messageId}`);
+  return result;
+}
+
+/**
  * Send an order-confirmation email immediately after Stripe webhook fires.
  * This goes out within seconds of payment, before the proof is generated,
  * so the customer is reassured that we received their order.
@@ -314,7 +337,78 @@ async function sendApprovalConfirmation(to, orderData, statusPageUrl) {
 }
 
 /**
- * Email a new order to the partner UV print shop.
+ * Digital Keepsake delivery — the customer's finished tribute as a printable
+ * high-resolution file, plus a credit toward the framed piece.
+ *
+ * Reached only from the admin review approve action for fulfillment:"digital"
+ * orders (adminReview.js). There is NO auto-send path: a real person reviews
+ * every order before this goes out, and the copy says so. Brand voice: kind,
+ * short sentences, en dashes with spaces (never em dashes), no exclamation
+ * points.
+ *
+ * @param {string} to
+ * @param {object} orderData — { orderId, totalCents }
+ * @param {object} links — { downloadUrl, promoCode?, upgradeUrl?, statusPageUrl? }
+ */
+async function sendDigitalDeliveryEmail(to, orderData, links = {}) {
+  const { orderId, totalCents } = orderData;
+  const { downloadUrl, promoCode, upgradeUrl, statusPageUrl } = links;
+  const shortId = orderId.substring(0, 8).toUpperCase();
+
+  const creditBlock = promoCode ? `
+      <div style="background:#FAF8F5;border-radius:8px;padding:20px;margin:24px 0 0;border-left:3px solid #C4A882;">
+        <p style="color:#2C2C2C;line-height:1.6;margin:0 0 8px;">
+          Want it on the wall in a frame? Put this ${formatPrice(1995)} toward the framed tribute
+          within 30 days.
+        </p>
+        <p style="color:#2C2C2C;line-height:1.6;margin:0 0 12px;">
+          Use code <strong style="font-family:Georgia,serif;letter-spacing:0.5px;">${promoCode}</strong> at checkout.
+        </p>
+        ${upgradeUrl ? `
+        <a href="${upgradeUrl}" style="color:#8B9D83;font-weight:600;text-decoration:none;">
+          Design the framed tribute &rarr;
+        </a>` : ''}
+      </div>` : '';
+
+  const html = wrapHtml(`
+    <div style="background:#fff;border-radius:12px;padding:32px;margin-bottom:24px;">
+      <h1 style="font-family:Georgia,serif;font-size:1.6rem;font-weight:400;color:#2C2C2C;text-align:center;margin:0 0 8px;">
+        Their tribute is ready
+      </h1>
+      <p style="text-align:center;color:#9B9590;margin:0 0 24px;">
+        Order ${shortId} &middot; ${formatPrice(totalCents)}
+      </p>
+
+      <p style="color:#2C2C2C;line-height:1.6;margin-bottom:16px;">
+        A real person reviewed every word, and your keepsake is ready to download. This is the
+        same high-resolution file a print shop would use &ndash; exactly the tribute you approved.
+      </p>
+
+      <div style="text-align:center;margin:24px 0 16px;">
+        <a href="${downloadUrl}"
+           style="display:inline-block;background:#8B9D83;color:#fff;text-decoration:none;padding:14px 40px;border-radius:8px;font-weight:600;font-size:1rem;">
+          Download your tribute
+        </a>
+      </div>
+
+      <p style="color:#2C2C2C;line-height:1.6;margin-bottom:8px;">
+        It prints beautifully up to 11&times;14 at any print shop or home printer. Save the file
+        somewhere safe &ndash; the download link stays active for 90 days.
+      </p>
+
+      ${creditBlock}
+      ${statusPageUrl ? `
+      <p style="text-align:center;color:#9B9590;font-size:0.85rem;margin-top:24px;">
+        You can <a href="${statusPageUrl}" style="color:#8B9D83;">view your order</a> anytime.
+      </p>` : ''}
+    </div>
+  `);
+
+  return send(to, `Their tribute is ready – Order ${shortId}`, html);
+}
+
+/**
+ * Email a new order to the partner print shop.
  * Includes the print file (attached when under 20MB, always linked),
  * order specs, shipping address, and a tokenized admin link for
  * marking the order shipped.
@@ -353,11 +447,11 @@ async function sendPartnerOrderEmail(order, { printFileUrl, printFilePath, admin
   const html = wrapHtml(`
     <div style="background:#fff;border-radius:12px;padding:32px;">
       <h1 style="font-family:Georgia,serif;font-size:1.4rem;font-weight:400;color:#2C2C2C;margin:0 0 16px;">
-        New UV print order — ${sid}
+        New print order — ${sid}
       </h1>
 
       <p style="color:#2C2C2C;line-height:1.8;margin:0 0 16px;">
-        <strong>Product:</strong> ${sizeLabel} framed tribute, UV-printed (mat + bevel printed in-image, full bleed)<br>
+        <strong>Product:</strong> ${sizeLabel} framed tribute, archival print (border + bevel printed in-image, full bleed)<br>
         <strong>Orientation:</strong> ${orientation}<br>
         <strong>Print file:</strong> 300 DPI JPEG${attachments.length ? ' (attached)' : ''} — <a href="${printFileUrl}" style="color:#8B9D83;">download</a>
       </p>
@@ -389,7 +483,7 @@ async function sendPartnerOrderEmail(order, { printFileUrl, printFilePath, admin
   `);
 
   const cc = ADMIN_EMAIL && ADMIN_EMAIL !== partnerEmail ? { cc: ADMIN_EMAIL } : {};
-  return send(partnerEmail, `New UV print order — ${sid} (${sizeLabel} ${orientation})`, html, { attachments, ...cc });
+  return send(partnerEmail, `New print order — ${sid} (${sizeLabel} ${orientation})`, html, { attachments, ...cc });
 }
 
 /**
@@ -431,11 +525,13 @@ async function sendShippedEmail(to, orderData, tracking, statusPageUrl) {
 }
 
 module.exports = {
+  sendAdminAlert,
   sendOrderConfirmation,
   sendProofEmail,
   sendReviewRequest,
   sendChangeRequestNotification,
   sendApprovalConfirmation,
+  sendDigitalDeliveryEmail,
   sendPartnerOrderEmail,
   sendShippedEmail,
 };

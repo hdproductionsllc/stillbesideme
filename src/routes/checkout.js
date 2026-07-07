@@ -78,11 +78,16 @@ router.post('/checkout', async (req, res) => {
       return res.status(400).json({ error: 'Please generate or select a poem before purchasing.' });
     }
 
+    // A frame only applies to framed products. Digital keepsakes and print-only
+    // SKUs have no frame, so they never resolve a frame or take a frame upcharge
+    // (the customizer posts frameChoice regardless of the chosen rung, so
+    // guarding here prevents charging for a frame the customer never receives).
+    const isFramed = typeof sku === 'string' && sku.startsWith('framed-');
     // Resolve the chosen frame + its upcharge from the template (never trust
     // the client's price). Unknown/absent frame falls back to the default.
     let safeFrame = null;
     let frameUpcharge = 0;
-    if (template.frameOptions && Array.isArray(template.frameOptions.groups)) {
+    if (isFramed && template.frameOptions && Array.isArray(template.frameOptions.groups)) {
       for (const group of template.frameOptions.groups) {
         const match = (group.choices || []).find(c => c.id === frameChoice);
         if (match) { safeFrame = match.id; frameUpcharge = group.upchargeCents || 0; break; }
@@ -120,23 +125,36 @@ router.post('/checkout', async (req, res) => {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3001}`;
 
-    const session = await stripe.checkout.sessions.create({
+    // Digital SKUs have nothing to ship, so they skip the shipping address
+    // step and free-shipping line entirely. Everything else is identical.
+    const isDigital = product.fulfillment === 'digital';
+
+    const sessionParams = {
       mode: 'payment',
       line_items: [{
         price_data: {
           currency: 'usd',
           product_data: {
             name: `${template.name} – ${product.label}`,
-            description: 'Personalized memorial wall art, museum-quality framed print. Free shipping.',
+            description: isDigital
+              ? 'Personalized memorial keepsake, high-resolution printable file.'
+              : 'Personalized memorial wall art, museum-quality framed print. Free shipping.',
           },
           unit_amount: totalCents,
         },
         quantity: 1,
       }],
-      shipping_address_collection: {
+      metadata: { orderId },
+      allow_promotion_codes: true,
+      success_url: `${baseUrl}/order-confirmed?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/customize/${templateId}`,
+    };
+
+    if (!isDigital) {
+      sessionParams.shipping_address_collection = {
         allowed_countries: ['US'],
-      },
-      shipping_options: [{
+      };
+      sessionParams.shipping_options = [{
         shipping_rate_data: {
           type: 'fixed_amount',
           fixed_amount: { amount: 0, currency: 'usd' },
@@ -146,12 +164,10 @@ router.post('/checkout', async (req, res) => {
             maximum: { unit: 'business_day', value: 10 },
           },
         },
-      }],
-      metadata: { orderId },
-      allow_promotion_codes: true,
-      success_url: `${baseUrl}/order-confirmed?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/customize/${templateId}`,
-    });
+      }];
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     // Save Stripe session ID on order
     db.run(

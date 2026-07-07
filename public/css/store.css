@@ -533,6 +533,16 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
   line-height: 1.15;
 }
 
+.hero-eyebrow {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-warm);
+  margin-bottom: var(--space-md);
+}
+
 .hero-sub {
   font-family: var(--font-display);
   font-size: clamp(1rem, 2vw, 1.2rem);
@@ -1906,6 +1916,139 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
     max-width: 100%;
   }
   .sympathy-results {
+    max-width: 100%;
+  }
+}
+
+/* ── Pet Memorial Poem Generator ─────────────────────────────── */
+.poem-format-toggle {
+  display: flex;
+  gap: var(--space-md);
+}
+
+.poem-format-option {
+  flex: 1;
+  display: block;
+  cursor: pointer;
+  margin-bottom: 0 !important;
+}
+
+.poem-format-option input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.poem-format-option span {
+  display: block;
+  text-align: center;
+  padding: 0.75rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  color: var(--color-primary);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.poem-format-option span small {
+  display: block;
+  font-weight: 400;
+  font-size: 0.82rem;
+  color: var(--color-muted);
+  margin-top: 2px;
+}
+
+.poem-format-option input:checked + span {
+  border-color: var(--color-warm);
+  background: rgba(196, 168, 130, 0.12);
+}
+
+.poem-format-option input:focus-visible + span {
+  outline: 2px solid var(--color-warm);
+  outline-offset: 2px;
+}
+
+.poem-results {
+  max-width: 640px;
+  margin: var(--space-2xl) auto 0;
+}
+
+.poem-result-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: var(--space-2xl) var(--space-xl);
+  text-align: center;
+}
+
+.poem-result-text {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  line-height: 1.85;
+  color: var(--color-primary);
+  white-space: pre-wrap;
+  margin: 0 0 var(--space-xl);
+}
+
+.poem-result-actions {
+  display: flex;
+  gap: var(--space-md);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.poem-result-actions .btn {
+  display: inline-block;
+  width: auto;
+  margin-top: 0;
+  cursor: pointer;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+}
+
+.poem-result-cta {
+  text-align: center;
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-2xl);
+  border-top: 1px solid var(--color-border);
+}
+
+.poem-result-cta h3 {
+  margin-bottom: var(--space-sm);
+  color: var(--color-primary);
+}
+
+.poem-result-cta p {
+  color: var(--color-muted);
+  max-width: 500px;
+  margin: 0 auto var(--space-lg);
+  line-height: 1.6;
+}
+
+.poem-result-downsell {
+  margin: var(--space-md) auto 0;
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+.poem-result-downsell a {
+  color: var(--color-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.poem-result-downsell a:hover {
+  color: var(--color-primary);
+}
+
+@media (max-width: 768px) {
+  .poem-results {
     max-width: 100%;
   }
 }

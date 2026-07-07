@@ -9,7 +9,33 @@
  */
 
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const router = express.Router();
+
+const TEMPLATES_DIR = path.join(__dirname, '..', 'data', 'templates');
+const templateCache = {};
+
+/** Load a template by ID (cached) — mirrors checkout.js / adminReview.js. */
+function loadTemplate(templateId) {
+  if (templateCache[templateId]) return templateCache[templateId];
+  const filePath = path.join(TEMPLATES_DIR, `${templateId}.json`);
+  if (!fs.existsSync(filePath)) return null;
+  templateCache[templateId] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  return templateCache[templateId];
+}
+
+/**
+ * Is this a Digital Keepsake order? Fulfillment lives on the SKU's template
+ * entry — the only trusted source. Digital orders show a digital timeline
+ * (confirmed → reviewed → delivered) and surface a download link when delivered.
+ */
+function isDigitalOrder(order) {
+  const template = loadTemplate(order.template_id);
+  if (!template || !Array.isArray(template.printProducts)) return false;
+  const product = template.printProducts.find(p => p.sku === order.product_sku);
+  return !!product && product.fulfillment === 'digital';
+}
 
 function shortId(orderId) {
   return orderId.substring(0, 8).toUpperCase();
@@ -115,6 +141,65 @@ function buildTimeline(order, events) {
 }
 
 /**
+ * Digital Keepsake timeline: confirmed → reviewed → delivered. No shipping.
+ * The review step reflects the mandatory human gate ("reviewed by a real
+ * person"); delivery surfaces the download link on the page.
+ */
+function buildDigitalTimeline(order, events) {
+  const byType = {};
+  for (const e of events) {
+    if (!byType[e.event_type]) byType[e.event_type] = e;
+  }
+
+  const orderPlacedAt = byType.order_created?.created_at || order.created_at;
+  const paymentAt = byType.payment_confirmed?.created_at;
+  const deliveredAt = byType.digital_delivered?.created_at || order.proof_approved_at;
+  const isDelivered = order.status === 'delivered';
+  const awaitingReview = order.status === 'awaiting_review' || order.status === 'change_requested';
+
+  const milestones = [
+    {
+      key: 'confirmed',
+      label: 'Order confirmed',
+      detail: order.status === 'pending_payment'
+        ? 'Waiting for payment to confirm.'
+        : 'Thank you. Your tribute is in the queue for review.',
+      at: paymentAt || orderPlacedAt,
+      state: order.status === 'pending_payment' ? 'current' : 'done',
+    },
+    {
+      key: 'reviewed',
+      label: 'Reviewed by a real person',
+      detail: isDelivered
+        ? 'A member of our team reviewed your tribute by hand.'
+        : awaitingReview
+          ? 'A real person is reviewing your tribute now. This usually takes a few hours.'
+          : 'Your tribute will be reviewed by a real person before it\'s sent.',
+      at: isDelivered ? deliveredAt : null,
+      state: isDelivered ? 'done' : (awaitingReview ? 'current' : 'pending'),
+    },
+    {
+      key: 'delivered',
+      label: 'Ready in your inbox',
+      detail: isDelivered
+        ? 'Your high-resolution file is ready to download below. We also emailed you the link.'
+        : 'We\'ll email your download link as soon as your tribute is ready.',
+      at: isDelivered ? deliveredAt : null,
+      state: isDelivered ? 'done' : 'pending',
+    },
+  ];
+
+  if (order.status === 'cancelled') {
+    for (let i = 1; i < milestones.length; i++) {
+      milestones[i].state = 'cancelled';
+      milestones[i].detail = 'This order was cancelled.';
+    }
+  }
+
+  return milestones;
+}
+
+/**
  * GET /api/orders/status/:token
  * Returns full status payload — designed to feed the order status page.
  */
@@ -138,28 +223,34 @@ router.get('/status/:token', (req, res) => {
 
   const shipping = order.shipping_json ? JSON.parse(order.shipping_json) : null;
   const tracking = trackingForOrder(db, order);
+  const digital = isDigitalOrder(order);
+  const downloadUrl = (digital && order.status === 'delivered' && order.print_file_url && order.proof_token)
+    ? `/download/${order.proof_token}`
+    : null;
 
   res.json({
     orderId: order.id,
     shortId: shortId(order.id),
     status: order.status,
-    statusLabel: humanStatus(order.status),
+    statusLabel: humanStatus(order.status, digital),
     templateId: order.template_id,
     sku: order.product_sku,
     skuLabel: formatSku(order.product_sku),
+    digital,
+    downloadUrl,
     totalCents: order.total_cents,
     email: order.email ? maskEmail(order.email) : null,
     proofUrl: order.proof_url,
     proofToken: order.proof_token,
-    shipping: shipping ? {
+    shipping: digital || !shipping ? null : {
       city: shipping.city,
       state: shipping.state,
       country: shipping.country,
-    } : null,
-    tracking,
+    },
+    tracking: digital ? null : tracking,
     createdAt: order.created_at,
     updatedAt: order.updated_at,
-    timeline: buildTimeline(order, events),
+    timeline: digital ? buildDigitalTimeline(order, events) : buildTimeline(order, events),
   });
 });
 
@@ -193,7 +284,17 @@ router.get('/lookup', (req, res) => {
   res.json({ token: order.proof_token });
 });
 
-function humanStatus(status) {
+function humanStatus(status, digital) {
+  if (digital) {
+    return {
+      draft: 'Draft',
+      pending_payment: 'Awaiting payment',
+      submitted: 'Submitted',
+      awaiting_review: 'Being reviewed',
+      delivered: 'Delivered to your inbox',
+      cancelled: 'Cancelled',
+    }[status] || status;
+  }
   return {
     draft: 'Draft',
     pending_payment: 'Awaiting payment',
@@ -211,9 +312,14 @@ function humanStatus(status) {
 
 function formatSku(sku) {
   if (!sku) return '';
-  // framed-11x14 → Framed 11 x 14"
+  // framed-11x14 → Framed 11×14"
   const m = sku.match(/framed-(\d+)x(\d+)/);
   if (m) return `Framed ${m[1]}×${m[2]}"`;
+  // digital-11x14 → Digital Keepsake
+  if (/^digital-/.test(sku)) return 'Digital Keepsake';
+  // print-11x14 → Print only 11×14"
+  const p = sku.match(/print-(\d+)x(\d+)/);
+  if (p) return `Print only ${p[1]}×${p[2]}"`;
   return sku;
 }
 

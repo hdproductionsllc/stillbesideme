@@ -55,7 +55,33 @@ const LUMA_CONFIG = {
     95,   // Backing: Kraft Paper
     148,  // Print Mounting: Dry Mounted to Foam Core
   ],
+
+  // Print-only (unframed) product — the SAME archival matte fine art paper as
+  // the framed piece, sold bare for the customer's own frame.
+  // subcategory 103001 = "Archival Matte Fine Art Paper" (its own product line,
+  // NOT a frame subcategory). It carries the print itself, so the frame-category
+  // sharedOptions above (No Mat, Glazing, Hanging Wire, Kraft Backing, Foam
+  // Mounting) do NOT exist here and Luma rejects them. The only group this
+  // subcategory needs is the print bleed.
+  printOnly: {
+    subcategoryId: 103001,
+    // Bleed Size: 0.25in. The border art is printed full-bleed into the image
+    // (same 300 DPI file the framed pipeline uses), so 0.25in keeps the safe
+    // margins the render already assumes.
+    options: [
+      36,   // Bleed Size: 0.25in
+    ],
+  },
 };
+
+/**
+ * True when the SKU is an unframed print-only product (prefix "print-").
+ * Print-only orders route to a fine-art-paper subcategory with its own option
+ * set, never the frame subcategory + frame options.
+ */
+function isPrintOnlySku(sku) {
+  return typeof sku === 'string' && sku.startsWith('print-');
+}
 
 /**
  * Build Basic auth header from API key + secret.
@@ -267,11 +293,21 @@ async function placeOrder(orderId, db) {
   const firstName = nameParts[0] || '';
   const lastName = nameParts.slice(1).join(' ') || '';
 
+  // Print-only orders ship on bare fine-art paper (no frame). They route to the
+  // dedicated paper subcategory with only its valid options (bleed); framed
+  // orders route to the frame subcategory + frame options as before.
+  const printOnly = isPrintOnlySku(sku);
+
   // Resolve frame via subcategory (Luma bakes frame profile+color into subcategory).
   // Prefer the customer's chosen frame; styleVariant kept only for order-item options.
   const styleVariant = fields.style || 'classic-dark';
   const frameId = fields.frameChoice || fields.frame || null;
-  const subcategoryId = resolveFrameSubcategory(order.template_id, frameId);
+  const subcategoryId = printOnly
+    ? LUMA_CONFIG.printOnly.subcategoryId
+    : resolveFrameSubcategory(order.template_id, frameId);
+  const orderItemOptions = printOnly
+    ? LUMA_CONFIG.printOnly.options.map(id => ({ optionId: id }))
+    : buildOrderItemOptions(styleVariant);
 
   // Build Luma order payload
   const payload = {
@@ -298,7 +334,7 @@ async function placeOrder(orderId, db) {
       file: {
         imageUrl,
       },
-      orderItemOptions: buildOrderItemOptions(styleVariant),
+      orderItemOptions,
     }],
   };
 

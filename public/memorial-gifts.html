@@ -6,8 +6,9 @@
   <!-- Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-CM9DENCN96"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-CM9DENCN96');</script>
-  <!-- Meta Pixel (activate by setting META_PIXEL_ID) -->
-  <script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');if(typeof META_PIXEL_ID!=='undefined'){fbq('init',META_PIXEL_ID);fbq('track','PageView');}</script>
+  <script src="/js/env.js"></script>
+  <!-- Meta Pixel (config from /js/env.js; inert until metaPixelId is set) -->
+  <script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');if(window.SBM_ENV&&window.SBM_ENV.metaPixelId){fbq('init',window.SBM_ENV.metaPixelId);fbq('track','PageView');}</script>
   <title>Personalized Memorial Gifts – A Poem for the Pet You Loved | Still Beside Me</title>
   <meta name="description" content="A personalized poem written from your memories of the pet you lost, printed beside their photo, with their name and the years you shared, in an elegant dark wood frame. Four sizes from $79.">
   <link rel="canonical" href="https://stillbesideme.com/memorial-gifts">
@@ -265,20 +266,24 @@
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════
-       4. TESTIMONIALS &ndash; Pet memorial focused
+       4. OUR PROMISE &ndash; honest trust block (no fabricated reviews)
        ═══════════════════════════════════════════════════════════ -->
   <section class="social-proof">
     <div class="container">
+      <p class="proof-count">Our promise to you</p>
+      <p class="proof-subline">A tribute like this has to be right. Here is how we make sure it is.</p>
       <div class="testimonials">
-        <div class="testimonial fade-in">
-          <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-          <blockquote>"We lost our lab Max after fourteen years. The poem mentioned the way he waited at the front window &ndash; something I'd written in two short lines on the form. My husband never cries, and he cried. It hangs in the entryway where Max used to wait."</blockquote>
-          <cite>&ndash; Rachel T., honoring her dog Max</cite>
+        <div class="testimonial benefit-card fade-in">
+          <h3>You approve every word</h3>
+          <p>The poem is written from your memories of them. You see the finished design first, and nothing prints until you say it is right.</p>
         </div>
-        <div class="testimonial fade-in">
-          <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-          <blockquote>"My best friend lost her golden retriever and I had no idea what to send. When she opened this and read the poem out loud to her kids, the whole room was in tears. It's been hanging in her hallway ever since."</blockquote>
-          <cite>&ndash; Jennifer M., sent as a gift</cite>
+        <div class="testimonial benefit-card fade-in">
+          <h3>A real person reviews your order</h3>
+          <p>Your photo and your proof are checked by human eyes, not just software. Your design proof arrives within 24 hours.</p>
+        </div>
+        <div class="testimonial benefit-card fade-in">
+          <h3>Guaranteed from start to finish</h3>
+          <p>Made to order in the USA. Full refund any time before you approve. Free replacement if it ever arrives damaged.</p>
         </div>
       </div>
     </div>

@@ -40,6 +40,15 @@
     <div id="loading" class="admin-card">Loading order…</div>
     <div id="content" style="display:none">
       <div class="admin-card" id="order-card"></div>
+      <div class="admin-card admin-form" id="resubmit-card" style="display:none">
+        <h2>Resubmit fulfillment</h2>
+        <p style="font-size:0.9rem;color:#6b6359;margin:0;">
+          This order is approved but was not accepted by the print provider.
+          Resubmitting sends it again. Nothing happens if it already went through.
+        </p>
+        <button class="admin-btn" id="resubmit-btn">Resubmit fulfillment</button>
+        <div class="admin-msg" id="resubmit-msg"></div>
+      </div>
       <div class="admin-card admin-form" id="ship-card">
         <h2>Mark shipped</h2>
         <label for="tracking-number">Tracking number *</label>
@@ -103,7 +112,33 @@
           document.getElementById('tracking-carrier').value = o.tracking.carrier || '';
           document.getElementById('tracking-url').value = o.tracking.url || '';
         }
+
+        // Resubmit only applies to orders stuck at proof_approved
+        // (submission failed, so they never reached in_production).
+        document.getElementById('resubmit-card').style.display =
+          o.status === 'proof_approved' ? '' : 'none';
       }
+
+      document.getElementById('resubmit-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('resubmit-btn');
+        const msg = document.getElementById('resubmit-msg');
+
+        btn.disabled = true;
+        msg.textContent = '';
+
+        try {
+          const res = await fetch(`/api/admin/order/${token}/resubmit`, { method: 'POST' });
+          const data = await res.json();
+          msg.className = 'admin-msg ' + (res.ok ? 'ok' : 'err');
+          msg.textContent = res.ok ? data.message : (data.error || 'Something went wrong.');
+          if (res.ok) load();
+        } catch (e) {
+          msg.className = 'admin-msg err';
+          msg.textContent = 'Could not reach the server. Please try again.';
+        }
+
+        btn.disabled = false;
+      });
 
       document.getElementById('ship-btn').addEventListener('click', async () => {
         const btn = document.getElementById('ship-btn');

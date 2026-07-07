@@ -71,8 +71,11 @@ async function handleCheckoutCompleted(session, db) {
     return;
   }
 
-  // Idempotency – don't process twice
-  if (['awaiting_review', 'proof_ready', 'proof_approved', 'change_requested', 'in_production', 'shipped'].includes(order.status)) {
+  // Idempotency – don't process twice. Includes the terminal states
+  // (delivered/cancelled) so a duplicate checkout.session.completed after a
+  // digital order is delivered can't reset it and regenerate the proof_token
+  // that the customer's download link is keyed on.
+  if (['awaiting_review', 'proof_ready', 'proof_approved', 'change_requested', 'in_production', 'shipped', 'delivered', 'cancelled'].includes(order.status)) {
     console.log(`Stripe webhook: order ${orderId} already processed (status: ${order.status})`);
     return;
   }
@@ -107,7 +110,13 @@ async function handleCheckoutCompleted(session, db) {
 
   // Update order with payment + shipping info, set to awaiting_review:
   // a human approves every proof before the customer sees it.
-  const provider = process.env.FULFILLMENT_PROVIDER || 'whcc';
+  // Luma is the primary provider — default to it when the env var is unset
+  // (WHCC creds are broken; stamping 'whcc' here would poison the order).
+  let provider = process.env.FULFILLMENT_PROVIDER;
+  if (!provider) {
+    console.warn(`Stripe webhook: FULFILLMENT_PROVIDER not set — defaulting order ${orderId} to 'luma'`);
+    provider = 'luma';
+  }
   db.run(
     `UPDATE orders SET
        status = 'awaiting_review',
@@ -193,6 +202,21 @@ async function handleCheckoutCompleted(session, db) {
       `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
       [orderId, 'proof_generation_failed', JSON.stringify({ error: err.message })]
     );
+
+    // Alert the admin — this order is paid and silently stalled otherwise
+    try {
+      const shortId = orderId.substring(0, 8).toUpperCase();
+      await emailService.sendAdminAlert(
+        `Order ${shortId} stalled: proof generation failed`,
+        `Order ${shortId} is paid but its proof could not be generated.\n\n` +
+        `Order ID: ${orderId}\n` +
+        `Step: proof generation (Stripe webhook)\n` +
+        `Error: ${err.message}\n\n` +
+        `Review page: ${baseUrl}/admin/review/${adminToken}`
+      );
+    } catch (alertErr) {
+      console.error(`Failed to send admin alert for order ${orderId}:`, alertErr.message);
+    }
   }
 }
 

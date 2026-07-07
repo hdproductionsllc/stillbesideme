@@ -18,10 +18,37 @@
  */
 
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const router = express.Router();
 const emailService = require('../services/emailService');
 
 const REVIEWABLE_STATUSES = ['awaiting_review', 'change_requested'];
+
+const TEMPLATES_DIR = path.join(__dirname, '..', 'data', 'templates');
+const templateCache = {};
+
+/** Load a template by ID (cached after first read) — mirrors checkout.js. */
+function loadTemplate(templateId) {
+  if (templateCache[templateId]) return templateCache[templateId];
+  const filePath = path.join(TEMPLATES_DIR, `${templateId}.json`);
+  if (!fs.existsSync(filePath)) return null;
+  templateCache[templateId] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  return templateCache[templateId];
+}
+
+/**
+ * Is this order a Digital Keepsake? The fulfillment type lives on the SKU's
+ * template entry (never trust anything else). Digital orders skip the customer
+ * proof round entirely — the customer already approved every word in the
+ * customizer, so "approve" delivers the finished file instead of a proof.
+ */
+function isDigitalOrder(order) {
+  const template = loadTemplate(order.template_id);
+  if (!template || !Array.isArray(template.printProducts)) return false;
+  const product = template.printProducts.find(p => p.sku === order.product_sku);
+  return !!product && product.fulfillment === 'digital';
+}
 
 function findOrderByAdminToken(db, token) {
   if (!token || token.length < 8) return null;
@@ -114,6 +141,12 @@ router.post('/review/:token/approve', async (req, res) => {
     return res.status(404).json({ error: 'Order not found' });
   }
 
+  // Digital Keepsake: "approve" means deliver the finished file, not send a
+  // proof. No customer proof round — the delivered file equals the preview.
+  if (isDigitalOrder(order)) {
+    return deliverDigitalOrder(req, res, db, order);
+  }
+
   const alreadySent = order.status === 'proof_ready';
   if (!REVIEWABLE_STATUSES.includes(order.status) && !alreadySent) {
     return res.status(400).json({ error: `Order is ${order.status.replace(/_/g, ' ')} — nothing to approve` });
@@ -167,5 +200,200 @@ router.post('/review/:token/approve', async (req, res) => {
   console.log(`Order ${order.id}: review approved — proof emailed to ${order.email}`);
   res.json({ success: true, message: 'Approved — proof emailed to the customer.' });
 });
+
+/**
+ * Deliver a Digital Keepsake order (fulfillment:"digital").
+ *
+ * Unlike the framed flow, approval does NOT send a proof — it delivers the
+ * finished, high-resolution file the customer already approved word-for-word
+ * in the customizer. Steps: render the same 300 DPI print file the framed
+ * 11x14 uses (stored on the /data volume via printRenderer's OUTPUT_DIR),
+ * mint a one-time $19.95 upgrade credit, email the tokenized download link,
+ * then mark the order `delivered`.
+ *
+ * Idempotency: the order is flipped to `delivered` LAST, so a mid-way failure
+ * lets the admin retry safely. Rendering overwrites the same file; the upgrade
+ * credit is minted at most once (guarded by the `upgrade_credit_created`
+ * event); a re-approve of an already-delivered order is a no-op.
+ */
+async function deliverDigitalOrder(req, res, db, order) {
+  const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
+  const shortId = order.id.substring(0, 8).toUpperCase();
+
+  // Already delivered: never double-render, double-deliver, or double-mint.
+  // ?resend=1 re-sends the delivery email only, reusing the existing credit.
+  if (order.status === 'delivered') {
+    if (req.query.resend === '1') {
+      if (!order.email) {
+        return res.status(400).json({ error: 'Order has no customer email — cannot resend the delivery' });
+      }
+      try {
+        const promoCode = existingPromoCode(db, order.id);
+        await sendDigitalDelivery(order, baseUrl, promoCode);
+      } catch (err) {
+        console.error(`Failed to resend digital delivery for order ${order.id}:`, err.message);
+        return res.status(500).json({ error: 'Could not resend the delivery email. Check SMTP settings and try again.' });
+      }
+      return res.json({ success: true, message: 'Delivery email re-sent to the customer.' });
+    }
+    return res.json({ success: true, message: 'This keepsake has already been delivered to the customer.' });
+  }
+
+  if (!REVIEWABLE_STATUSES.includes(order.status)) {
+    return res.status(400).json({ error: `Order is ${order.status.replace(/_/g, ' ')} — nothing to deliver` });
+  }
+  if (!order.email) {
+    return res.status(400).json({ error: 'Order has no customer email — cannot deliver the keepsake' });
+  }
+
+  // 1. Render the final print file — same pipeline as the framed 11x14.
+  //    Idempotent: overwrites output/print-ready/{orderId}.jpg on retry.
+  const printRenderer = require('../services/printRenderer');
+  try {
+    const { printRelativeUrl } = await printRenderer.generatePrintFile(order);
+    db.run('UPDATE orders SET print_file_url = ?, updated_at = datetime(\'now\') WHERE id = ?',
+      [printRelativeUrl, order.id]);
+    order.print_file_url = printRelativeUrl;
+    console.log(`Digital keepsake rendered for order ${order.id}: ${printRelativeUrl}`);
+  } catch (err) {
+    console.error(`Failed to render digital keepsake for order ${order.id}:`, err.message);
+    db.run(
+      `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+      [order.id, 'print_render_failed', JSON.stringify({ error: err.message })]
+    );
+    try {
+      await emailService.sendAdminAlert(
+        `Order ${shortId} stalled: digital render failed`,
+        `Order ${shortId} was approved for delivery but the keepsake file could not be rendered.\n\n` +
+        `Order ID: ${order.id}\n` +
+        `Step: print render (digital delivery)\n` +
+        `Error: ${err.message}\n\n` +
+        `Review page: ${baseUrl}/admin/review/${order.admin_token}`
+      );
+    } catch (alertErr) {
+      console.error(`Failed to send admin alert for order ${order.id}:`, alertErr.message);
+    }
+    return res.status(500).json({ error: 'Failed to render the keepsake file. Our team has been notified.' });
+  }
+
+  // 2. Mint the one-time $19.95 upgrade credit (idempotent). Non-fatal: a
+  //    credit hiccup must not block delivery of a paid-for file.
+  let promoCode = null;
+  try {
+    promoCode = await ensureUpgradeCredit(db, order);
+  } catch (err) {
+    console.error(`Failed to create upgrade credit for order ${order.id}:`, err.message);
+    db.run(
+      `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+      [order.id, 'upgrade_credit_failed', JSON.stringify({ error: err.message })]
+    );
+  }
+
+  // 3. Send the delivery email with the tokenized download link + credit.
+  try {
+    await sendDigitalDelivery(order, baseUrl, promoCode);
+  } catch (err) {
+    console.error(`Failed to send digital delivery email for order ${order.id}:`, err.message);
+    return res.status(500).json({ error: 'Could not send the delivery email. Check SMTP settings and try again.' });
+  }
+
+  // 4. Mark delivered — LAST, so any failure above is safely retryable.
+  db.run(
+    `UPDATE orders SET
+       status = 'delivered',
+       reviewed_at = datetime('now'),
+       proof_approved_at = datetime('now'),
+       change_request_notes = NULL,
+       updated_at = datetime('now')
+     WHERE id = ?`,
+    [order.id]
+  );
+  db.run(
+    `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+    [order.id, 'review_approved', JSON.stringify({ fulfillment: 'digital' })]
+  );
+  db.run(
+    `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+    [order.id, 'digital_delivered', JSON.stringify({ email: order.email, promoCode: promoCode || null })]
+  );
+
+  console.log(`Order ${order.id}: digital keepsake delivered to ${order.email}`);
+  res.json({ success: true, message: 'Delivered — download link emailed to the customer.' });
+}
+
+/** Send (or resend) the digital delivery email for an order. */
+function sendDigitalDelivery(order, baseUrl, promoCode) {
+  return emailService.sendDigitalDeliveryEmail(
+    order.email,
+    { orderId: order.id, totalCents: order.total_cents },
+    {
+      downloadUrl: `${baseUrl}/download/${order.proof_token}`,
+      promoCode: promoCode || null,
+      upgradeUrl: `${baseUrl}/customize/${order.template_id}`,
+      statusPageUrl: order.proof_token ? `${baseUrl}/order/${order.proof_token}` : null,
+    }
+  );
+}
+
+/** The promo code already minted for this order, if any. */
+function existingPromoCode(db, orderId) {
+  const row = db.get(
+    `SELECT data_json FROM order_events WHERE order_id = ? AND event_type = 'upgrade_credit_created' ORDER BY created_at ASC LIMIT 1`,
+    [orderId]
+  );
+  if (!row) return null;
+  try { return JSON.parse(row.data_json).promoCode || null; } catch (e) { return null; }
+}
+
+/**
+ * Create the $19.95 upgrade credit for a delivered digital order — a Stripe
+ * coupon (amount_off, once, expires in 30 days) fronted by a single-use
+ * promotion code `UPGRADE-<shortId>`. `allow_promotion_codes` is already on in
+ * checkout, so the customer just types the code toward the framed tribute.
+ *
+ * Idempotent: if a credit was already minted for this order we reuse it rather
+ * than mint a second coupon. Returns the promo code string.
+ */
+async function ensureUpgradeCredit(db, order) {
+  const existing = existingPromoCode(db, order.id);
+  if (existing) return existing;
+
+  const shortId = order.id.substring(0, 8).toUpperCase();
+  const promoCodeStr = `UPGRADE-${shortId}`;
+  const redeemBy = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60; // 30 days
+
+  const Stripe = require('stripe');
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+  const coupon = await stripe.coupons.create({
+    amount_off: 1995,
+    currency: 'usd',
+    duration: 'once',
+    redeem_by: redeemBy,
+    name: `Digital keepsake credit for order ${shortId}`,
+    metadata: { orderId: order.id },
+  });
+
+  const promo = await stripe.promotionCodes.create({
+    coupon: coupon.id,
+    code: promoCodeStr,
+    max_redemptions: 1,
+    expires_at: redeemBy,
+    metadata: { orderId: order.id },
+  });
+
+  db.run(
+    `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+    [order.id, 'upgrade_credit_created', JSON.stringify({
+      couponId: coupon.id,
+      promoCode: promo.code,
+      amountOffCents: 1995,
+      redeemBy,
+    })]
+  );
+
+  console.log(`Order ${order.id}: upgrade credit ${promo.code} created (coupon ${coupon.id})`);
+  return promo.code;
+}
 
 module.exports = router;

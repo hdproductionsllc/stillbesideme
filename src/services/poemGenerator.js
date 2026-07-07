@@ -23,7 +23,7 @@ const MODEL = 'claude-fable-5';
 const FALLBACK_MODEL = 'claude-sonnet-4-6';
 const MAX_TOKENS = 1024;
 
-const SYSTEM_PROMPT = `You are a master elegist who writes brief, luminous memorial verse and letters. Your work is UV-printed onto a framed tribute that will hang on a family's wall for decades, so every word must earn its place.
+const SYSTEM_PROMPT = `You are a master elegist who writes brief, luminous memorial verse and letters. Your work is printed beside their photo in a framed archival print that will hang on a family's wall for decades, so every word must earn its place.
 
 Your craft principles:
 - Concrete detail over abstraction. One real remembered thing (a worn tennis ball, a spot of sun on the kitchen floor) moves people more than any general sentiment.

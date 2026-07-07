@@ -31,6 +31,37 @@ for (const dir of [DATA_DIR, SESSIONS_DIR, UPLOADS_DIR, OUTPUT_DIR]) {
   }
 }
 
+// --- Digital Keepsake helpers (mirror the loadTemplate pattern in
+// checkout.js / adminReview.js — fulfillment lives on the SKU's template entry,
+// which is the only trusted source of "is this a digital order").
+const TEMPLATES_DIR = path.join(__dirname, 'src', 'data', 'templates');
+const _templateCache = {};
+function loadTemplate(templateId) {
+  if (_templateCache[templateId]) return _templateCache[templateId];
+  const fp = path.join(TEMPLATES_DIR, `${templateId}.json`);
+  if (!fs.existsSync(fp)) return null;
+  _templateCache[templateId] = JSON.parse(fs.readFileSync(fp, 'utf-8'));
+  return _templateCache[templateId];
+}
+function isDigitalOrder(order) {
+  const t = loadTemplate(order.template_id);
+  if (!t || !Array.isArray(t.printProducts)) return false;
+  const p = t.printProducts.find(x => x.sku === order.product_sku);
+  return !!p && p.fulfillment === 'digital';
+}
+/** Build the attachment filename, e.g. "Banjo-tribute-11x14.jpg". */
+function downloadFilename(order) {
+  const t = loadTemplate(order.template_id);
+  const mapping = (t && t.tributeMapping) || {};
+  let fields = {};
+  try { fields = order.fields_json ? JSON.parse(order.fields_json) : {}; } catch (e) { /* ignore */ }
+  const rawName = (mapping.name && fields[mapping.name]) || '';
+  const safeName = String(rawName).replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'Pet';
+  const sizeMatch = String(order.product_sku || '').match(/(\d+x\d+)/);
+  const size = sizeMatch ? sizeMatch[1] : '11x14';
+  return `${safeName}-tribute-${size}.jpg`;
+}
+
 // Initialize database (creates tables via migrations)
 async function start() {
   const db = await require('./src/db/database').init();
@@ -156,6 +187,20 @@ async function start() {
   });
   // ── end temporary LFH block ───────────────────────────────────────────
 
+  // Client-side analytics config — /js/env.js exposes ONLY the public ad/pixel
+  // IDs that are actually set. Registered before express.static so it always
+  // wins over any static file of the same name. Always valid JS, even when
+  // nothing is configured.
+  app.get('/js/env.js', (req, res) => {
+    const env = {};
+    if (process.env.META_PIXEL_ID) env.metaPixelId = process.env.META_PIXEL_ID;
+    if (process.env.GOOGLE_ADS_ID) env.googleAdsId = process.env.GOOGLE_ADS_ID;
+    if (process.env.GOOGLE_ADS_CONVERSION_LABEL) env.googleAdsLabel = process.env.GOOGLE_ADS_CONVERSION_LABEL;
+    res.set('Content-Type', 'application/javascript');
+    res.set('Cache-Control', 'public, max-age=300');
+    res.send(`window.SBM_ENV=${JSON.stringify(env)};`);
+  });
+
   // Static files
   app.use(express.static(path.join(__dirname, 'public')));
 
@@ -224,6 +269,12 @@ async function start() {
   });
   app.get('/sympathy-message-helper', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'sympathy-message-helper.html'));
+  });
+  app.get('/pet-memorial-poem-generator', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'pet-memorial-poem-generator.html'));
+  });
+  app.get('/rainbow-bridge-poem-for-dogs', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'rainbow-bridge-poem-for-dogs.html'));
   });
 
   // Blog routes – clean URLs
@@ -450,6 +501,18 @@ async function start() {
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
+  <url>
+    <loc>${baseUrl}/pet-memorial-poem-generator</loc>
+    <lastmod>${lastmod('pet-memorial-poem-generator.html')}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/rainbow-bridge-poem-for-dogs</loc>
+    <lastmod>${lastmod('rainbow-bridge-poem-for-dogs.html')}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
 </urlset>`);
   });
 
@@ -479,6 +542,58 @@ async function start() {
   app.use('/api/proof', require('./src/routes/proofApproval'));
   app.get('/proof/:token', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'proof-approval.html'));
+  });
+
+  // Digital Keepsake download — same tokenization as /proof/:token (the
+  // proof_token doubles as the per-order download key). Serves the rendered
+  // 300 DPI file as an attachment. Valid only for delivered digital orders;
+  // the link politely expires 90 days after delivery.
+  app.get('/download/:token', (req, res) => {
+    const token = req.params.token;
+
+    const politeGone = (heading, message) => {
+      res.status(404).type('html').send(
+        '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">' +
+        '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+        '<title>Download unavailable – Still Beside Me</title>' +
+        '<style>body{font-family:Georgia,"Times New Roman",serif;max-width:34rem;margin:16vh auto;' +
+        'padding:0 1.5rem;color:#2b2b2b;line-height:1.6;text-align:center}h1{font-weight:400;font-size:1.6rem}' +
+        'a{color:#8a5a44}</style></head><body>' +
+        '<h1>' + heading + '</h1><p>' + message + '</p>' +
+        '<p>You can <a href="/order">look up your order</a> or <a href="/contact">contact us</a> ' +
+        'and we’ll re-send your file.</p></body></html>'
+      );
+    };
+
+    if (!token || token.length < 8) {
+      return politeGone('We couldn’t find that download',
+        'This download link doesn’t look right.');
+    }
+
+    const order = db.get('SELECT * FROM orders WHERE proof_token = ?', [token]);
+    if (!order || order.status !== 'delivered' || !isDigitalOrder(order) || !order.print_file_url) {
+      return politeGone('We couldn’t find that download',
+        'This link isn’t ready yet, or it belongs to a different kind of order.');
+    }
+
+    // Politely expire 90 days after delivery (proof_approved_at is set at delivery).
+    const deliveredAt = order.proof_approved_at || order.updated_at;
+    const deliveredMs = deliveredAt
+      ? new Date(deliveredAt.includes('T') ? deliveredAt : deliveredAt.replace(' ', 'T') + 'Z').getTime()
+      : NaN;
+    if (!Number.isNaN(deliveredMs) && (Date.now() - deliveredMs) / 86400000 > 90) {
+      return politeGone('This download link has expired',
+        'Download links stay active for 90 days. We keep your file safe on our end.');
+    }
+
+    // Resolve the file from print_file_url (/output/... maps to OUTPUT_DIR).
+    const filePath = path.join(OUTPUT_DIR, order.print_file_url.replace(/^\/output\//, ''));
+    if (!fs.existsSync(filePath)) {
+      return politeGone('We couldn’t find that download',
+        'The file isn’t where we expected it to be.');
+    }
+
+    res.download(filePath, downloadFilename(order));
   });
 
   // Partner fulfillment admin (tokenized link from the fulfillment email)

@@ -370,6 +370,9 @@
 
       // Action buttons depending on status
       const actions = [];
+      if (data.downloadUrl) {
+        actions.push('<a class="btn btn-warm" href="' + escapeHtml(data.downloadUrl) + '">Download your tribute</a>');
+      }
       if (data.status === 'proof_ready' || data.status === 'change_requested') {
         actions.push('<a class="btn btn-warm" href="/proof/' + encodeURIComponent(data.proofToken) + '">Review &amp; approve your proof</a>');
       }
