@@ -201,6 +201,31 @@ function resolveSubcategoryId(styleVariant) {
 }
 
 /**
+ * Resolve the Luma subcategoryId from the customer's chosen frame.
+ * The frame (black/white/oak/natural/signature) IS a Luma subcategory —
+ * each frame profile+color is its own subcategory. Options are shared and
+ * validated across all offered frames (No Mat, Archival Matte, Acrylic,
+ * Wire, Kraft, Foam mount). Falls back to the template default, then to
+ * the legacy black frame, so an order can never be left without a frame.
+ */
+function resolveFrameSubcategory(templateId, frameId) {
+  try {
+    const tmpl = require('./tributeRenderer').loadTemplate(templateId);
+    const fo = tmpl && tmpl.frameOptions;
+    if (fo && Array.isArray(fo.groups)) {
+      const all = fo.groups.reduce((acc, g) => acc.concat(g.choices || []), []);
+      const chosen = all.find(c => c.id === frameId)
+                  || all.find(c => c.id === fo.default)
+                  || all[0];
+      if (chosen && chosen.luma) return chosen.luma;
+    }
+  } catch (e) {
+    console.warn(`resolveFrameSubcategory fell back for template ${templateId}/${frameId}: ${e.message}`);
+  }
+  return LUMA_CONFIG.subcategories['classic-dark'];
+}
+
+/**
  * High-level: place an order with Luma from our order data.
  * Mirrors whccOrderApi.placeOrder() flow.
  */
@@ -242,9 +267,11 @@ async function placeOrder(orderId, db) {
   const firstName = nameParts[0] || '';
   const lastName = nameParts.slice(1).join(' ') || '';
 
-  // Resolve frame color via subcategory (Luma bakes frame into subcategory)
+  // Resolve frame via subcategory (Luma bakes frame profile+color into subcategory).
+  // Prefer the customer's chosen frame; styleVariant kept only for order-item options.
   const styleVariant = fields.style || 'classic-dark';
-  const subcategoryId = resolveSubcategoryId(styleVariant);
+  const frameId = fields.frameChoice || fields.frame || null;
+  const subcategoryId = resolveFrameSubcategory(order.template_id, frameId);
 
   // Build Luma order payload
   const payload = {

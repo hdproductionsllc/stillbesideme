@@ -32,6 +32,7 @@
   let activePoemIndex = -1;   // which version is showing
   let currentStyle = 'classic-dark';
   let currentLayout = 'side-by-side';
+  let currentFrame = null; // chosen frame id from template.frameOptions
   let orderType = 'self'; // 'self' or 'gift'
   let thirdPanelEnabled = false;
   let thirdPanelType = 'photo'; // 'photo' or 'text'
@@ -165,8 +166,9 @@
         PreviewRenderer.setColors(DEFAULT_AUTO_COLORS);
         PreviewRenderer.setPreviewPoem(SAMPLE_POEM);
         PreviewRenderer.setPreviewHeader('Banjo', '2014 – 2026');
-        buildSwatchRow();
       }
+      // Frame chooser (black/white/oak/natural + Signature upgrades).
+      if (template.frameOptions) buildFrameSelector();
 
       // Restore saved state
       restoreState();
@@ -376,16 +378,9 @@
         PreviewRenderer.setPhoto(panelId, data.thumbnailUrl, data.crop.position);
         showUploadPreview(slotId, data.thumbnailUrl, wrapper, null, data.quality);
 
-        // Auto-match frame colors to the uploaded photo
-        if (slotId === 'main' && template.colorMode === 'auto' && data.palette) {
-          paletteSwatches = data.palette.swatches || [];
-          autoColors = data.palette.auto || null;
-          activeSwatchIndex = -1;
-          frameOverride = false;
-          accentOverride = null;
-          if (autoColors) applyColors(autoColors);
-          buildSwatchRow();
-        }
+        // (Photo color-matching removed — the frame is the customer's choice,
+        // the tribute background stays an elegant dark. Frame selector is built
+        // once at init and is independent of the uploaded photo.)
 
         saveState();
       } else {
@@ -1472,6 +1467,63 @@
    * (when a photo is uploaded) plus always-available custom frame + engraving
    * color pickers.
    */
+  // ── Frame Selector ───────────────────────────────────────────
+
+  function getFrameDef(id) {
+    const fo = template.frameOptions;
+    if (!fo || !Array.isArray(fo.groups)) return null;
+    for (const g of fo.groups) {
+      const c = (g.choices || []).find(x => x.id === id);
+      if (c) return Object.assign({ tier: g.tier, upchargeCents: g.upchargeCents || 0 }, c);
+    }
+    return null;
+  }
+
+  function frameUpchargeCents() {
+    const def = getFrameDef(currentFrame);
+    return def ? def.upchargeCents : 0;
+  }
+
+  function selectFrame(id) {
+    const def = getFrameDef(id);
+    if (!def) return;
+    currentFrame = id;
+    PreviewRenderer.setFrame(def);
+    buildFrameSelector();
+    updatePurchaseButton();
+    saveState();
+  }
+
+  function buildFrameSelector() {
+    const container = document.getElementById('style-selector');
+    const fo = template.frameOptions;
+    if (!container || !fo || !Array.isArray(fo.groups)) return;
+
+    container.style.display = '';
+    container.className = 'frame-selector';
+    if (!currentFrame || !getFrameDef(currentFrame)) {
+      currentFrame = fo.default || (fo.groups[0].choices[0] && fo.groups[0].choices[0].id);
+    }
+
+    container.innerHTML = fo.groups.map(g => {
+      const up = g.upchargeCents ? ` <span class="frame-group-up">+$${(g.upchargeCents / 100).toFixed(0)}</span>` : '';
+      const chips = (g.choices || []).map(c => `
+        <button type="button" class="frame-chip${c.id === currentFrame ? ' active' : ''}" data-frame="${c.id}" title="${c.label}" aria-label="${c.label}">
+          <span class="frame-chip-sw" style="background:${c.swatch}"></span>
+          <span class="frame-chip-label">${c.label}</span>
+        </button>`).join('');
+      return `<div class="frame-group"><div class="frame-group-label">${g.label}${up}</div><div class="frame-chip-row">${chips}</div></div>`;
+    }).join('');
+
+    container.querySelectorAll('.frame-chip').forEach(chip => {
+      chip.addEventListener('click', () => selectFrame(chip.dataset.frame));
+    });
+
+    // Apply the current frame to the preview (idempotent).
+    const def = getFrameDef(currentFrame);
+    if (def) PreviewRenderer.setFrame(def);
+  }
+
   function buildSwatchRow() {
     const container = document.getElementById('style-selector');
     if (!container || template.colorMode !== 'auto') return;
@@ -1606,7 +1658,8 @@
     if (!btn) return;
     const product = getSelectedProduct();
     if (product) {
-      btn.textContent = `Purchase \u2013 $${(product.price / 100).toFixed(2)}`;
+      const total = product.price + frameUpchargeCents();
+      btn.textContent = `Purchase \u2013 $${(total / 100).toFixed(2)}`;
     }
   }
 
@@ -1645,6 +1698,7 @@
           orderType,
           colors: currentColors,
           frameIcon,
+          frameChoice: currentFrame,
         }),
       });
 
@@ -1691,6 +1745,7 @@
         frameOverride,
         accentOverride,
         frameIcon,
+        frameChoice: currentFrame,
         customRatios: PreviewRenderer.getCustomRatios(),
         selectedProduct: document.querySelector('.product-option.selected .product-option-label')?.textContent,
         selectedSku: document.querySelector('.product-option.selected')?.dataset?.sku,
@@ -1820,6 +1875,11 @@
       // Restore style (validate against current template variants)
       if (state.style && !(template.styleVariants && template.styleVariants[state.style])) {
         state.style = null;
+      }
+      if (state.frameChoice && getFrameDef(state.frameChoice)) {
+        currentFrame = state.frameChoice;
+        buildFrameSelector();
+        updatePurchaseButton();
       }
       if (state.style && state.style !== currentStyle) {
         setStyle(state.style);

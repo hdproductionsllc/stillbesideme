@@ -127,5 +127,33 @@
     { "sku": "framed-11x14", "label": "Framed 11×14\"", "price": 11900, "default": true, "badge": "Most Popular" },
     { "sku": "framed-16x20", "label": "Framed 16×20\"", "price": 16900 },
     { "sku": "framed-20x30", "label": "Framed 20×30\"", "price": 24900, "badge": "Statement Piece" }
-  ]
+  ],
+
+  "frameOptions": {
+    "default": "black",
+    "groups": [
+      {
+        "label": "Frame",
+        "tier": "included",
+        "upchargeCents": 0,
+        "choices": [
+          { "id": "black",   "label": "Black",        "luma": 105001, "faceIn": 0.875, "swatch": "#1c1c1c", "molding": "linear-gradient(145deg, #232323, #2e2e2e 15%, #101010 40%, #1c1c1c 70%, #0a0a0a)", "default": true },
+          { "id": "white",   "label": "White",        "luma": 105002, "faceIn": 0.875, "swatch": "#eeeae1", "molding": "linear-gradient(145deg, #fbf9f4, #ffffff 15%, #e4ded3 45%, #f0ebe2 70%, #d9d2c5)" },
+          { "id": "oak",     "label": "Oak",          "luma": 105003, "faceIn": 0.875, "swatch": "#c8a97e", "molding": "linear-gradient(145deg, #d8b988, #e6cfa3 15%, #b58e5f 45%, #cba97f 70%, #a97e50)" },
+          { "id": "natural", "label": "Natural Wood", "luma": 105008, "faceIn": 0.875, "swatch": "#b5895a", "molding": "linear-gradient(145deg, #c99a63, #d8ac74 15%, #a2703f 45%, #b98a52 70%, #8f6234)" }
+        ]
+      },
+      {
+        "label": "Signature frames",
+        "tier": "signature",
+        "upchargeCents": 6000,
+        "note": "Ornate solid-wood profiles",
+        "choices": [
+          { "id": "driftwood", "label": "Driftwood Gray",      "luma": 105018, "faceIn": 3.0,    "swatch": "#9b978e", "molding": "linear-gradient(145deg, #a8a49b, #b8b4ab 15%, #86827a 45%, #9b978e 70%, #6f6b63)" },
+          { "id": "pleinair",  "label": "Plein Air Espresso",  "luma": 105020, "faceIn": 2.5625, "swatch": "#4a3b2e", "molding": "linear-gradient(145deg, #5a4636, #6b5340 15%, #3a2c20 45%, #4a3b2e 70%, #2c2018)" },
+          { "id": "copper",    "label": "Vintage Copper",      "luma": 105021, "faceIn": 3.25,   "swatch": "#a56a3f", "molding": "linear-gradient(145deg, #c07d4c, #d18f5a 15%, #8a4f2c 45%, #a56a3f 70%, #6f3d20)" }
+        ]
+      }
+    ]
+  }
 }

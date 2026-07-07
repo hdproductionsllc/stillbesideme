@@ -169,6 +169,9 @@
   // Frame size from selected product SKU (e.g. [11, 14] for "framed-11x14")
   let frameDims = null;
 
+  // Chosen frame definition { id, faceIn, molding, swatch } from template.frameOptions
+  let currentFrame = null;
+
   // Custom fr ratios (user-dragged dividers): layoutKey -> { columns: [...], rows: [...] }
   const customRatios = {};
 
@@ -204,6 +207,7 @@
     getFrameIcon: () => frameIcon,
     setPreviewPoem,
     setPreviewHeader,
+    setFrame,
     setLayout,
     setFrameSize,
     getFields: () => ({ ...fields }),
@@ -363,7 +367,9 @@
       // Render the frame at true scale: the real frame face is FRAME_FACE_IN
       // wide, so its share of the preview width is face/(print + 2*face).
       // A fixed pixel width reads far too chunky on the larger print sizes.
-      var FRAME_FACE_IN = 1.25; // Luma "1.25w x 0.875h Black" (subcategory 105005)
+      // The chosen frame's real face width drives this so a thin 0.875" black
+      // and a 3.25" Vintage Copper look correctly different in the preview.
+      var FRAME_FACE_IN = (currentFrame && currentFrame.faceIn) || 0.875;
       var frameRoot = document.getElementById('frame-preview');
       if (frameRoot) {
         var facePct = (FRAME_FACE_IN / (w + 2 * FRAME_FACE_IN)) * 100;
@@ -576,6 +582,20 @@
   function setPreviewHeader(name, dates) {
     previewName = name || '';
     previewDates = dates || '';
+    queueRender();
+  }
+
+  // Apply the customer's chosen frame — molding color live on the border and
+  // real face width (via applyGridStyles) so the preview matches what ships.
+  function setFrame(frameDef) {
+    if (!frameDef) return;
+    currentFrame = frameDef;
+    const border = container && container.closest('.frame-preview')
+      ? container.closest('.frame-preview').querySelector('.frame-border')
+      : document.querySelector('#frame-preview .frame-border');
+    if (border && frameDef.molding) border.style.background = frameDef.molding;
+    // Recompute frame face width for the current size/layout.
+    applyGridStyles(currentLayout);
     queueRender();
   }
 

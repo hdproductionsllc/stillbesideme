@@ -37,7 +37,7 @@ router.post('/checkout', async (req, res) => {
   const db = req.app.locals.db;
 
   try {
-    const { templateId, sku, fields, poemText, style, layout, orderType, colors, frameIcon } = req.body;
+    const { templateId, sku, fields, poemText, style, layout, orderType, colors, frameIcon, frameChoice } = req.body;
     const safeFrameIcon = ['none', 'paw', 'heart'].includes(frameIcon) ? frameIcon : 'none';
 
     // Validate auto-matched colors (never trust client) — drop if malformed
@@ -78,9 +78,21 @@ router.post('/checkout', async (req, res) => {
       return res.status(400).json({ error: 'Please generate or select a poem before purchasing.' });
     }
 
+    // Resolve the chosen frame + its upcharge from the template (never trust
+    // the client's price). Unknown/absent frame falls back to the default.
+    let safeFrame = null;
+    let frameUpcharge = 0;
+    if (template.frameOptions && Array.isArray(template.frameOptions.groups)) {
+      for (const group of template.frameOptions.groups) {
+        const match = (group.choices || []).find(c => c.id === frameChoice);
+        if (match) { safeFrame = match.id; frameUpcharge = group.upchargeCents || 0; break; }
+      }
+      if (!safeFrame) safeFrame = template.frameOptions.default || null;
+    }
+
     // Create order
     const orderId = uuidv4();
-    const totalCents = product.price;
+    const totalCents = product.price + frameUpcharge;
 
     db.run(
       `INSERT INTO orders (id, session_id, status, template_id, product_sku, fields_json, photos_json, poem_text, total_cents)
@@ -90,7 +102,7 @@ router.post('/checkout', async (req, res) => {
         req.sessionID,
         templateId,
         sku,
-        JSON.stringify({ ...fields, style, layout, orderType, frameIcon: safeFrameIcon, ...(safeColors ? { colors: safeColors } : {}) }),
+        JSON.stringify({ ...fields, style, layout, orderType, frameIcon: safeFrameIcon, ...(safeFrame ? { frameChoice: safeFrame } : {}), ...(safeColors ? { colors: safeColors } : {}) }),
         JSON.stringify(photos),
         poemText.trim(),
         totalCents
