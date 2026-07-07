@@ -49,7 +49,7 @@ const LUMA_CONFIG = {
   // Mat Color is deliberately not listed — with "No Mat" there is no mat to color.
   sharedOptions: [
     64,   // Mat Size: No Mat (full-bleed — frame goes straight around the print)
-    78,   // Paper Type: Semi-Glossy Photo Paper
+    74,   // Paper Type: Archival Matte Fine Art Paper (David 2026-07-06: matches "archival" copy, no glare under acrylic)
     146,  // Glazing: Acrylic Glass
     83,   // Hanging Hardware: Hanging Wire installed on frame
     95,   // Backing: Kraft Paper
