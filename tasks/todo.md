@@ -2,6 +2,89 @@
 
 ---
 
+## Pass 9 — CEO conversion P0: measurable ads + trustworthy site (2026-07-06 late night, this session)
+
+Six-agent audit (funnel, persuasion/trust, ops/economics, competitors/ad-costs, SEO, live mobile UX). Funnel mechanics are good (one page, no account, 3 required inputs, Stripe-hosted checkout). The dead-in-the-water items before ad spend:
+
+1. **Conversion tracking is DEAD**: GA4 `purchase` never fires (`store.js` not loaded on `/order-confirmed`, and it sends no value anyway); Meta Pixel never initializes (`META_PIXEL_ID` never defined on any page); no Google Ads tag. Ad money would be unmeasurable.
+2. **Zero real product photos** — every "frame" is a CSS mockup + stock pets (only David can fix: photograph the dress-rehearsal print).
+3. **Testimonials look fabricated** (reused, unverifiable) — Meta ad-account-ban + FTC risk.
+4. **Broken/detour CTAs**: sympathy-gifts hero/nav → dead `#collections` anchor; all blog CTAs → `/#collections` detour.
+5. **Orphan human-memorial `.html` variants still served** (clean URLs 302 but `/loss-of-mother-gift.html` etc. bypass), contradicting pets-only + wrong price ($84.95).
+6. **Silent ops stalls**: no admin alert on proof-gen/print/submit failures, no retry endpoint; webhook default provider `whcc` (broken creds) vs proofApproval `luma`; stale "UV-printed" poem system prompt.
+
+NOTE: concurrent session owns customizer.js / preview.js / checkout.js / lumaOrderApi.js (frame-choice work below) — this pass does not touch them. Customizer pre-checkout validation (photo/name checked only server-side after Purchase click) deferred to that lane.
+
+- [ ] A. Landing pages: honest trust section replaces fabricated testimonials; emotional eyebrow above SEO H1s (pet/dog); sympathy CTAs → /customize/pet-tribute
+- [ ] B. Blog CTAs → /customize/pet-tribute (human-loss posts → /)
+- [ ] C. Backend: /js/env.js (pixel/ads IDs from env); .html-variant redirects for human pages; provider default whcc→luma; admin-alert emails on failures; fulfillment resubmit endpoint + admin button; poem prompt fix
+- [ ] E. Tracking: real GA4 purchase (id+value+dedup) on order-confirmed; Meta Pixel init via env.js sitewide; Purchase event; Google Ads slot
+- [ ] Adversarial verify + repair + integration boot test
+- [ ] DAVID: real product photos; META_PIXEL_ID on Railway; verify Railway SMTP + FULFILLMENT_PROVIDER=luma; dress-rehearsal order
+
+---
+
+## Pass 8 — Drop color-matching, add frame choice + upsells, poem position, restore title (2026-07-06 late)
+
+David's direction: color-matching "doesn't work" — remove from copy AND product. New story: beautifully presented hero photo + poem + name/years, in a frame the customer chooses. Add frame selection + upgrades at 100% markup on real Luma option cost. Poem repositionable (up/down/left/right). Restore the pet name + dates title lost when UV was tried.
+
+Frame menu (real Luma API pricing — color is FREE to us, width ~$1 diff):
+- Included free: Black (default), White, Oak, Natural Wood.
+- Standard profile: thin 0.875" (David wants thin; also ~$1 cheaper than 1.25").
+- 100%-markup upsells: Gallery 1.25" width; premium decorative frames (Gold/Espresso/Matte-Black-wide); premium paper (Somerset Velvet / Cold Press vs archival matte). Exact upcharges pulled at checkout-wiring time.
+
+- [x] Color-matching removal workflow (3 editors + verifier), keeps all pet-loss SEO work
+- [x] Restore name+dates title: muted sample title in designer empty state; fixed print em-dash; node-verified buildTributeSvg emits name + en-dashed dates
+- [ ] Reconcile + deploy safe batch (copy removal + title + earlier frame-scale/zoom/black-frame/paper), verify prod
+- [ ] Frame selector (color + width) in designer with live preview
+- [ ] Poem position control (left/right/above/below photo)
+- [ ] Wire frame + upsells into checkout at 100% markup; lumaOrderApi resolves chosen subcategory + options
+- [ ] Retire the auto-tint swatch feature (color-matching gone)
+- [ ] STILL NEXT: David's dress-rehearsal order once designer is stable
+
+---
+
+## Pass 7 — Tribute text: smart, beautiful, guaranteed-to-fit (2026-07-06)
+
+Owner report: generated poems/letters break ugly (a sentence ends with one lone word on its own line); portrait orientation cuts text off; the system must be reliable and elegant. Plus a false marketing claim to remove ("Professional photo enhancement / color-correct / upscale").
+
+Root cause: TWO renderers that disagree.
+- `public/js/preview.js` (live canvas): greedy wrap → orphans; font shrinks only to 82% then **overflows** (visual cut-off).
+- `src/services/tributeRenderer.js` (real proof + print SVG): greedy wrap → orphans; **drops poem lines** (`break`) when out of vertical room → printed tribute truncated; never shrinks font.
+So preview ≠ print, and portrait clips on the actual product.
+
+- [x] A. Balanced, orphan-free wrapping — identical greedyPack/balanceLine in both renderers (preview.js canvas + tributeRenderer.js SVG). Over-wide author line → binary-searched balanced break (like CSS text-wrap: balance); no lone-word lines.
+- [x] B. Guaranteed fit — never truncate, never overflow.
+  - preview.js: poem font shrinks to a 60% legible floor so it always fits the panel (was: stopped at 82% then spilled past footer).
+  - tributeRenderer.js: poem font fit to available height BEFORE drawing; deleted the line-dropping `break`; every line drawn.
+- [x] C. Honest photo copy — enhancement/upscale/"professional photographer" claims replaced with "a real person reviews your photo/proof before printing" across index, pet/dog/cat-memorial (visible + JSON-LD FAQ) and customizer.js quality messages + assurance line.
+- [x] D. Verify — node harness PASSED: no orphans, no truncation in portrait-short/tall + landscape + tiny proof, preview==print balancing. Rendered PNGs eyeballed (portrait-short fits full 8-line letter + family block; last wrap is two balanced halves). JSON-LD all parses; JS all `--check` clean.
+
+Note: balancing does NOT add lines (greedy already yields min line count), so it never worsens vertical fit.
+
+### v2 ideas
+- Print path measures width in characters (innerW/(fontSize*0.5)); for perfectly tight fits, swap to real glyph metrics (opentype.js) so Georgia advance widths are exact.
+- Preview floor is 60% (legibility); could match print's guaranteed-fit by drawing all lines regardless and only capping the font, since preview panels are rarely that cramped.
+- Consider a subtle min-lines guard so a 2-word poem never balances oddly (not observed, but cheap insurance).
+
+---
+
+## Pass 6 — Sitewide truth pass, LFH off sale, SEO P1 (2026-07-06 night, workflow-assisted)
+
+David's rulings: no 3D-print/UV/handcrafted claims anywhere; never say "mat" in copy (printed into artwork – sell the design); never pair $79 with 11×14; LFH removed for now (reversible); paper decision pending (semi-gloss vs archival matte – ships semi-gloss until he rules).
+
+- [x] 7-agent workflow: 5 file-partitioned editors + adversarial verifier + SEO/AIO auditor
+- [x] Truth pass across homepage, pet/dog/cat, sympathy/memorial, blog, customizer.js, template JSON
+- [x] Mat-sweep correction pass (rule arrived mid-workflow): zero "mat" on live pages
+- [x] LFH off sale: hidden template, 302s for 13 pages, links/schema/footers stripped (utility pages too)
+- [x] FAQ consistency verified: schema == visible on all pages (17 checker flags all confirmed false positives)
+- [x] SEO P1: fixed /loss-of-dog + /loss-of-cat 404 links, Product schema image on 6 pages, homepage Product url, keyworded H1 + definitional FAQ
+- [ ] SEO P2 queue: retarget sympathy-gifts to "pet loss gifts"; retarget memorial-gifts + 2 human blogs; llms.txt; testimonial authenticity before ads; differentiate FAQ sets per page
+- [ ] SEO P3 queue: sitemap real lastmod + drop noindexed URLs; 302→301 if LFH stays off >few weeks; comparison table in best-memorial-gifts blog; header nav category links + visible breadcrumbs
+- [ ] STILL NEXT: David's dress-rehearsal order (11×14 + BANJO100), watch Luma submission live
+
+---
+
 ## Pass 5 — Pet tribute size ladder + real Luma COGS pricing (2026-07-06 night)
 
 David's pricing call (grounded in real Luma API costs, memory: `luma-cogs-2026-07.md`):

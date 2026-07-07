@@ -318,139 +318,135 @@ async function start() {
   // XML Sitemap
   app.get('/sitemap.xml', (req, res) => {
     const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
-    const today = new Date().toISOString().split('T')[0];
+    // lastmod = real file modification date; fixed launch date for anything without a file
+    const SITEMAP_FALLBACK_DATE = '2026-06-01';
+    const lastmod = (relPath) => {
+      try {
+        return fs.statSync(path.join(__dirname, 'public', relPath)).mtime.toISOString().split('T')[0];
+      } catch (e) {
+        return SITEMAP_FALLBACK_DATE;
+      }
+    };
     res.set('Content-Type', 'application/xml');
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>${baseUrl}/</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('index.html')}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>${baseUrl}/pet-memorial-gifts</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('pet-memorial-gifts.html')}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>${baseUrl}/sympathy-gifts</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('sympathy-gifts.html')}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>${baseUrl}/memorial-gifts</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('memorial-gifts.html')}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>${baseUrl}/dog-memorial-gifts</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('dog-memorial-gifts.html')}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>${baseUrl}/cat-memorial-gifts</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('cat-memorial-gifts.html')}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>${baseUrl}/customize/pet-tribute</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>${baseUrl}/privacy-policy</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('privacy-policy.html')}</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
     <loc>${baseUrl}/terms</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('terms.html')}</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
     <loc>${baseUrl}/refund-policy</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('refund-policy.html')}</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
     <loc>${baseUrl}/shipping-policy</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('shipping-policy.html')}</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
     <loc>${baseUrl}/contact</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('contact.html')}</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>${baseUrl}/order</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>${baseUrl}/blog</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('blog/index.html')}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>${baseUrl}/blog/how-to-write-sympathy-card</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('blog/how-to-write-sympathy-card.html')}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>${baseUrl}/blog/first-year-after-losing-pet</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('blog/first-year-after-losing-pet.html')}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>${baseUrl}/blog/personalized-memorial-gifts-vs-flowers</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('blog/personalized-memorial-gifts-vs-flowers.html')}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>${baseUrl}/blog/what-to-get-someone-who-lost-a-dog</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('blog/what-to-get-someone-who-lost-a-dog.html')}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>${baseUrl}/blog/pet-memorial-poems</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('blog/pet-memorial-poems.html')}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>${baseUrl}/blog/what-to-send-instead-of-flowers</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('blog/what-to-send-instead-of-flowers.html')}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>${baseUrl}/blog/best-memorial-gifts-that-last</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('blog/best-memorial-gifts-that-last.html')}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
     <loc>${baseUrl}/sympathy-message-helper</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastmod('sympathy-message-helper.html')}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>

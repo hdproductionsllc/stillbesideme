@@ -10,7 +10,10 @@
 - These rules apply to both AI-generated poems and the fallback template stub.
 
 ## Canvas Rendering
-- When rendering text on canvas, try all spacing compression tiers BEFORE shrinking font size. Poem font only shrinks as a last resort (floor 82%). Never cut off text with a hard `break`.
+- When rendering text on canvas, try all spacing compression tiers BEFORE shrinking font size. Poem font only shrinks as a last resort (legible floor ~60%). **Fit is guaranteed — a tribute is NEVER clipped.** In portrait/short panels the poem shrinks to fit rather than spilling past the footer.
+- **There are TWO tribute renderers that MUST behave identically**: `public/js/preview.js` (canvas, what the customer sees) and `src/services/tributeRenderer.js` (SVG, the real proof + print). A fix to one is a bug in the other until both change. They share a mirrored greedyPack/balanceLine wrap and a fit-to-height pass.
+- **Never truncate poem lines to save space.** The print SVG used to `break` out of the draw loop when it ran out of vertical room, silently dropping the end of longer letters in portrait. Fit the font to the space first, then draw every line.
+- **Balanced wrapping, never greedy.** Poems/letters arrive with the author's own line breaks; only re-wrap an authored line when it's wider than the panel, and split it into balanced halves (binary-search the smallest width that holds the min line count) so no line is left a lone orphan word. Balancing keeps the min line count, so it costs no vertical space.
 - Blank lines in poems should render at 50% line height, not full height. They're breathing room, not wasted space.
 - Use en dash (`\u2013`) for date ranges on tribute panels, curly quotes (`\u201C`/`\u201D`) for nicknames.
 - **Scale text by BOTH width and height**: `Math.min(w / 400, h / 260)`. Never use width-only scaling (`w / 400`) because wide-but-short panels (stacked layout) blow up the text. Height cap prevents overflow.
@@ -85,4 +88,5 @@ Every landing page should follow this structure in order:
 - When the product definition OR pricing changes, sweep ALL customer-facing surfaces in the SAME pass: meta tags, og/twitter tags, JSON-LD, page copy, alt text, JS-rendered strings, email templates. Never defer factual claims as "copy audit later" - a customer reads them today.
 - **Price-size pairing rule**: never let a "From $X" price sit next to a specific size unless X is that size's price. "11x14 frame ... From $79" implies $79 buys an 11x14. Say "Four sizes from $79" or name the size WITH its own price.
 - Proactively grep for claim drift after any product pivot; David should never find stale copy before we do.
+- **Never claim capabilities the product doesn't have** (2026-07-06, David caught it). We do NOT color-correct, upscale, retouch, "enhance," or have a "professional photographer" touch photos. What actually happens: a real person reviews the photo + proof before printing and reaches out if it won't print well. Frame the review gate as the reassurance, never invent a magic-fix pipeline. This lived in customer copy AND JS-rendered strings (customizer.js quality messages + assurance line) — sweep both.
 - **Never mention "mat" in customer-facing copy** (2026-07-06). The mat/bevel is printed into the artwork, not a physical mat. Naming it invites scrutiny and disappointment. Approved framing: "colors drawn from their photo", "their name and years set into the design", "archival, museum-quality print", "elegant dark wood frame". Sell the design, not the materials mechanics.
