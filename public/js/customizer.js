@@ -164,6 +164,7 @@
       if (template.colorMode === 'auto') {
         PreviewRenderer.setColors(DEFAULT_AUTO_COLORS);
         PreviewRenderer.setPreviewPoem(SAMPLE_POEM);
+        PreviewRenderer.setPreviewHeader('Banjo', '2014 – 2026');
         buildSwatchRow();
       }
 
@@ -450,18 +451,18 @@
       if (quality.tier === 'low') {
         const msg = document.createElement('p');
         msg.className = 'quality-message';
-        msg.textContent = 'This photo is lower resolution, but don\'t worry \u2013 our team will upscale and enhance it for the best possible print.';
+        msg.textContent = 'This photo is a little lower resolution. A real person reviews every photo before printing \u2013 if it won\'t hold up at the size you chose, we\'ll reach out before anything is made.';
         wrapper.appendChild(msg);
       } else if (quality.tier === 'usable') {
         const msg = document.createElement('p');
         msg.className = 'quality-message';
-        msg.textContent = 'Good enough to work with. We\'ll upscale and optimize it for a sharp, lasting print.';
+        msg.textContent = 'This will print nicely. A real person reviews every photo before it goes to print.';
         wrapper.appendChild(msg);
       }
 
       const assurance = document.createElement('p');
       assurance.className = 'photo-assurance';
-      assurance.innerHTML = '&#10003; Every photo is reviewed and enhanced by a professional photographer before printing';
+      assurance.innerHTML = '&#10003; A real person reviews every photo before it\'s printed';
       wrapper.appendChild(assurance);
     }
   }

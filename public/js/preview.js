@@ -11,8 +11,10 @@
  * Text panel: User-entered custom message text.
  *
  * Design principle: the poem is the product. When space is tight we
- * compress margins and spacing first. The poem font only shrinks as a
- * last resort, and never below 82%.
+ * compress margins and spacing first, then shrink the poem font as a last
+ * resort. Fit is guaranteed — the tribute is never clipped — so in a short
+ * portrait panel the poem shrinks to a legible floor rather than spilling
+ * past the footer. Lines are balanced (no lone orphan word) via wrapText.
  */
 
 (function () {
@@ -175,6 +177,8 @@
   let nameOnFrame = false;   // true when name/dates are engraved on the frame (auto theme)
   let frameIcon = 'paw';     // engraved symbol beside the name: 'none' | 'paw' | 'heart'
   let previewPoemText = '';  // sample poem shown before a real one is generated (display only)
+  let previewName = '';      // sample name shown before one is entered (display only)
+  let previewDates = '';     // sample dates shown before entered (display only)
   let fontsLoaded = false;
   let renderQueued = false;
 
@@ -199,6 +203,7 @@
     setFrameIcon,
     getFrameIcon: () => frameIcon,
     setPreviewPoem,
+    setPreviewHeader,
     setLayout,
     setFrameSize,
     getFields: () => ({ ...fields }),
@@ -566,6 +571,14 @@
     queueRender();
   }
 
+  // Sample name/dates title shown (muted) before the customer enters their own,
+  // so the tribute's header is visibly demonstrated in the empty state.
+  function setPreviewHeader(name, dates) {
+    previewName = name || '';
+    previewDates = dates || '';
+    queueRender();
+  }
+
   /**
    * Apply auto-matched colors { accent, bevel, ... } to the preview.
    *
@@ -818,7 +831,9 @@
     const poemField = tm.poemText || 'poemText';
 
     // Name, dates, nickname and poem all read in the printed tribute panel.
-    const petName = fields[nameField] || '';
+    let petName = fields[nameField] || '';
+    let headerIsSample = false;
+    if (!petName && previewName) { petName = previewName; headerIsSample = true; }
     const nickname = fields[nickField] || '';
     const familyName = fields[famField] || '';
     let poemText = fields[poemField] || '';
@@ -835,6 +850,7 @@
     if (birthDate && passDate) dateStr = birthDate + ' \u2013 ' + passDate;
     else if (birthDate) dateStr = birthDate;
     else if (passDate) dateStr = passDate;
+    if (!dateStr && previewDates) { dateStr = previewDates; headerIsSample = true; }
 
     const hasHeader = !!(petName || dateStr);
     const hasFooter = !!(nickname || familyName);
@@ -905,8 +921,14 @@
         pad = last.pad;
         var available = h - margin * 2 - headerH - pad * 2 - footerH;
 
+        // Shrink the poem until it fits the panel. The poem is the product, so
+        // we hold its size as long as we can, but a tribute must NEVER be
+        // clipped — so we keep going to a legible floor (60%) rather than
+        // stopping at 82% and letting the text spill past the footer. A longer
+        // "letter" in a short portrait panel lands here; balancing keeps the
+        // line count minimal so it settles at a comfortable size.
         poem = fullPoem;
-        for (var pct = 98; pct >= 82; pct -= 2) {
+        for (var pct = 98; pct >= 60; pct -= 2) {
           var p = measurePoem(poemBaseSize * pct / 100);
           poem = p;
           if (p.totalH <= available) break;
@@ -924,17 +946,17 @@
     ctx.textBaseline = 'top';
     var y = margin;
 
-    // Header
+    // Header (sample name/dates render muted so they read as placeholders)
     if (petName) {
       ctx.font = '500 ' + nameSize + 'px "Cormorant Garamond", serif';
-      ctx.fillStyle = colors.name;
+      ctx.fillStyle = headerIsSample ? mixHex(colors.name, colors.bg, 0.55) : colors.name;
       ctx.fillText(petName, cx, y, maxTextWidth);
       y += nameSize * 1.2;
     }
 
     if (dateStr) {
       ctx.font = '300 ' + dateSize + 'px "Cormorant Garamond", serif';
-      ctx.fillStyle = colors.dates;
+      ctx.fillStyle = headerIsSample ? mixHex(colors.dates, colors.bg, 0.5) : colors.dates;
       ctx.fillText(dateStr, cx, y, maxTextWidth);
       y += dateSize * 1.6;
     }
@@ -1079,7 +1101,64 @@
     ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
   }
 
+  // ── Balanced word-wrap ─────────────────────────────────────
+  //
+  // The poem/letter arrives with the author's own line breaks (one per \n).
+  // We only ever re-wrap an authored line when it is wider than the panel.
+  // When that happens a greedy wrap crams the first line full and strands
+  // whatever is left — often a single word — alone on the next line. That
+  // lone-word line is exactly the "one word on its own line" the tribute must
+  // never show.
+  //
+  // Instead we split an over-wide line into the FEWEST lines that fit, then
+  // balance their widths so the break lands near the middle (the same idea as
+  // CSS `text-wrap: balance`). Two roughly equal lines never leave an orphan.
+  // Because we keep the fewest-lines count, the block is never taller than a
+  // greedy wrap — balancing costs no vertical space.
+  //
+  // NOTE: mirrors wrapText/balanceLine in src/services/tributeRenderer.js
+  // (the SVG print path). Keep the two algorithms in sync.
+
+  function greedyPack(words, limit, measure) {
+    var lines = [];
+    var cur = '';
+    for (var i = 0; i < words.length; i++) {
+      var test = cur ? cur + ' ' + words[i] : words[i];
+      if (cur && measure(test) > limit) {
+        lines.push(cur);
+        cur = words[i];
+      } else {
+        cur = test;
+      }
+    }
+    if (cur) lines.push(cur);
+    return lines;
+  }
+
+  function balanceLine(words, limit, measure) {
+    // Fits as-is → one line, nothing to balance.
+    if (measure(words.join(' ')) <= limit) return [words.join(' ')];
+
+    // Fewest lines this content needs at the true width limit.
+    var need = greedyPack(words, limit, measure).length;
+
+    // The longest single word is a hard floor for the achievable line width.
+    var lo = 0;
+    for (var i = 0; i < words.length; i++) lo = Math.max(lo, measure(words[i]));
+    var hi = limit;
+
+    // Binary-search the smallest width that still packs into `need` lines.
+    // Packing at that width yields evenly balanced lines, all within `limit`.
+    for (var iter = 0; iter < 24 && hi - lo > 0.5; iter++) {
+      var mid = (lo + hi) / 2;
+      if (greedyPack(words, mid, measure).length <= need) hi = mid;
+      else lo = mid;
+    }
+    return greedyPack(words, hi, measure);
+  }
+
   function wrapText(ctx, text, maxWidth) {
+    var measure = function (s) { return ctx.measureText(s).width; };
     var paragraphs = text.split('\n');
     var allLines = [];
 
@@ -1091,22 +1170,8 @@
       }
 
       var words = para.split(/\s+/);
-      var currentLine = '';
-
-      for (var i = 0; i < words.length; i++) {
-        var testLine = currentLine ? currentLine + ' ' + words[i] : words[i];
-        var metrics = ctx.measureText(testLine);
-
-        if (metrics.width > maxWidth && currentLine) {
-          allLines.push(currentLine);
-          currentLine = words[i];
-        } else {
-          currentLine = testLine;
-        }
-      }
-      if (currentLine) {
-        allLines.push(currentLine);
-      }
+      var wrapped = balanceLine(words, maxWidth, measure);
+      for (var i = 0; i < wrapped.length; i++) allLines.push(wrapped[i]);
     }
 
     return allLines;

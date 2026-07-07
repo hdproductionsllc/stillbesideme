@@ -32,9 +32,55 @@ function escSvg(str) {
 }
 
 /**
- * Word-wrap text, respecting explicit \n linebreaks.
- * Returns array of strings. Blank lines are represented as '' sentinels
- * so callers can insert vertical spacing.
+ * Greedy pack: fill each line up to `limit` (measured in characters).
+ */
+function greedyPack(words, limit) {
+  const lines = [];
+  let cur = '';
+  for (const word of words) {
+    const test = cur ? cur + ' ' + word : word;
+    if (cur && test.length > limit) {
+      lines.push(cur);
+      cur = word;
+    } else {
+      cur = test;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+/**
+ * Balance one authored line into the FEWEST lines that fit `limit`, with the
+ * break near the middle so no line is left a lone orphan word (the same idea
+ * as CSS `text-wrap: balance`). Balancing keeps the minimum line count, so it
+ * never makes the block taller.
+ *
+ * NOTE: mirrors greedyPack/balanceLine in public/js/preview.js (the canvas
+ * preview path). Keep the two algorithms in sync.
+ */
+function balanceLine(words, limit) {
+  if (words.join(' ').length <= limit) return [words.join(' ')];
+
+  const need = greedyPack(words, limit).length;
+
+  let lo = 0;
+  for (const w of words) lo = Math.max(lo, w.length);
+  let hi = limit;
+
+  // Smallest width that still packs into `need` lines → balanced lines.
+  for (let iter = 0; iter < 24 && hi - lo > 0.5; iter++) {
+    const mid = (lo + hi) / 2;
+    if (greedyPack(words, mid).length <= need) hi = mid;
+    else lo = mid;
+  }
+  return greedyPack(words, hi);
+}
+
+/**
+ * Word-wrap text, respecting explicit \n linebreaks. Over-wide authored lines
+ * are balanced (no orphan words). Blank lines become '' sentinels so callers
+ * can insert vertical spacing.
  */
 function wrapText(text, maxChars) {
   if (!text) return [];
@@ -47,16 +93,7 @@ function wrapText(text, maxChars) {
       continue;
     }
     const words = rawLine.split(/\s+/);
-    let current = '';
-    for (const word of words) {
-      if (current.length + word.length + 1 > maxChars && current.length > 0) {
-        results.push(current);
-        current = word;
-      } else {
-        current = current ? current + ' ' + word : word;
-      }
-    }
-    if (current) results.push(current);
+    for (const line of balanceLine(words, maxChars)) results.push(line);
   }
   return results;
 }
@@ -108,7 +145,7 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
   }
 
   // Dates
-  const dates = [birthDate, passDate].filter(Boolean).join(' \u2014 ');
+  const dates = [birthDate, passDate].filter(Boolean).join(' \u2013 ');
   if (dates) {
     y += datesFontSize;
     elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="sans-serif" font-size="${datesFontSize}" fill="${escSvg(colors.dates)}">${escSvg(dates)}</text>`);
@@ -121,20 +158,48 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
   elements.push(`<line x1="${(width - dividerW) / 2}" y1="${y}" x2="${(width + dividerW) / 2}" y2="${y}" stroke="${escSvg(colors.divider)}" stroke-width="2" />`);
   y += 30;
 
-  // Poem text (line-break aware word wrapping)
+  // Poem text (line-break aware, balanced word wrapping).
+  //
+  // The poem is fit to the space that is actually left BELOW the header and
+  // ABOVE the family block, then every line is drawn — the tribute is never
+  // truncated (the old code dropped whatever lines ran past the bottom, which
+  // clipped longer letters in portrait). We hold the poem at full size when it
+  // fits and shrink the font only as far as needed, down to a legible floor.
   if (poemText) {
-    const maxChars = Math.round(innerW / (poemFontSize * 0.5));
-    const poemLines = wrapText(poemText, maxChars);
-    const poemLineHeight = Math.round(poemFontSize * lineHeight);
+    // Height the family block below the poem will consume (so we reserve it).
+    const familyReserve = familyName
+      ? 16 + 24 + familyFontSize + 8 + Math.round(familyFontSize * 1.15) + Math.round(familyFontSize * 0.4)
+      : 0;
+    const poemAvailH = maxContentH - y - familyReserve;
 
-    for (const line of poemLines) {
-      if (y + poemLineHeight > maxContentH - 120) break; // leave room for family
+    // Measure the wrapped poem at a candidate font size.
+    const measurePoem = (fontSize) => {
+      const maxChars = Math.max(8, Math.round(innerW / (fontSize * 0.5)));
+      const lines = wrapText(poemText, maxChars);
+      const lh = Math.round(fontSize * lineHeight);
+      let total = 0;
+      for (const line of lines) total += line === '' ? Math.round(lh * 0.6) : lh;
+      return { lines, lh, total };
+    };
+
+    // Largest font (down to a floor) whose full text fits the available space.
+    const floorFont = Math.max(10, Math.round(width * 0.017));
+    let fit = measurePoem(poemFontSize);
+    let poemSize = poemFontSize;
+    for (let fs = poemFontSize; fs >= floorFont; fs -= 1) {
+      const m = measurePoem(fs);
+      fit = m;
+      poemSize = fs;
+      if (m.total <= poemAvailH) break;
+    }
+
+    for (const line of fit.lines) {
       if (line === '') {
-        y += Math.round(poemLineHeight * 0.6); // blank line spacing
+        y += Math.round(fit.lh * 0.6); // blank line spacing
         continue;
       }
-      y += poemLineHeight;
-      elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="${poemFontSize}" fill="${escSvg(colors.poem)}" font-style="italic">${escSvg(line)}</text>`);
+      y += fit.lh;
+      elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="${poemSize}" fill="${escSvg(colors.poem)}" font-style="italic">${escSvg(line)}</text>`);
     }
     y += 16;
   }
