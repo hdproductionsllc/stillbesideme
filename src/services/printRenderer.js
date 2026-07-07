@@ -73,6 +73,14 @@ async function generatePrintFile(order) {
     ? calculateMatLayout(layout, totalW, totalH, data.printSpec, 1)
     : calculateLayout(layout, totalW, totalH);
 
+  // Poem position: swap the photo and tribute regions so the print matches the
+  // preview (poem left/above instead of right/below).
+  if (data.poemFirst) {
+    const swap = panels.photo;
+    panels.photo = panels.tribute;
+    panels.tribute = swap;
+  }
+
   // Build composite layers
   const layers = [];
 

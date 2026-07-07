@@ -71,6 +71,13 @@ async function generateProof(order) {
     panels = calculateLayout(layout, totalW, totalH);
   }
 
+  // Poem position: swap photo/tribute regions to match the customer's preview.
+  if (data.poemFirst) {
+    const swap = panels.photo;
+    panels.photo = panels.tribute;
+    panels.tribute = swap;
+  }
+
   // Build composite layers
   const layers = [];
 

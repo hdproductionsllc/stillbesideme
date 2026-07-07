@@ -517,6 +517,8 @@ function resolveOrderData(order) {
   const photos = order.photos_json ? JSON.parse(order.photos_json) : {};
   const style = fields.style || template.defaultStyle || 'classic-dark';
   const layout = fields.layout || template.defaultLayout || 'side-by-side';
+  // Poem position: when true the poem sits before the photo (left/above).
+  const poemFirst = !!fields.poemFirst;
   const styleVariant = template.styleVariants[style] || template.styleVariants['classic-dark'];
   // Per-order colors (auto-matched mat/bevel) or legacy style variant colors
   const tributeColors = resolveColors(template, fields);
@@ -552,6 +554,7 @@ function resolveOrderData(order) {
     photos,
     style,
     layout,
+    poemFirst,
     styleVariant,
     tributeColors,
     hasPrintedMat,

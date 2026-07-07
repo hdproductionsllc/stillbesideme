@@ -33,6 +33,7 @@
   let currentStyle = 'classic-dark';
   let currentLayout = 'side-by-side';
   let currentFrame = null; // chosen frame id from template.frameOptions
+  let poemFirst = false;   // poem before photo (left in landscape, above in portrait)
   let orderType = 'self'; // 'self' or 'gift'
   let thirdPanelEnabled = false;
   let thirdPanelType = 'photo'; // 'photo' or 'text'
@@ -1699,6 +1700,7 @@
           colors: currentColors,
           frameIcon,
           frameChoice: currentFrame,
+          poemFirst,
         }),
       });
 
@@ -1746,6 +1748,7 @@
         accentOverride,
         frameIcon,
         frameChoice: currentFrame,
+        poemFirst,
         customRatios: PreviewRenderer.getCustomRatios(),
         selectedProduct: document.querySelector('.product-option.selected .product-option-label')?.textContent,
         selectedSku: document.querySelector('.product-option.selected')?.dataset?.sku,
@@ -1881,6 +1884,12 @@
         buildFrameSelector();
         updatePurchaseButton();
       }
+      if (state.poemFirst) {
+        poemFirst = true;
+        PreviewRenderer.setPoemPosition(true);
+        const flipBtn = document.getElementById('poem-flip-btn');
+        if (flipBtn) flipBtn.classList.add('active');
+      }
       if (state.style && state.style !== currentStyle) {
         setStyle(state.style);
         const thumbs = document.querySelectorAll('.style-thumb');
@@ -1949,9 +1958,21 @@
     });
   }
 
+  function initPoemFlip() {
+    const btn = document.getElementById('poem-flip-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      poemFirst = !poemFirst;
+      PreviewRenderer.setPoemPosition(poemFirst);
+      btn.classList.toggle('active', poemFirst);
+      saveState();
+    });
+  }
+
   // ── Start ──────────────────────────────────────────────────
 
   init();
   initPreviewZoom();
+  initPoemFlip();
 
 })();

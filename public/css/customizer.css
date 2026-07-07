@@ -1493,3 +1493,7 @@ body.preview-zoom-open { overflow: hidden; }
   flex: 0 0 auto;
 }
 .frame-chip-label { font-size: 0.85rem; color: var(--color-text, #FAF8F5); white-space: nowrap; }
+
+/* ── Preview controls row (zoom + poem flip) ──────────────────── */
+.preview-controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.preview-zoom-btn.active { border-color: var(--color-accent, #C4A882); background: rgba(196,168,130,0.14); }

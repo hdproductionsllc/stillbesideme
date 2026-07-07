@@ -172,6 +172,9 @@
   // Chosen frame definition { id, faceIn, molding, swatch } from template.frameOptions
   let currentFrame = null;
 
+  // Poem position: false = poem after photo (right/below), true = before (left/above)
+  let poemFirst = false;
+
   // Custom fr ratios (user-dragged dividers): layoutKey -> { columns: [...], rows: [...] }
   const customRatios = {};
 
@@ -208,6 +211,8 @@
     setPreviewPoem,
     setPreviewHeader,
     setFrame,
+    setPoemPosition,
+    getPoemPosition: () => poemFirst,
     setLayout,
     setFrameSize,
     getFields: () => ({ ...fields }),
@@ -352,7 +357,16 @@
 
     container.style.gridTemplateColumns = cols.map(v => v + 'fr').join(' ');
     container.style.gridTemplateRows = rows.map(v => v + 'fr').join(' ');
-    container.style.gridTemplateAreas = layout.areas.map(
+    // Poem position: when poemFirst, swap the photo and tribute cells so the
+    // poem sits left (landscape) or above (portrait) instead of right/below.
+    var areasSrc = poemFirst
+      ? layout.areas.map(function (row) {
+          return row.map(function (cell) {
+            return cell === 'photo' ? 'tribute' : (cell === 'tribute' ? 'photo' : cell);
+          });
+        })
+      : layout.areas;
+    container.style.gridTemplateAreas = areasSrc.map(
       row => '"' + row.join(' ') + '"'
     ).join(' ');
 
@@ -583,6 +597,16 @@
     previewName = name || '';
     previewDates = dates || '';
     queueRender();
+  }
+
+  // Poem position: true puts the poem before the photo (left in landscape,
+  // above in portrait). Re-lays out and re-renders.
+  function setPoemPosition(first) {
+    poemFirst = !!first;
+    applyGridStyles(currentLayout);
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { sizeCanvases(); render(); });
+    });
   }
 
   // Apply the customer's chosen frame — molding color live on the border and
