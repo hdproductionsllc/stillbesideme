@@ -1865,8 +1865,32 @@
     }
   }
 
+  // ── Preview zoom (magnifier for small tribute text) ─────────
+
+  function initPreviewZoom() {
+    const btn = document.getElementById('preview-zoom-btn');
+    const pane = document.querySelector('.preview-pane');
+    if (!btn || !pane) return;
+
+    function setZoom(on) {
+      pane.classList.toggle('zoomed', on);
+      document.body.classList.toggle('preview-zoom-open', on);
+      btn.innerHTML = on ? '&#10005; Close' : '&#128269; Zoom in to read';
+      // Re-render the canvases at the new layout size so the poem text
+      // is redrawn crisp at the larger scale instead of stretched.
+      window.dispatchEvent(new Event('resize'));
+      if (on) pane.scrollTop = 0;
+    }
+
+    btn.addEventListener('click', () => setZoom(!pane.classList.contains('zoomed')));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && pane.classList.contains('zoomed')) setZoom(false);
+    });
+  }
+
   // ── Start ──────────────────────────────────────────────────
 
   init();
+  initPreviewZoom();
 
 })();

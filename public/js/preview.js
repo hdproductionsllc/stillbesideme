@@ -355,6 +355,16 @@
       var w = isLandscape ? Math.max(frameDims[0], frameDims[1]) : Math.min(frameDims[0], frameDims[1]);
       var h = isLandscape ? Math.min(frameDims[0], frameDims[1]) : Math.max(frameDims[0], frameDims[1]);
 
+      // Render the frame at true scale: the real frame face is FRAME_FACE_IN
+      // wide, so its share of the preview width is face/(print + 2*face).
+      // A fixed pixel width reads far too chunky on the larger print sizes.
+      var FRAME_FACE_IN = 1.25; // Luma "1.25w x 0.875h Black" (subcategory 105005)
+      var frameRoot = document.getElementById('frame-preview');
+      if (frameRoot) {
+        var facePct = (FRAME_FACE_IN / (w + 2 * FRAME_FACE_IN)) * 100;
+        frameRoot.style.setProperty('--frame-width', facePct.toFixed(2) + '%');
+      }
+
       // Printed-mat templates: the panels region represents the openings
       // INSIDE the mat border, so subtract the border from each side.
       // The mat itself is rendered by .mat-board padding around this region.

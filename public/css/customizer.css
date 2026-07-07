@@ -1428,3 +1428,45 @@
     padding: 0.85rem 1.5rem;
   }
 }
+
+/* ── Preview zoom (magnifier for small tribute text) ─────────── */
+.preview-zoom-btn {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(26, 23, 20, 0.85);
+  color: #FAF8F5;
+  font-size: 0.85rem;
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.preview-zoom-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.preview-pane.zoomed {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: block;
+  max-width: none;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 56px 16px 80px;
+  background: rgba(18, 15, 13, 0.98);
+}
+.preview-pane.zoomed .frame-preview {
+  width: 175%;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+.preview-pane.zoomed .layout-selector,
+.preview-pane.zoomed .style-selector,
+.preview-pane.zoomed #panel-toggle-wrap { display: none; }
+.preview-pane.zoomed .preview-zoom-btn {
+  position: fixed;
+  top: 12px;
+  right: 14px;
+  z-index: 1001;
+}
+body.preview-zoom-open { overflow: hidden; }
+@media (max-width: 900px) {
+  .preview-pane.zoomed .frame-preview { width: 220%; }
+}
