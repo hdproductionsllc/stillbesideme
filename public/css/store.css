@@ -251,7 +251,7 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
 }
 
 .frame-mockup .frame-border {
-  background: linear-gradient(145deg, #2c2018, #3a2a1c 15%, #1e1610 40%, #2a1e14 70%, #1a120c);
+  background: linear-gradient(145deg, #232323, #2e2e2e 15%, #101010 40%, #1c1c1c 70%, #0a0a0a);
   padding: var(--frame-width);
   border-radius: 2px;
   position: relative;

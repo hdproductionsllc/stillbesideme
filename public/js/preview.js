@@ -572,7 +572,7 @@
 
     const accent = c.accent || c.bevel || '#C4A882';
     // Fixed elegant dark wood — the frame is not color-matched to the photo.
-    const darkWood = '#2a1e14';
+    const darkWood = '#1c1c1c';
 
     const frameEl = document.getElementById('frame-preview');
     if (frameEl) {

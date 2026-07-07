@@ -87,7 +87,7 @@
       "label": "Classic Dark",
       "description": "Dark wood frame, near-black mat, cream and gold text – timeless and premium",
       "frame": {
-        "gradient": "linear-gradient(145deg, #2c2018, #3a2a1c 15%, #1e1610 40%, #2a1e14 70%, #1a120c)",
+        "gradient": "linear-gradient(145deg, #232323, #2e2e2e 15%, #101010 40%, #1c1c1c 70%, #0a0a0a)",
         "shadow": "0 4px 24px rgba(0,0,0,0.5)"
       },
       "mat": { "color": "#1a1a1a" },

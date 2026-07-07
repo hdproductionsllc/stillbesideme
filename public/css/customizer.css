@@ -247,7 +247,7 @@
 
 /* --- Classic Dark Theme --- */
 .frame-preview.theme-classic-dark .frame-border {
-  background: linear-gradient(145deg, #2c2018, #3a2a1c 15%, #1e1610 40%, #2a1e14 70%, #1a120c);
+  background: linear-gradient(145deg, #232323, #2e2e2e 15%, #101010 40%, #1c1c1c 70%, #0a0a0a);
   box-shadow:
     /* Wall-mount depth – frame floats on the wall */
     0 10px 45px rgba(0, 0, 0, 0.55),
@@ -706,7 +706,7 @@
 
 /* Thumb: Classic Dark */
 .style-thumb-dark .style-thumb-inner {
-  background: linear-gradient(145deg, #2c2018, #1a120c);
+  background: linear-gradient(145deg, #232323, #0a0a0a);
   display: flex;
   padding: 3px;
 }
