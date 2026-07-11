@@ -48,8 +48,10 @@ function calculatePrintDimensions(sku, layout) {
 
 // Photo cover-fit is shared via tributeRenderer.renderPhotoCover —
 // it honors percent smart-crop positions that sharp's `position` rejects.
-const renderPhoto = (photoPath, region, cropPosition) =>
-  renderPhotoCover(photoPath, region, cropPosition);
+// Print files stay lossless (no jpegQuality); crop carries the customer's
+// zoom/pan from the customizer preview when present.
+const renderPhoto = (photoPath, region, cropPosition, crop) =>
+  renderPhotoCover(photoPath, region, cropPosition, undefined, crop);
 
 /**
  * Generate a print-ready JPEG for an order.
@@ -71,7 +73,7 @@ async function generatePrintFile(order) {
   const { width: totalW, height: totalH } = calculatePrintDimensions(order.product_sku, layout);
   const panels = data.hasPrintedMat
     ? calculateMatLayout(layout, totalW, totalH, data.printSpec, 1)
-    : calculateLayout(layout, totalW, totalH);
+    : calculateLayout(layout, totalW, totalH, data.customRatios);
 
   // Poem position: swap the photo and tribute regions so the print matches the
   // preview (poem left/above instead of right/below).
@@ -86,7 +88,7 @@ async function generatePrintFile(order) {
 
   // Main photo
   const photoBuffer = await renderPhoto(
-    photoPath, panels.photo, data.mainPhoto.crop?.position,
+    photoPath, panels.photo, data.mainPhoto.crop?.position, data.photoCrops?.photo,
   );
   layers.push({ input: photoBuffer, left: panels.photo.left, top: panels.photo.top });
 
@@ -96,7 +98,7 @@ async function generatePrintFile(order) {
       ? data.panel2Path
       : photoPath; // fall back to main photo if no second photo uploaded
     const p2CropPos = data.panel2Photo?.crop?.position || 'centre';
-    const panel2Buffer = await renderPhoto(p2Path, panels.panel2, p2CropPos);
+    const panel2Buffer = await renderPhoto(p2Path, panels.panel2, p2CropPos, data.photoCrops?.panel2);
     layers.push({ input: panel2Buffer, left: panels.panel2.left, top: panels.panel2.top });
   }
 

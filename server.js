@@ -228,45 +228,9 @@ async function start() {
   app.get('/cat-memorial-gifts', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'cat-memorial-gifts.html'));
   });
-  app.get('/loss-of-mother-gift', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'loss-of-mother-gift.html'));
-  });
-  app.get('/loss-of-father-gift', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'loss-of-father-gift.html'));
-  });
-  app.get('/loss-of-husband-gift', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'loss-of-husband-gift.html'));
-  });
-  app.get('/loss-of-wife-gift', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'loss-of-wife-gift.html'));
-  });
-  app.get('/loss-of-grandmother-gift', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'loss-of-grandmother-gift.html'));
-  });
-  app.get('/loss-of-grandfather-gift', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'loss-of-grandfather-gift.html'));
-  });
-  app.get('/loss-of-child-gift', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'loss-of-child-gift.html'));
-  });
-  app.get('/loss-of-brother-gift', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'loss-of-brother-gift.html'));
-  });
-  app.get('/loss-of-sister-gift', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'loss-of-sister-gift.html'));
-  });
-  app.get('/loss-of-best-friend-gift', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'loss-of-best-friend-gift.html'));
-  });
-  app.get('/sympathy-gift-for-coworker', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'sympathy-gift-for-coworker.html'));
-  });
-  app.get('/memorial-gift-for-anniversary-of-death', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'memorial-gift-for-anniversary-of-death.html'));
-  });
-  app.get('/letter-from-heaven', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'letter-from-heaven.html'));
-  });
+  // (The Letter From Heaven / human-loss clean-URL handlers were removed —
+  // the 302 redirect block above owns those paths while LFH is off sale.
+  // Restore them from letter-from-heaven-era history if LFH returns.)
   app.get('/sympathy-message-helper', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'sympathy-message-helper.html'));
   });

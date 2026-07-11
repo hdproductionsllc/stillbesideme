@@ -11,6 +11,46 @@ const router = express.Router();
 
 const TEMPLATES_DIR = path.join(__dirname, '..', 'data', 'templates');
 
+// ── Preview-adjustment sanitizers (never trust the client) ──────────
+// The customizer sends the customer's divider-drag panel ratios and photo
+// zoom/pan so the print matches what they framed on screen. Both are
+// optional; malformed values are dropped (renderers fall back to defaults).
+
+/** A 2-track fr array like [1.15, 1]; anything else is dropped. */
+function sanitizeTracks(tracks) {
+  if (!Array.isArray(tracks) || tracks.length !== 2) return null;
+  const nums = tracks.map(Number);
+  if (!nums.every(n => Number.isFinite(n) && n > 0.05 && n < 20)) return null;
+  return nums;
+}
+
+function sanitizeRatios(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const columns = sanitizeTracks(raw.columns);
+  const rows = sanitizeTracks(raw.rows);
+  return (columns || rows) ? { ...(columns ? { columns } : {}), ...(rows ? { rows } : {}) } : null;
+}
+
+/** Per-slot photo crops { photo, panel2 } with zoom [1,3] and pan [0,1]. */
+function sanitizePhotoCrops(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const out = {};
+  for (const slot of ['photo', 'panel2']) {
+    const c = raw[slot];
+    if (!c || typeof c !== 'object') continue;
+    const zoom = Number(c.zoom);
+    if (!Number.isFinite(zoom)) continue;
+    const panX = Number(c.panX);
+    const panY = Number(c.panY);
+    out[slot] = {
+      zoom: Math.min(3, Math.max(1, zoom)),
+      panX: Math.min(1, Math.max(0, Number.isFinite(panX) ? panX : 0.5)),
+      panY: Math.min(1, Math.max(0, Number.isFinite(panY) ? panY : 0.5)),
+    };
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 /** Load a template by ID (cached after first read). */
 const templateCache = {};
 function loadTemplate(templateId) {
@@ -37,8 +77,12 @@ router.post('/checkout', async (req, res) => {
   const db = req.app.locals.db;
 
   try {
-    const { templateId, sku, fields, poemText, style, layout, orderType, colors, frameIcon, frameChoice, poemFirst } = req.body;
+    const { templateId, sku, fields, poemText, style, layout, orderType, colors, frameIcon, frameChoice, poemFirst, customRatios, photoCrops } = req.body;
     const safeFrameIcon = ['none', 'paw', 'heart'].includes(frameIcon) ? frameIcon : 'none';
+
+    // Preview adjustments: panel ratios + photo zoom/pan (see sanitizers above)
+    const safeRatios = sanitizeRatios(customRatios);
+    const safeCrops = sanitizePhotoCrops(photoCrops);
 
     // Validate auto-matched colors (never trust client) — drop if malformed
     const HEX_RE = /^#[0-9a-fA-F]{6}$/;
@@ -107,7 +151,7 @@ router.post('/checkout', async (req, res) => {
         req.sessionID,
         templateId,
         sku,
-        JSON.stringify({ ...fields, style, layout, orderType, frameIcon: safeFrameIcon, poemFirst: !!poemFirst, ...(safeFrame ? { frameChoice: safeFrame } : {}), ...(safeColors ? { colors: safeColors } : {}) }),
+        JSON.stringify({ ...fields, style, layout, orderType, frameIcon: safeFrameIcon, poemFirst: !!poemFirst, ...(safeFrame ? { frameChoice: safeFrame } : {}), ...(safeColors ? { colors: safeColors } : {}), ...(safeRatios ? { customRatios: safeRatios } : {}), ...(safeCrops ? { photoCrops: safeCrops } : {}) }),
         JSON.stringify(photos),
         poemText.trim(),
         totalCents

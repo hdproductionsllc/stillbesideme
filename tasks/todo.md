@@ -2,6 +2,48 @@
 
 ---
 
+## Pass 13 — Full-sweep: preview↔print fidelity, mobile, pixel, Luma guards, SEO (2026-07-11)
+
+David: "full sweep… site works on mobile and desktop, designer accurately reflects the final product, all products map to real Luma products, SEO optimized, live today." Three audit agents swept (Luma mapping / frontend fidelity / SEO); all 8 Luma subcategories verified live against the production API (all 6 shared options valid on every frame; 103001+bleed 36 valid). David ruled: fix-forward, no 2.0 fork; the light cream paper insert is THE product.
+
+### The big one — print now matches the preview
+- [x] **Light palette**: `resolveColors` returns the preview's cream/ink/gold palette for colorMode:auto (PAPER_PALETTE in tributeRenderer). Before: customers designed light, prints rendered dark charcoal + gold.
+- [x] **Real fonts**: vendored Cormorant Garamond (OFL, 8 static TTFs + fonts.conf, `src/assets/fonts/`); FONTCONFIG_PATH set in tributeRenderer before Sharp's first render. Before: SVG asked for Georgia, which doesn't exist on Railway — prints silently fell back to a generic serif.
+- [x] **Layout parity**: nickname moved to footer (curly quotes, italic) above a single italic family line — matching the preview exactly.
+- [x] **Customer adjustments survive to print**: divider-drag panel ratios + per-photo zoom/pan now sent at purchase (`customRatios`, `photoCrops`), sanitized in checkout.js (clamped zoom 1–3, pan 0–1, fr 2-track), consumed by calculateLayout/renderPhotoCover (EXIF auto-orient added). Legacy orders unaffected (fields absent = old behavior).
+- [x] Verified by rendering real proofs (poemFirst + ratios 1.35:1 + zoom 1.8/panX 0.15 gradient test — all visible in output) and a 4200×3300 print file.
+
+### Mobile + customizer UX
+- [x] Removed `capture="environment"` (forced Android into camera, hid gallery).
+- [x] HEIC uploads: skip undecodable local preview, show "Preparing photo" placeholder, swap in server-converted JPEG thumbnail.
+- [x] Size grid: renders `sublabel`; unframed rungs sit under a quiet "Without a frame" divider, visually secondary (brand rule: cheap tiers never advertised).
+- [x] Frame chooser hidden + upcharge zeroed on print-/digital- SKUs (button price previously overstated vs Stripe charge); preview shows a bare print (no molding) for those SKUs.
+- [x] Sticky preview top 64→57px (header height match).
+- [x] proof-approval product label fixed ("digital-11 x 14" → "Digital Keepsake").
+
+### Trust + measurement
+- [x] **Proof page now shows the chosen frame** — proofApproval API returns `{frame}` (molding gradient + true faceIn scale); approval page wraps the frameless proof in it with a "Shown in your chosen frame" note.
+- [x] **Meta Pixel resurrected on the money page**: customize.html now loads /js/env.js + the standard SBM_ENV-gated pixel (its old `typeof META_PIXEL_ID` gate could never pass). Rest of the funnel already had the correct snippet.
+- [x] begin_checkout/InitiateCheckout moved to the purchase button with the REAL order value; marketing-page CTA clicks are now `customize_cta_click` (was hardcoded $119 begin_checkout, double-counting).
+
+### Luma hardening
+- [x] placeOrder explicitly rejects `digital-` SKUs (was only blocked incidentally by missing shipping).
+- [x] Fallback frame subcategories aligned to the catalog frames (classic-dark 105005→105001 etc.) — a fallback order now ships the same Black frame the catalog sells.
+
+### SEO + polish
+- [x] Homepage footer "Free Comfort Tools" column de-orphans the 3 free tools.
+- [x] 14 dead LFH route handlers removed (302 block owns those paths).
+- [x] Homepage title retitled brand-first — no longer cannibalizes /pet-memorial-gifts.
+- [x] Homepage frame mockups restyled to the light cream product (were still showing the old dark design — contradicted what the customizer sells).
+
+### Still open (David's side)
+- [ ] Resend SMTP: create account, verify domain, put SMTP_* + ADMIN_EMAIL on Railway (hard blocker for digital delivery emails).
+- [ ] META_PIXEL_ID on Railway (site wiring is ready).
+- [ ] One real test order each: framed (included frame), framed (signature), print-11x14, digital.
+- [ ] Repo visibility decision (public: strategy docs stay local).
+
+---
+
 ## Pass 12 — Mobile design-tool ergonomics (BUILT, approved 2026-07-10; not committed)
 
 David: "did you check our design tool in mobile? can our user experience be improved?" I hadn't — prior pass verified print output, not live mobile. Read the customizer layout + touch code. Touch is well-wired (pan, pinch, divider-drag, iOS zoom guard, zoom-to-read). Four real, code-evident friction points. Fixing all four.

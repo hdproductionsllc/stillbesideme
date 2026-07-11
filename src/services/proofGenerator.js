@@ -39,9 +39,10 @@ function buildWatermarkSvg(width, height) {
 }
 
 // Photo cover-fit is shared via tributeRenderer.renderPhotoCover —
-// it honors percent smart-crop positions that sharp's `position` rejects.
-const renderPhoto = (photoPath, region, cropPosition, quality) =>
-  renderPhotoCover(photoPath, region, cropPosition, quality || 90);
+// it honors percent smart-crop positions that sharp's `position` rejects,
+// and the customer's zoom/pan from the customizer preview when present.
+const renderPhoto = (photoPath, region, cropPosition, quality, crop) =>
+  renderPhotoCover(photoPath, region, cropPosition, quality || 90, crop);
 
 /**
  * Generate a proof image for an order.
@@ -68,7 +69,7 @@ async function generateProof(order) {
   } else {
     totalW = isLandscapeLayout(layout) ? 1600 : 1000;
     totalH = isLandscapeLayout(layout) ? 1000 : 1600;
-    panels = calculateLayout(layout, totalW, totalH);
+    panels = calculateLayout(layout, totalW, totalH, data.customRatios);
   }
 
   // Poem position: swap photo/tribute regions to match the customer's preview.
@@ -83,7 +84,7 @@ async function generateProof(order) {
 
   // Main photo
   const photoBuffer = await renderPhoto(
-    photoPath, panels.photo, data.mainPhoto.crop?.position, 90,
+    photoPath, panels.photo, data.mainPhoto.crop?.position, 90, data.photoCrops?.photo,
   );
   layers.push({ input: photoBuffer, left: panels.photo.left, top: panels.photo.top });
 
@@ -93,7 +94,7 @@ async function generateProof(order) {
       ? data.panel2Path
       : photoPath;
     const p2CropPos = data.panel2Photo?.crop?.position || 'centre';
-    const panel2Buffer = await renderPhoto(p2Path, panels.panel2, p2CropPos, 90);
+    const panel2Buffer = await renderPhoto(p2Path, panels.panel2, p2CropPos, 90, data.photoCrops?.panel2);
     layers.push({ input: panel2Buffer, left: panels.panel2.left, top: panels.panel2.top });
   }
 

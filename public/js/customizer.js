@@ -41,9 +41,11 @@
   // Poem format ('poem' or 'letter') for templates with poemFormats
   let poemFormat = 'poem';
 
-  // Default frame shown before a photo is uploaded (warm taupe + cream engraving)
+  // Default frame shown before a photo is uploaded. The accent is the warm
+  // gold the print pipeline uses for dividers (tributeRenderer PAPER_PALETTE)
+  // — keep them in sync so the preview divider matches the printed one.
   const DEFAULT_AUTO_COLORS = {
-    frame: '#6E5C4E', accent: '#F4ECDD', tone: 'dark',
+    frame: '#6E5C4E', accent: '#C4A882', tone: 'dark',
     mat: '#1f1b17', bevel: '#C4A882', text: '#FAF8F5'
   };
 
@@ -178,6 +180,7 @@
       const initialProduct = document.querySelector('.product-option.selected');
       if (initialProduct && initialProduct.dataset.sku && PreviewRenderer.setFrameSize) {
         PreviewRenderer.setFrameSize(initialProduct.dataset.sku);
+        updateFrameSectionVisibility(initialProduct.dataset.sku);
       }
 
       // Attach divider handles after initial layout
@@ -321,9 +324,12 @@
         <div class="upload-zone-icon">&#128247;</div>
         <div class="upload-zone-text">${slot.sublabel || slot.label}</div>
         <div class="upload-zone-hint">Drag & drop, or click to browse</div>
-        <input type="file" id="upload-input-${slot.id}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment">
+        <input type="file" id="upload-input-${slot.id}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif">
       </div>
     `;
+    // No capture attribute on the file input: customers pick an existing photo of their pet
+    // from the gallery; capture="environment" forced Android straight
+    // into the camera and hid the photo library.
 
     const zone = wrapper.querySelector('.upload-zone');
     const input = wrapper.querySelector('input[type="file"]');
@@ -358,11 +364,16 @@
     // Map slot IDs to panel IDs
     const panelId = slotId === 'main' ? 'photo' : slotId;
 
-    const localUrl = URL.createObjectURL(file);
+    // HEIC/HEIF can't be decoded by non-Apple browsers, so a local object-URL
+    // preview renders blank and reads as a failed upload. Skip the local
+    // preview for those — the server converts to JPEG on upload and we swap
+    // in its thumbnail as soon as the response arrives.
+    const isHeic = /\.(heic|heif)$/i.test(file.name) || /heic|heif/i.test(file.type || '');
+    const localUrl = isHeic ? null : URL.createObjectURL(file);
     photoUploaded[panelId] = true;
-    PreviewRenderer.setPhoto(panelId, localUrl, '50% 50%');
+    if (localUrl) PreviewRenderer.setPhoto(panelId, localUrl, '50% 50%');
 
-    showUploadPreview(slotId, localUrl, wrapper, 'Uploading...');
+    showUploadPreview(slotId, localUrl, wrapper, isHeic ? 'Preparing your photo…' : 'Uploading...');
 
     const formData = new FormData();
     formData.append('photo', file);
@@ -399,13 +410,19 @@
 
     if (zone) zone.style.display = 'none';
 
+    // HEIC uploads have no local preview (browsers outside Safari can't
+    // decode them) — show a quiet placeholder until the server's converted
+    // thumbnail arrives.
+    const PLACEHOLDER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="90"><rect width="120" height="90" fill="#EFEBE4"/><text x="60" y="50" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#928B82">Preparing photo</text></svg>');
+
     if (existing) {
-      existing.querySelector('img').src = imageUrl;
+      existing.querySelector('img').src = imageUrl || PLACEHOLDER;
     } else {
       const preview = document.createElement('div');
       preview.className = 'upload-preview';
       preview.innerHTML = `
-        <img src="${imageUrl}" alt="Uploaded photo">
+        <img src="${imageUrl || PLACEHOLDER}" alt="Uploaded photo">
         <div class="upload-preview-actions">
           <button class="upload-replace-btn">Replace photo</button>
           <span class="quality-badge" id="quality-badge-${slotId}"></span>
@@ -1340,15 +1357,29 @@
     const grid = document.createElement('div');
     grid.className = 'product-grid';
 
+    // Framed sizes render first and prominent; the unframed rungs (print-only,
+    // digital) sit under a quiet divider, visually secondary — they exist for
+    // the customer who can't stretch to a frame, never as the headline.
+    let quietDividerAdded = false;
     for (const product of template.printProducts) {
+      const framed = product.sku.startsWith('framed-');
+      if (!framed && !quietDividerAdded) {
+        const divider = document.createElement('div');
+        divider.className = 'product-grid-divider';
+        divider.textContent = 'Without a frame';
+        grid.appendChild(divider);
+        quietDividerAdded = true;
+      }
+
       const option = document.createElement('div');
-      option.className = `product-option${product.default ? ' selected' : ''}`;
+      option.className = `product-option${product.default ? ' selected' : ''}${framed ? '' : ' product-option-quiet'}`;
       option.dataset.sku = product.sku;
       option.dataset.price = product.price;
       option.innerHTML = `
         <div>
           <span class="product-option-label">${product.label}</span>
           ${product.badge ? `<span class="product-option-badge">${product.badge}</span>` : ''}
+          ${product.sublabel ? `<span class="product-option-sublabel">${product.sublabel}</span>` : ''}
         </div>
         <span class="product-option-price">$${(product.price / 100).toFixed(2)}</span>
       `;
@@ -1356,6 +1387,7 @@
       option.addEventListener('click', () => {
         grid.querySelectorAll('.product-option').forEach(o => o.classList.remove('selected'));
         option.classList.add('selected');
+        updateFrameSectionVisibility(product.sku);
         updatePurchaseButton();
         // Update preview to match frame proportions
         if (PreviewRenderer && PreviewRenderer.setFrameSize) {
@@ -1693,12 +1725,27 @@
     };
   }
 
+  /** Frames only apply to framed products (mirrors the server's guard). */
+  function isFramedSku(sku) {
+    return typeof sku === 'string' && sku.startsWith('framed-');
+  }
+
+  /** Hide the frame chooser for print-only/digital \u2014 no frame ships with them. */
+  function updateFrameSectionVisibility(sku) {
+    const container = document.getElementById('style-selector');
+    if (!container || !template.frameOptions) return;
+    container.style.display = isFramedSku(sku) ? '' : 'none';
+  }
+
   function updatePurchaseButton() {
     const btn = document.getElementById('purchase-btn');
     if (!btn) return;
     const product = getSelectedProduct();
     if (product) {
-      const total = product.price + frameUpchargeCents();
+      // The frame upcharge only exists on framed products \u2014 the server
+      // charges 0 for print-only/digital, so the button must agree.
+      const upcharge = isFramedSku(product.sku) ? frameUpchargeCents() : 0;
+      const total = product.price + upcharge;
       btn.textContent = `Purchase \u2013 $${(total / 100).toFixed(2)}`;
     }
   }
@@ -1720,6 +1767,20 @@
       return;
     }
 
+    // Real checkout intent — fire GA4 + Meta with the true order value.
+    // (The marketing pages' CTA-click event is top-of-funnel only; this is
+    // the one that carries the amount the customer is about to pay.)
+    try {
+      const upcharge = isFramedSku(product.sku) ? frameUpchargeCents() : 0;
+      const value = (product.price + upcharge) / 100;
+      if (typeof gtag === 'function') {
+        gtag('event', 'begin_checkout', { currency: 'USD', value });
+      }
+      if (typeof fbq === 'function' && window.SBM_ENV && window.SBM_ENV.metaPixelId) {
+        fbq('track', 'InitiateCheckout', { currency: 'USD', value });
+      }
+    } catch (e) { /* analytics must never block checkout */ }
+
     // Disable button and show loading
     btn.disabled = true;
     btn.textContent = 'Preparing checkout...';
@@ -1740,6 +1801,14 @@
           frameIcon,
           frameChoice: currentFrame,
           poemFirst,
+          // What the customer framed on screen must be what prints: the
+          // divider-drag panel ratios and each photo's zoom/pan. The server
+          // sanitizes both and its renderers reproduce them exactly.
+          customRatios: PreviewRenderer.getCurrentFrValues(),
+          photoCrops: {
+            photo: PreviewRenderer.getPhotoCrop('photo'),
+            panel2: PreviewRenderer.getPhotoCrop('panel2'),
+          },
         }),
       });
 

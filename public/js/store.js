@@ -138,18 +138,14 @@
   // ============================================================
   // GA4 E-commerce Events
   // ============================================================
-  // Track "Create a Tribute" CTA clicks as begin_checkout
+  // Track "Create a Tribute" CTA clicks as top-of-funnel intent only.
+  // The real begin_checkout / InitiateCheckout fires from the customizer's
+  // purchase button with the true order value (customizer.js) — firing it
+  // here too would double-count the funnel and stamp it with a made-up value.
   document.querySelectorAll('a[href*="/customize"]').forEach(link => {
     link.addEventListener('click', () => {
       if (typeof gtag === 'function') {
-        gtag('event', 'begin_checkout', {
-          currency: 'USD',
-          value: 119.00,
-        });
-      }
-      // Meta Pixel (only when the pixel is live via /js/env.js)
-      if (typeof fbq === 'function' && window.SBM_ENV && window.SBM_ENV.metaPixelId) {
-        fbq('track', 'InitiateCheckout');
+        gtag('event', 'customize_cta_click');
       }
     });
   });

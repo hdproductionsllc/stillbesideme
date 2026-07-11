@@ -43,6 +43,32 @@
       width: 100%;
       height: auto;
     }
+    /* The proof image is frameless — for framed orders we draw the chosen
+       frame around it (same molding gradient the customizer preview uses)
+       so the customer approves the full look, frame included. */
+    .proof-image-wrap.has-frame {
+      border-radius: 2px;
+      overflow: visible;
+      box-shadow: none;
+    }
+    .proof-frame {
+      border-radius: 2px;
+      line-height: 0;
+      box-shadow:
+        0 12px 45px rgba(0, 0, 0, 0.4),
+        0 3px 14px rgba(0, 0, 0, 0.25),
+        inset 0 2px 0 rgba(255, 255, 255, 0.18),
+        inset 0 -2px 0 rgba(0, 0, 0, 0.3);
+    }
+    .proof-frame img {
+      box-shadow: inset 0 2px 7px rgba(0, 0, 0, 0.3);
+    }
+    .proof-frame-note {
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--color-muted, #8a8378);
+      margin: calc(var(--space-xl) * -0.6) 0 var(--space-xl);
+    }
     .order-summary {
       background: var(--color-surface);
       border-radius: 12px;
@@ -202,6 +228,16 @@
       return;
     }
 
+    // Human-readable product line (mirrors itemNameForSku in order-confirmed.html)
+    function productLabelForSku(sku) {
+      if (!sku) return 'Pet Tribute';
+      const size = sku.replace(/^(framed|print|digital)-/, '').replace('x', ' × ');
+      if (sku.indexOf('digital-') === 0) return 'Digital Keepsake';
+      if (sku.indexOf('print-') === 0) return `Print only – ${size}"`;
+      if (sku.indexOf('framed-') === 0) return `Framed ${size}"`;
+      return sku;
+    }
+
     fetch(`/api/proof/${encodeURIComponent(token)}/data`)
       .then(r => {
         if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Not found'); });
@@ -222,6 +258,12 @@
 
         const total = data.totalCents ? `$${(data.totalCents / 100).toFixed(2)}` : '';
         const shortId = data.orderId.substring(0, 8).toUpperCase();
+        // Frame face width at true scale: face / (print width + both faces),
+        // so a thin 0.875" black and a wide signature frame read differently.
+        const frameSize = (data.sku || '').match(/(\d+)x(\d+)/);
+        const framePadPct = data.frame
+          ? (data.frame.faceIn / ((frameSize ? parseInt(frameSize[1], 10) : 11) + 2 * data.frame.faceIn) * 100).toFixed(1)
+          : 0;
         const shipping = data.shipping;
         const shippingLine = shipping ? `${shipping.city || ''}, ${shipping.state || ''} ${shipping.zip || ''}` : '';
 
@@ -235,9 +277,14 @@
             <p class="subtitle">Please review carefully before approving — this is exactly how your tribute will be printed.</p>
           </div>
 
-          <div class="proof-image-wrap">
-            <img src="${data.proofUrl}" alt="Your tribute proof" id="proofImage" />
+          <div class="proof-image-wrap${data.frame && data.frame.molding ? ' has-frame' : ''}">
+            ${data.frame && data.frame.molding
+              ? `<div class="proof-frame" style="background:${data.frame.molding};padding:${framePadPct}%">
+                   <img src="${data.proofUrl}" alt="Your tribute proof" id="proofImage" />
+                 </div>`
+              : `<img src="${data.proofUrl}" alt="Your tribute proof" id="proofImage" />`}
           </div>
+          ${data.frame ? `<p class="proof-frame-note">Shown in your chosen frame &ndash; ${data.frame.label}</p>` : ''}
 
           ${previousNotesHtml}
 
@@ -249,7 +296,7 @@
             </div>
             <div class="detail-row">
               <span class="detail-label">Product</span>
-              <span class="detail-value">${data.sku.replace('framed-', 'Framed ').replace('x', ' x ')}"</span>
+              <span class="detail-value">${productLabelForSku(data.sku)}</span>
             </div>
             ${total ? `<div class="detail-row"><span class="detail-label">Total</span><span class="detail-value">${total}</span></div>` : ''}
             ${shippingLine ? `<div class="detail-row"><span class="detail-label">Ships to</span><span class="detail-value">${shippingLine}</span></div>` : ''}

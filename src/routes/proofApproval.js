@@ -12,6 +12,28 @@ const emailService = require('../services/emailService');
 
 const VALID_PROOF_STATUSES = ['proof_ready', 'change_requested'];
 
+/**
+ * Resolve the customer's chosen frame from the template so the approval
+ * page can draw it around the proof (the proof image itself is frameless).
+ * Returns { id, label, molding, faceIn } or null for unframed products.
+ */
+function resolveFrameForDisplay(templateId, fields, sku) {
+  if (typeof sku !== 'string' || !sku.startsWith('framed-')) return null;
+  try {
+    const template = require('../services/tributeRenderer').loadTemplate(templateId);
+    const fo = template && template.frameOptions;
+    if (!fo || !Array.isArray(fo.groups)) return null;
+    const all = fo.groups.reduce((acc, g) => acc.concat(g.choices || []), []);
+    const chosen = all.find(c => c.id === (fields && fields.frameChoice))
+      || all.find(c => c.id === fo.default)
+      || all[0];
+    if (!chosen) return null;
+    return { id: chosen.id, label: chosen.label || chosen.id, molding: chosen.molding || null, faceIn: chosen.faceIn || 0.875 };
+  } catch (err) {
+    return null;
+  }
+}
+
 /** Look up an order by proof token and validate status. */
 function findOrderByToken(db, token) {
   if (!token || token.length < 8) return null;
@@ -47,6 +69,9 @@ router.get('/:token/data', (req, res) => {
     proofUrl: order.proof_url,
     shipping,
     style: fields.style,
+    // Chosen frame (null for print-only/digital) — lets the approval page
+    // draw the frame around the frameless proof image.
+    frame: resolveFrameForDisplay(order.template_id, fields, order.product_sku),
     name: fields[getNameField(order.template_id, fields)] || '',
     changeRequestNotes: order.change_request_notes || null,
     createdAt: order.created_at,

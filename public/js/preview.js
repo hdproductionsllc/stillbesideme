@@ -686,10 +686,16 @@
   }
 
   function setFrameSize(sku) {
-    // Parse "framed-11x14" → [11, 14]
-    var match = sku && sku.match(/framed-(\d+)x(\d+)/);
+    // Parse "framed-11x14" / "print-11x14" / "digital-11x14" → [11, 14]
+    var match = sku && sku.match(/^(framed|print|digital)-(\d+)x(\d+)/);
     if (!match) { frameDims = null; return; }
-    frameDims = [parseInt(match[1], 10), parseInt(match[2], 10)];
+    frameDims = [parseInt(match[2], 10), parseInt(match[3], 10)];
+
+    // Print-only and digital keepsakes ship without a frame — the preview
+    // shows the bare print (paper edge, soft shadow, no molding).
+    var frameRoot = document.getElementById('frame-preview');
+    if (frameRoot) frameRoot.classList.toggle('no-frame', match[1] !== 'framed');
+
     applyGridStyles(currentLayout);
     // Double rAF ensures browser has reflowed the CSS aspect-ratio
     // change before we measure panel dimensions and re-render text

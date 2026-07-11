@@ -4,3 +4,4 @@ output/
 data/*.db
 data/sessions/
 .env
+src/assets/fonts/cache/

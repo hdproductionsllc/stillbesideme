@@ -399,6 +399,24 @@
 .frame-preview.theme-auto .preview-panels::before { content: none; }
 .frame-preview.theme-auto .panel { box-shadow: none; }
 
+/* --- Frameless (print-only / digital keepsake) ---
+   No frame ships with these products, so the preview shows the bare print:
+   paper edge and a soft lift off the wall, no molding, no engraved rails. */
+.frame-preview.no-frame .frame-border {
+  background: none;
+  box-shadow: none;
+}
+.frame-preview.no-frame.theme-auto .frame-name,
+.frame-preview.no-frame.theme-auto .frame-dates {
+  display: none;
+}
+.frame-preview.no-frame.theme-auto .mat-board {
+  margin: 0;
+  box-shadow:
+    0 10px 35px rgba(0, 0, 0, 0.28),
+    0 2px 10px rgba(0, 0, 0, 0.16);
+}
+
 /* Engraved-symbol picker (none / paw / heart) */
 .icon-picker {
   display: flex;
@@ -1329,6 +1347,44 @@
   color: var(--color-primary);
 }
 
+/* Secondary line under a product label ("ready for your own frame", …) */
+.product-option-sublabel {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--color-muted, #8a8378);
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+/* Quiet tier: the unframed rungs sit below the framed sizes, deliberately
+   understated — available, never advertised. */
+.product-grid-divider {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-muted, #8a8378);
+  margin: var(--space-sm, 0.75rem) 0 0;
+}
+
+.product-option-quiet {
+  opacity: 0.85;
+  padding: calc(var(--space-md) * 0.7) var(--space-md);
+}
+
+.product-option-quiet .product-option-label {
+  font-weight: 500;
+  font-size: 0.95em;
+}
+
+.product-option-quiet .product-option-price {
+  font-size: 1rem;
+}
+
+.product-option-quiet.selected {
+  opacity: 1;
+}
+
 /* ============================================================
    CART ACTION
    ============================================================ */
@@ -1368,7 +1424,7 @@
 
   .preview-stage {
     position: sticky;
-    top: 64px;
+    top: 57px; /* matches .site-header height — a larger value opens a gap */
     z-index: 21;
     width: 100%;
     background: #1a1714;

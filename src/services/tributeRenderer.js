@@ -10,7 +10,38 @@ const path = require('path');
 const fs = require('fs');
 const colorUtils = require('./colorUtils');
 
+// Sharp rasterizes our SVGs through fontconfig. Point it at the vendored
+// Cormorant Garamond files so print/proof text renders in the exact typeface
+// the customizer preview shows — on any host. (Railway's containers ship no
+// Georgia, so the old stack silently fell back to a generic serif.)
+// Must be set before Sharp's first render; every render path requires this
+// module first, so this is the one reliable place.
+if (!process.env.FONTCONFIG_PATH) {
+  process.env.FONTCONFIG_PATH = path.join(__dirname, '..', 'assets', 'fonts');
+}
+
 const TEMPLATES_DIR = path.join(__dirname, '..', 'data', 'templates');
+
+// The typeface the customizer preview uses — vendored in src/assets/fonts.
+const FONT_SERIF = "'Cormorant Garamond', Georgia, serif";
+
+// The light "paper insert" palette the customizer preview shows for
+// colorMode:"auto" templates (mirrors preview.js setColors — keep in sync).
+// Cream paper, dark ink, warm gold accent.
+const PAPER_INK = '#332C26';
+const PAPER_BG = '#FAF7F2';
+const PAPER_PALETTE = Object.freeze({
+  background: PAPER_BG,
+  name: PAPER_INK,
+  dates: PAPER_INK,
+  divider: '#C4A882',
+  poem: PAPER_INK,
+  nickname: colorUtils.mix(PAPER_INK, PAPER_BG, 0.18),
+  family: colorUtils.mix(PAPER_INK, PAPER_BG, 0.28),
+  mat: PAPER_BG,
+  bevel: '#C4A882',
+  tone: 'light',
+});
 
 // ─── Template Loading ────────────────────────────────────────────────
 
@@ -130,25 +161,21 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
   const elements = [];
   const maxContentH = height - Math.round(height * 0.12);
 
+  // Header mirrors the preview: name, dates, divider. The nickname lives in
+  // the footer (with the family line), exactly where the preview draws it.
+
   // Name
   if (name) {
     y += nameFontSize;
-    elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="${nameFontSize}" fill="${escSvg(colors.name)}" font-weight="400">${escSvg(name)}</text>`);
+    elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="${FONT_SERIF}" font-size="${nameFontSize}" fill="${escSvg(colors.name)}" font-weight="500">${escSvg(name)}</text>`);
     y += 10;
-  }
-
-  // Nickname
-  if (nickname) {
-    y += nicknameFontSize;
-    elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="${nicknameFontSize}" fill="${escSvg(colors.nickname)}" font-style="italic">"${escSvg(nickname)}"</text>`);
-    y += 16;
   }
 
   // Dates
   const dates = [birthDate, passDate].filter(Boolean).join(' \u2013 ');
   if (dates) {
     y += datesFontSize;
-    elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="sans-serif" font-size="${datesFontSize}" fill="${escSvg(colors.dates)}">${escSvg(dates)}</text>`);
+    elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="${FONT_SERIF}" font-size="${datesFontSize}" fill="${escSvg(colors.dates)}" font-weight="300">${escSvg(dates)}</text>`);
     y += 20;
   }
 
@@ -166,9 +193,13 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
   // clipped longer letters in portrait). We hold the poem at full size when it
   // fits and shrink the font only as far as needed, down to a legible floor.
   if (poemText) {
-    // Height the family block below the poem will consume (so we reserve it).
-    const familyReserve = familyName
-      ? 16 + 24 + familyFontSize + 8 + Math.round(familyFontSize * 1.15) + Math.round(familyFontSize * 0.4)
+    // Height the footer block below the poem will consume (so we reserve it):
+    // divider, optional nickname line, optional family line.
+    const familyReserve = (nickname || familyName)
+      ? 16
+        + (nickname ? 24 + nicknameFontSize : 0)
+        + (familyName ? (nickname ? Math.round(nicknameFontSize * 0.9) : 24) + familyFontSize : 0)
+        + Math.round(familyFontSize * 0.4)
       : 0;
     const poemAvailH = maxContentH - y - familyReserve;
 
@@ -199,21 +230,28 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
         continue;
       }
       y += fit.lh;
-      elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="${poemSize}" fill="${escSvg(colors.poem)}" font-style="italic">${escSvg(line)}</text>`);
+      elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="${FONT_SERIF}" font-size="${poemSize}" fill="${escSvg(colors.poem)}" font-weight="300">${escSvg(line)}</text>`);
     }
     y += 16;
   }
 
-  // Divider before family
-  if (familyName) {
+  // Footer mirrors the preview: divider, then the nickname in quotes, then
+  // the family line as a single italic sentence ("Beloved companion of the
+  // Smith family") — not the old stacked prefix/name pair.
+  if (nickname || familyName) {
     const divW2 = Math.round(innerW * 0.15);
     elements.push(`<line x1="${(width - divW2) / 2}" y1="${y}" x2="${(width + divW2) / 2}" y2="${y}" stroke="${escSvg(colors.divider)}" stroke-width="1.5" />`);
-    y += 24 + familyFontSize;
 
-    const prefix = familyPrefix || 'Forever loved by';
-    elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="sans-serif" font-size="${familyFontSize}" fill="${escSvg(colors.family)}">${escSvg(prefix)}</text>`);
-    y += 8 + Math.round(familyFontSize * 1.15);
-    elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="${Math.round(familyFontSize * 1.15)}" fill="${escSvg(colors.family)}">${escSvg(familyName)}</text>`);
+    if (nickname) {
+      y += 24 + nicknameFontSize;
+      elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="${FONT_SERIF}" font-size="${nicknameFontSize}" fill="${escSvg(colors.nickname)}" font-style="italic" font-weight="400">“${escSvg(nickname)}”</text>`);
+    }
+
+    if (familyName) {
+      y += (nickname ? Math.round(nicknameFontSize * 0.9) : 24) + familyFontSize;
+      const prefix = familyPrefix || 'Forever loved by';
+      elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="${FONT_SERIF}" font-size="${familyFontSize}" fill="${escSvg(colors.family)}" font-style="italic" font-weight="300">${escSvg(`${prefix} ${familyName}`)}</text>`);
+    }
   }
 
   // Vertically center the content block (with a minimum top margin)
@@ -267,6 +305,16 @@ function resolveColors(template, fields) {
       bevel,
       tone,
     };
+  }
+
+  // Auto-color templates (pet-tribute) print the same light "paper insert"
+  // the customizer preview shows: cream paper, dark ink, warm gold accent.
+  // The preview is the product truth — the customer designs on this palette,
+  // so the proof and print must come out of it too. (Before this branch,
+  // these orders fell through to the legacy dark classic-dark variant and
+  // shipped the inverse of what was designed.)
+  if (template.colorMode === 'auto') {
+    return { ...PAPER_PALETTE };
   }
 
   // Legacy path: style variant lookup
@@ -356,10 +404,43 @@ const sharp = require('sharp');
  * @param {{width:number,height:number}} region
  * @param {string} [cropPosition]
  * @param {number} [jpegQuality] — when set, output is JPEG at this quality
+ * @param {{zoom:number,panX:number,panY:number}} [crop] — the customer's
+ *   zoom/pan from the customizer preview; when present it wins over
+ *   cropPosition so the print shows exactly what they framed on screen
  */
-async function renderPhotoCover(photoPath, region, cropPosition, jpegQuality) {
+async function renderPhotoCover(photoPath, region, cropPosition, jpegQuality, crop) {
   const finish = (pipeline) =>
     (jpegQuality ? pipeline.jpeg({ quality: jpegQuality }) : pipeline).toBuffer();
+
+  // Customer crop path — replicates preview.js drawCoverImage exactly:
+  // cover-fit the region's aspect, zoom tightens that window, pan (0..1,
+  // 0.5 = centered) positions it. Values were sanitized at checkout, but
+  // clamp again — this math must never produce an out-of-bounds extract.
+  if (crop && Number.isFinite(Number(crop.zoom))) {
+    const zoom = Math.min(3, Math.max(1, Number(crop.zoom)));
+    const panX = Math.min(1, Math.max(0, Number.isFinite(Number(crop.panX)) ? Number(crop.panX) : 0.5));
+    const panY = Math.min(1, Math.max(0, Number.isFinite(Number(crop.panY)) ? Number(crop.panY) : 0.5));
+
+    const meta = await sharp(photoPath).metadata();
+    // Browsers auto-orient EXIF-rotated photos before the customer pans
+    // them; mirror that (rotate() below) so the pan lands on the same pixels.
+    const exifSwapped = (meta.orientation || 1) >= 5;
+    const imgW = exifSwapped ? meta.height : meta.width;
+    const imgH = exifSwapped ? meta.width : meta.height;
+
+    const scale = Math.max(region.width / imgW, region.height / imgH);
+    const cropW = Math.max(1, Math.min(imgW, Math.round(region.width / scale / zoom)));
+    const cropH = Math.max(1, Math.min(imgH, Math.round(region.height / scale / zoom)));
+    const left = Math.max(0, Math.min(imgW - cropW, Math.round((imgW - cropW) * panX)));
+    const top = Math.max(0, Math.min(imgH - cropH, Math.round((imgH - cropH) * panY)));
+
+    return finish(
+      sharp(photoPath)
+        .rotate() // apply EXIF orientation, matching the browser
+        .extract({ left, top, width: cropW, height: cropH })
+        .resize(region.width, region.height)
+    );
+  }
 
   const pctMatch = typeof cropPosition === 'string'
     && cropPosition.match(/^(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%$/);
@@ -410,16 +491,31 @@ function isLandscapeLayout(layout) {
  * @param {string} layout
  * @param {number} totalW
  * @param {number} totalH
+ * @param {{columns?:number[], rows?:number[]}} [ratios] — the customer's
+ *   divider-drag fr values from the customizer preview. Each layout falls
+ *   back to its default proportions when absent (legacy orders unchanged).
  * @returns {{ photo: Region, tribute: Region, panel2: Region|null }}
  */
-function calculateLayout(layout, totalW, totalH) {
+function calculateLayout(layout, totalW, totalH, ratios) {
+  // First-track fraction from a 2-track fr array (e.g. [1.15, 1] → 0.535),
+  // clamped to the divider-drag bounds so a bad payload can't crush a panel.
+  const frac = (tracks, fallback) => {
+    if (!Array.isArray(tracks) || tracks.length !== 2) return fallback;
+    const a = Number(tracks[0]);
+    const b = Number(tracks[1]);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) return fallback;
+    return Math.min(0.8, Math.max(0.2, a / (a + b)));
+  };
+  const cols = ratios && ratios.columns;
+  const rows = ratios && ratios.rows;
+
   switch (layout) {
 
     // ── 2-panel layouts ──────────────────────────────────────────
 
     case 'side-by-side': {
       // columns [1, 1] — photo left, tribute right
-      const colW = Math.round(totalW * 0.5);
+      const colW = Math.round(totalW * frac(cols, 0.5));
       return {
         photo:   { left: 0,    top: 0, width: colW,            height: totalH },
         tribute: { left: colW, top: 0, width: totalW - colW,   height: totalH },
@@ -429,7 +525,7 @@ function calculateLayout(layout, totalW, totalH) {
 
     case 'stacked': {
       // rows [1, 1] — photo top, tribute bottom
-      const rowH = Math.round(totalH * 0.5);
+      const rowH = Math.round(totalH * frac(rows, 0.5));
       return {
         photo:   { left: 0, top: 0,    width: totalW, height: rowH },
         tribute: { left: 0, top: rowH, width: totalW, height: totalH - rowH },
@@ -442,9 +538,9 @@ function calculateLayout(layout, totalW, totalH) {
     case 'hero-left': {
       // columns [1.15, 1], rows [1, 1]
       // photo spans full left column; panel2 top-right, tribute bottom-right
-      const leftW = Math.round(totalW * (1.15 / 2.15));
+      const leftW = Math.round(totalW * frac(cols, 1.15 / 2.15));
       const rightW = totalW - leftW;
-      const topH = Math.round(totalH * 0.5);
+      const topH = Math.round(totalH * frac(rows, 0.5));
       const bottomH = totalH - topH;
       return {
         photo:   { left: 0,     top: 0,    width: leftW,  height: totalH },
@@ -456,9 +552,9 @@ function calculateLayout(layout, totalW, totalH) {
     case 'hero-top': {
       // columns [1, 1], rows [1.3, 1]
       // photo spans full top row; panel2 bottom-left, tribute bottom-right
-      const topH = Math.round(totalH * (1.3 / 2.3));
+      const topH = Math.round(totalH * frac(rows, 1.3 / 2.3));
       const bottomH = totalH - topH;
-      const leftW = Math.round(totalW * 0.5);
+      const leftW = Math.round(totalW * frac(cols, 0.5));
       const rightW = totalW - leftW;
       return {
         photo:   { left: 0,     top: 0,    width: totalW, height: topH },
@@ -470,9 +566,9 @@ function calculateLayout(layout, totalW, totalH) {
     case 'photos-left': {
       // columns [1, 1.15], rows [1, 1]
       // photo top-left, panel2 bottom-left; tribute spans full right column
-      const leftW = Math.round(totalW * (1 / 2.15));
+      const leftW = Math.round(totalW * frac(cols, 1 / 2.15));
       const rightW = totalW - leftW;
-      const topH = Math.round(totalH * 0.5);
+      const topH = Math.round(totalH * frac(rows, 0.5));
       const bottomH = totalH - topH;
       return {
         photo:   { left: 0,     top: 0,    width: leftW,  height: topH },
@@ -484,9 +580,9 @@ function calculateLayout(layout, totalW, totalH) {
     case 'tribute-top': {
       // columns [1, 1], rows [1, 1.3]
       // tribute spans full top row; photo bottom-left, panel2 bottom-right
-      const topH = Math.round(totalH * (1 / 2.3));
+      const topH = Math.round(totalH * frac(rows, 1 / 2.3));
       const bottomH = totalH - topH;
-      const leftW = Math.round(totalW * 0.5);
+      const leftW = Math.round(totalW * frac(cols, 0.5));
       const rightW = totalW - leftW;
       return {
         photo:   { left: 0,     top: topH, width: leftW,  height: bottomH },
@@ -497,7 +593,7 @@ function calculateLayout(layout, totalW, totalH) {
 
     default:
       // Fall back to side-by-side
-      return calculateLayout('side-by-side', totalW, totalH);
+      return calculateLayout('side-by-side', totalW, totalH, ratios);
   }
 }
 
@@ -565,6 +661,10 @@ function resolveOrderData(order) {
     panel2Photo,
     panel2Path,
     poemLabel: template.poemLabel || 'Poem',
+    // Customer preview adjustments (sanitized at checkout; both null on
+    // legacy orders): divider-drag panel ratios + per-slot photo zoom/pan.
+    customRatios: fields.customRatios || null,
+    photoCrops: fields.photoCrops || null,
   };
 }
 

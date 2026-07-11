@@ -25,12 +25,15 @@ const LUMA_CONFIG = {
   // Still Beside Me store (discovered via GET /api/v1/stores)
   storeId: process.env.LUMA_STORE_ID ? Number(process.env.LUMA_STORE_ID) : 81799,
 
-  // Subcategory = frame color. Using 1.25" profile (supports 5" to 60x40).
-  // The pet tribute ships in the elegant dark frame → Black.
+  // Subcategory = frame color. These are the LAST-RESORT fallbacks when a
+  // frame can't be resolved from the template (resolveFrameSubcategory).
+  // classic-dark points at the same 0.875" Black frame the catalog sells
+  // (105001) — the old 105005 was a different 1.25" profile, so a fallback
+  // order would have shipped a visibly different frame than "Black".
   subcategories: {
-    'classic-dark': 105005,  // 1.25w x 0.875h Black Frame
-    'warm-natural': 105007,  // 1.25w x 0.875h Oak Frame
-    'soft-light':   105006,  // 1.25w x 0.875h White Frame
+    'classic-dark': 105001,  // 1.25w x 0.875h Black Frame (catalog default)
+    'warm-natural': 105003,  // 1.25w x 0.875h Oak Frame (catalog oak)
+    'soft-light':   105002,  // 1.25w x 0.875h White Frame (catalog white)
   },
 
   // We send Luma a FULL-BLEED print: the mat and bevel are already printed
@@ -258,6 +261,14 @@ function resolveFrameSubcategory(templateId, frameId) {
 async function placeOrder(orderId, db) {
   const order = db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
   if (!order) throw new Error(`Order ${orderId} not found`);
+
+  // Digital keepsakes are delivered as a download by adminReview.js — they
+  // must never reach a print vendor. Guard explicitly: without this, a manual
+  // submit (e.g. POST /api/luma/orders/:id/submit) would fall through to the
+  // framed path and place a real framed order for a $19.95 digital product.
+  if (typeof order.product_sku === 'string' && order.product_sku.startsWith('digital-')) {
+    throw new Error(`Order ${orderId} is a digital keepsake (${order.product_sku}) — not a Luma product`);
+  }
 
   const shipping = order.shipping_json ? JSON.parse(order.shipping_json) : null;
   if (!shipping) throw new Error(`Order ${orderId} has no shipping address`);
