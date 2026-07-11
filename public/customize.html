@@ -41,18 +41,23 @@
 
     <!-- Preview Pane (60% desktop, sticky top mobile) -->
     <div class="preview-pane">
-      <div class="frame-preview theme-classic-dark" id="frame-preview">
-        <div class="frame-border">
-          <div class="mat-board">
-            <div class="preview-panels" id="preview-panels">
-              <!-- Panels built dynamically by preview.js -->
+      <!-- Stage = the part that stays pinned on mobile (frame + zoom/swap).
+           The selectors below scroll away with the form so the sticky block
+           stays short and the form is usable. -->
+      <div class="preview-stage">
+        <div class="frame-preview theme-classic-dark" id="frame-preview">
+          <div class="frame-border">
+            <div class="mat-board">
+              <div class="preview-panels" id="preview-panels">
+                <!-- Panels built dynamically by preview.js -->
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <div class="preview-controls">
-        <button type="button" class="preview-zoom-btn" id="preview-zoom-btn" aria-label="Zoom in to read the tribute text">&#128269; Zoom in to read</button>
-        <button type="button" class="preview-zoom-btn" id="poem-flip-btn" aria-label="Swap the photo and poem position">&#8646; Swap photo &amp; poem</button>
+        <div class="preview-controls">
+          <button type="button" class="preview-zoom-btn" id="preview-zoom-btn" aria-label="Zoom in to read the tribute text">&#128269; Zoom in to read</button>
+          <button type="button" class="preview-zoom-btn" id="poem-flip-btn" aria-label="Swap the photo and poem position">&#8646; Swap photo &amp; poem</button>
+        </div>
       </div>
       <!-- Layout selector (rebuilt dynamically by customizer.js) -->
       <div class="layout-selector" id="layout-selector"></div>

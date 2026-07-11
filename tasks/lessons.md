@@ -23,6 +23,13 @@
 - **Frame size updates preview**: When the user selects a product size (e.g., 5x7, 11x14), the preview aspect ratio MUST update to match the real frame proportions. Landscape layouts use the wider dimension as width.
 - **Panel gap = separator line**: Set `.preview-panels` background per theme to a shade slightly different from the tribute background, so the CSS Grid gap reads as an intentional divider. Must be visible in ALL themes, not just classic dark.
 
+## Mobile UX
+- **Verify the LIVE mobile experience, not just the print output.** A pass can prove the SVG/print renderer is correct and still ship a broken customizer on a phone. Read the layout CSS and touch handlers the way a phone exercises them (sticky heights, hover-only affordances, scroll-vs-gesture conflicts) before calling mobile "done."
+- **Pin only the frame, not the whole preview pane.** The full `.preview-pane` (frame + layout/style selectors) is too tall to pin on mobile — it eats the screen and, in a portrait layout, overflows the viewport so `position: sticky` silently stops working. Wrap the frame + zoom controls in `.preview-stage` and pin only that; let the selectors scroll away.
+- **`:hover` affordances are invisible on touch.** The drag-to-resize dividers only revealed on hover, so the feature was undiscoverable on phones. Gate an always-visible grip behind `@media (hover: none)`.
+- **Don't let a canvas hijack page scroll.** A photo-pan handler that `preventDefault`s every touchmove traps the user when the canvas sits at the top of a scrolling page. Use directional intent: decide on the first move (vertical → scroll the page, horizontal → pan, two fingers → pinch) and only `preventDefault` once you've committed to pan/pinch.
+- **Device-aware hint copy.** "Scroll to zoom" is meaningless on a phone. Detect touch with `matchMedia('(pointer: coarse)')` and say "Pinch to zoom" instead.
+
 ## Pricing & Margins
 - **WHCC doesn't expose wholesale pricing via API.** Pricing is on their website: whcc.com → Products → Wall Art → Framing → Framed Prints → Pricing tab.
 - **Always calculate WHCC cost as: frame + mat + acrylic.** The frame price includes a lustre print, but mat and acrylic are add-ons. Mat costs scale dramatically ($3.50 at 5x7, $92 at 30x40).

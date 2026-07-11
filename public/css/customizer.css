@@ -34,6 +34,18 @@
   border-left: 1px solid var(--color-border);
 }
 
+/* The stage holds the frame + zoom/swap controls. On desktop it's a passive
+   column wrapper (spacing identical to before). On mobile it becomes the ONLY
+   pinned element, so the selectors beneath it can scroll away and the form
+   stays reachable. */
+.preview-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+  width: 100%;
+}
+
 /* ============================================================
    CSS FRAME RENDERING – Matted frame around canvas panels
    ============================================================ */
@@ -181,6 +193,28 @@
 
 .divider-handle.dragging::after {
   background: rgba(200, 160, 80, 0.9);
+}
+
+/* Touch devices have no hover, so the drag-to-resize handles would be invisible
+   and undiscoverable. Reveal the line faintly at all times and add a small
+   center grip pill so it clearly reads as draggable. */
+@media (hover: none) {
+  .divider-handle::after {
+    background: rgba(200, 160, 80, 0.4);
+  }
+  .divider-handle::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(214, 178, 108, 0.9);
+    border-radius: 999px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+    z-index: 1;
+  }
+  .divider-handle.col::before { width: 5px; height: 28px; }
+  .divider-handle.row::before { width: 28px; height: 5px; }
 }
 
 /* ============================================================
@@ -1318,18 +1352,27 @@
     flex-direction: column;
   }
 
-  /* The preview floats (sticky) while the form scrolls beneath it. It pins
-     just below the sticky site header (which is ~64px on mobile) so the frame
-     top is never hidden behind it. The pane sizes to its content — no height
-     cap — so the frame is always fully visible and horizontally centered. */
+  /* Only the frame + zoom/swap controls pin (`.preview-stage`); the pane itself
+     is static so the layout/style selectors below scroll away with the form.
+     This keeps the pinned block short — the frame stays visible while you
+     adjust layout up top, and the whole form is reachable beneath it. A tall
+     portrait frame no longer overflows the viewport and breaks stickiness. */
   .preview-pane {
     flex: none;
-    position: sticky;
-    top: 64px;
+    position: static;
     height: auto;
     z-index: 20;
-    padding: var(--space-lg) var(--space-md);
+    padding: 0 0 var(--space-md);
     justify-content: center;
+  }
+
+  .preview-stage {
+    position: sticky;
+    top: 64px;
+    z-index: 21;
+    width: 100%;
+    background: #1a1714;
+    padding: var(--space-md) var(--space-md) var(--space-sm);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
   }
 
@@ -1402,7 +1445,11 @@
 /* Small mobile (375px and below) */
 @media (max-width: 480px) {
   .preview-pane {
-    padding: var(--space-sm);
+    padding: 0 0 var(--space-sm);
+  }
+
+  .preview-stage {
+    padding: var(--space-sm) var(--space-sm) var(--space-xs);
   }
 
   .frame-preview {
@@ -1451,6 +1498,14 @@
   -webkit-overflow-scrolling: touch;
   padding: 56px 16px 80px;
   background: rgba(18, 15, 13, 0.98);
+}
+/* In fullscreen zoom the stage stops pinning so the enlarged frame scrolls. */
+.preview-pane.zoomed .preview-stage {
+  position: static;
+  width: auto;
+  background: none;
+  box-shadow: none;
+  padding: 0;
 }
 .preview-pane.zoomed .frame-preview {
   width: 175%;

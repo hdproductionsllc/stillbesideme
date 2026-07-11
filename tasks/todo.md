@@ -2,6 +2,117 @@
 
 ---
 
+## Pass 12 — Mobile design-tool ergonomics (BUILT, approved 2026-07-10; not committed)
+
+David: "did you check our design tool in mobile? can our user experience be improved?" I hadn't — prior pass verified print output, not live mobile. Read the customizer layout + touch code. Touch is well-wired (pan, pinch, divider-drag, iOS zoom guard, zoom-to-read). Four real, code-evident friction points. Fixing all four.
+
+### Root causes
+1. **Sticky preview eats the screen.** The *entire* `.preview-pane` is pinned on mobile (`customizer.css:1325`) — frame + zoom/swap + layout picker + panel toggle + style thumbs. ~450–500px tall; leaves a sliver for the form. In a portrait layout the stack exceeds viewport height and sticky silently breaks.
+2. **Divider drag invisible on touch.** Handles only reveal on `:hover` (`customizer.css:178`); phones have no hover, so drag-to-resize is undiscoverable.
+3. **Scroll fights photo-pan.** Preview sits at top; its canvas captures every touchmove with `preventDefault` (`customizer.js:570`), so a swipe-to-scroll that starts on the photo pans the photo instead of scrolling the page.
+4. **Hint copy is desktop-only.** "Scroll to zoom" (`customizer.js:442`) — no scroll-to-zoom on a phone; it's pinch.
+
+### Fix plan
+- [x] **#1 Compact sticky preview.** Wrapped `.frame-preview` + `.preview-controls` in a `.preview-stage` (customize.html). Mobile: pin only `.preview-stage` (sticky, top:64px); `.preview-pane` static so the layout/panel/style selectors scroll away. Desktop unchanged. Zoom mode neutralizes stage styling so the enlarged frame scrolls.
+- [x] **#2 Discoverable dividers on touch.** `@media (hover: none)`: divider line at 0.4 opacity always + rounded center grip pill (customizer.css). No change for mouse users.
+- [x] **#3 Directional-intent gesture lock.** First-move intent in the canvas touchmove (customizer.js): <8px = undecided; then vertical-dominant → scroll (no preventDefault), horizontal-dominant / zoom>1 / fullscreen-zoom → pan; two fingers → pinch. saveState only on pan/pinch.
+- [x] **#4 Device-aware hint copy.** `matchMedia('(pointer: coarse)')` → "Drag to reposition. Pinch to zoom." on touch; scroll wording on desktop.
+
+### Verify
+- [x] `node --check` customizer.js + preview.js → OK.
+- [x] CSS brace balance 233/233; HTML wrap confirmed in source + served output.
+- [x] Booted server, `/customize`, `/css/customizer.css`, `/js/customizer.js` all HTTP 200; `preview-stage` present in served HTML.
+- [x] Grep confirmed no JS relied on old direct-child DOM (all id-based; `closest('.preview-pane')` still resolves).
+- [ ] **David's device-mode walkthrough** (below) — the real visual/gesture confirmation; no headless browser in deps.
+- [ ] Optional: throwaway Playwright screenshots if David wants hard before/after proof.
+
+### 2-minute mobile check for David (Chrome DevTools)
+1. `npm start`, open `http://localhost:3001/customize`, press **F12**, click the **device toolbar** icon (Ctrl+Shift+M), pick **iPhone SE**.
+2. Upload a photo → the frame pins at the top; scroll down → the layout/style pickers slide away and the **form is fully reachable** under a compact pinned frame.
+3. Switch to a **vertical/portrait layout** → frame still behaves (no viewport overflow / sticky break).
+4. Swipe **up/down starting on the photo** → the **page scrolls** (doesn't hijack). Swipe **left/right on the photo** → it **pans**. Two-finger **pinch** → zooms.
+5. On a 2-panel layout, look at the seam between photo & tribute → a **faint gold grip** shows; drag it to resize.
+6. The hint under the photo reads **"Drag to reposition. Pinch to zoom."**
+
+### Notes
+- Minimal, surgical: DOM wrap preserves every `id` (JS lookups untouched); CSS changes gated behind mobile / `hover:none` media queries so desktop is byte-for-byte unchanged.
+- Update `tasks/lessons.md` with the "verify live mobile, not just print output" lesson.
+
+---
+
+## Pass 11 — Low-price product line: Digital Keepsake $19.95 + Print-only 11×14 $39 (2026-07-07)
+
+Executing the real `fable_to_opus` handoff (written 07:11, after Pass 10 started). David: "deploy agents to elegantly execute all phases." Built by workflow `wf_79a0b239-8a5` — 5 sequential Phase 1 stages (shared payment files, no parallel), Phase 2, then 2 parallel adversarial verifiers. Main-session review + re-verify before reporting done. **Not committed/deployed — David's trigger.** Phase 3 stays gated (David + 50 orders).
+
+Locked assumptions (David can override): digital price $19.95; surfacing = grid rung + exit-intent + poem-generator CTA; no real charges or real Luma order placed.
+
+### Phase 1 — Digital Keepsake $19.95 ✓ BUILT
+- [x] `digital-11x14` SKU (fulfillment: digital) appended LAST in pet-tribute.json printProducts
+- [x] checkout.js: digital SKU skips `shipping_address_collection`; price still server-side
+- [x] order-confirmed GA4 `item_name` derives from SKU (was hardcoded "Framed Pet Tribute (11x14)")
+- [x] adminReview digital approve: no proof email → render via printRenderer → store on /data → status `delivered` → delivery email; idempotent (upgrade_credit_created event guards coupon)
+- [x] Stripe upgrade credit: coupon $19.95 off + promo `UPGRADE-<shortId>`, 30-day, single-use
+- [x] `GET /download/:token` (proof_token pattern), 90-day graceful 404; download link on order-status
+- [x] orderStatus digital timeline (confirmed → reviewed → delivered)
+- [x] Secondary quiet digital CTA on the poem-generator page; customizer exit-intent flagged for designer lane
+
+### Phase 2 — Print-only 11×14 $39 ✓ BUILT
+- [x] `print-11x14` SKU ($3900) between framed-20x30 and digital in the array
+- [x] lumaOrderApi: `print-` prefix → subcategory 103001, bleed option only (no frame-only shared options)
+- [x] Flows through unchanged physical proof path; real Luma test order = David's trigger (NOT placed)
+
+### Verify (adversarial, via agents + main-session review) ✓ DONE
+- [x] Runtime verifier PASSED: node --check all touched JS; boots; framed + Pass 10 routes 200; lowPrice still 79; no cheap price in hero/schema
+- [x] Skeptic verifier caught 1 HIGH + 2 LOW bugs (see fixes below)
+- [x] Main-session re-verify: confirmed bugs in real code, applied fixes, re-derived + booted
+
+### Bug fixes applied by main session (post-workflow)
+- [x] **HIGH — checkout.js overcharge**: frame upcharge was added to ALL SKUs; a customer with a $60 signature frame selected who switched to digital/print-only was charged $79.95/$99 for a frame they never get. Fixed: frame upcharge gated on `sku.startsWith('framed-')`. Re-derived: framed unchanged $179, print-only $99→$39, digital $79.95→$19.95.
+- [x] **LOW — stripeWebhooks.js**: idempotency guard omitted `delivered`/`cancelled`; a duplicate webhook post-delivery could reset a digital order and regenerate proof_token, breaking the emailed download link. Fixed: both terminal states added to the guard.
+- [ ] **LOW residual (accepted)**: `ensureUpgradeCredit` not idempotent across a crash between `promotionCodes.create` and the event insert (sub-ms window, non-fatal — delivery still succeeds, only the credit is affected). Documented, not fixed. → v2.
+
+### Coordination items for the designer (Pass 8) lane — NOT edited here
+- [ ] Size grid ignores `sublabel` and doesn't visually distinguish the digital/print rungs (customizer.js renders label+price only)
+- [ ] Confirm preview.js `setFrameSize` parses `digital-`/`print-` SKU prefixes to 11×14 proportions
+- [ ] Add the customizer exit-intent digital down-sell to customize.html
+
+### Shipped 2026-07-07 — commit cf71314 pushed to master (Railway auto-deploys). Phase 3 stays gated (David + 50 orders).
+- App code + web pages committed. Internal strategy/financial docs HELD BACK from the commit: the GitHub repo is PUBLIC, so the business plan, fable_to_opus (COGS/margins), 10x-action-plan, and spec were not pushed. Awaiting David's call: keep repo public (docs stay local) or make private (then commit docs).
+
+---
+
+## Pass 10 — SEO Phase 2 batch: free poem generator, rainbow-bridge page, gift-cluster de-cannibalization (2026-07-07)
+
+The `fable_to_opus` handoff file was empty; executing the SEO Phase 2 build sequence from `tasks/10x-action-plan.md` instead (David chose "do all three"). Pure-additive builds first (1 & 2, low risk), then a check-in before restructuring the live money pages (3).
+
+### Build 1 — Free Pet Memorial Poem Generator (`/pet-memorial-poem-generator`) — highest-leverage ✓ DONE
+- [x] `public/pet-memorial-poem-generator.html` — cloned the sympathy-helper free-tool pattern (env.js/GA/pixel head, WebApplication + FAQPage + BreadcrumbList schema, hero, tool form, poem result + copy, strong CTA to `/customize/pet-tribute`, FAQ, trust badges, footer, popup)
+- [x] Form fields: pet name, type, personality, favorite memory, favorite thing, poem/letter toggle → POST `/api/poems/generate`
+- [x] `public/js/poem-generator.js` — mirrors `sympathy.js`: submit → fetch → render `data.poem` → copy button + copy-on-CTA; handles 429; GA `poem_generated` event
+- [x] `public/css/store.css` — added poem-result + format-toggle styles (design-token consistent)
+- [x] `server.js` — clean-URL route + sitemap entry (priority 0.8, monthly)
+- [x] Interlink: generator linked from `blog/pet-memorial-poems` + the rainbow-bridge page; footer Resources column updated
+- [x] Honest CTA fix: removed unverifiable "carries over automatically" claim (don't own customizer.js); copy poem to clipboard on CTA click so "paste it in" is true
+
+### Build 2 — Rainbow Bridge poem page (`/rainbow-bridge-poem-for-dogs`) — fixes live 404 ✓ DONE
+- [x] `public/rainbow-bridge-poem-for-dogs.html` — full poem, accurate origin story (1959 Edna Clyne-Rekhy authorship revealed 2023 + 1980s wide circulation, hedged honestly), printable block with `window.print()` + `@media print`, CTA to product + poem generator; Article + FAQPage + BreadcrumbList schema
+- [x] Slug is `rainbow-bridge-poem-for-dogs` (exact target of the former 404 link in `blog/pet-memorial-poems.html`)
+- [x] `server.js` — clean-URL route + sitemap entry
+- [x] Reconciled the stale authorship sentence in `blog/pet-memorial-poems.html` so the two pages agree
+
+### Build 3 — De-cannibalize the gift cluster (⏸ DEFERRED — superseded by the real Fable handoff below; touches live money pages)
+- [ ] Reshape `pet-memorial-gifts.html` into a numbered gift-guide listicle (format that ranks for gifter queries)
+- [ ] Retarget `memorial-gifts.html` toward "pet memorial frame" (weakest SERP, exact product match)
+- [ ] Preserve all existing pet-loss SEO, schema, pricing, CTAs
+
+### Verify
+- [x] `node --check` on server.js + poem-generator.js pass; all 6 JSON-LD blocks on new pages parse
+- [x] Booted server on port 3999: new routes 200, old routes 200, sitemap includes both new URLs, former 404 link now resolves 200
+- [x] Poem API end-to-end returned a REAL Fable 5 poem (live key), weaving in the specific details — full product experience proven
+- [ ] Visual/pixel check deferred: no Puppeteer installed; pages reuse in-production CSS + a small set of new classes. Low risk, not eyeballed.
+
+---
+
 ## Pass 9 — CEO conversion P0: measurable ads + trustworthy site (2026-07-06 late night, this session)
 
 Six-agent audit (funnel, persuasion/trust, ops/economics, competitors/ad-costs, SEO, live mobile UX). Funnel mechanics are good (one page, no account, 3 required inputs, Stripe-hosted checkout). The dead-in-the-water items before ad spend:
@@ -15,12 +126,15 @@ Six-agent audit (funnel, persuasion/trust, ops/economics, competitors/ad-costs, 
 
 NOTE: concurrent session owns customizer.js / preview.js / checkout.js / lumaOrderApi.js (frame-choice work below) — this pass does not touch them. Customizer pre-checkout validation (photo/name checked only server-side after Purchase click) deferred to that lane.
 
-- [ ] A. Landing pages: honest trust section replaces fabricated testimonials; emotional eyebrow above SEO H1s (pet/dog); sympathy CTAs → /customize/pet-tribute
-- [ ] B. Blog CTAs → /customize/pet-tribute (human-loss posts → /)
-- [ ] C. Backend: /js/env.js (pixel/ads IDs from env); .html-variant redirects for human pages; provider default whcc→luma; admin-alert emails on failures; fulfillment resubmit endpoint + admin button; poem prompt fix
-- [ ] E. Tracking: real GA4 purchase (id+value+dedup) on order-confirmed; Meta Pixel init via env.js sitewide; Purchase event; Google Ads slot
-- [ ] Adversarial verify + repair + integration boot test
+- [x] A. Landing pages: honest "Our promise to you" trust section replaces fabricated testimonials on 6 pages; .hero-eyebrow added to store.css + emotional eyebrows on pet/dog/cat; sympathy CTAs → /customize/pet-tribute
+- [x] B. Blog: all 16 /#collections CTAs fixed across 8 posts (pet → customizer, 2 human-generic → /)
+- [x] C. Backend: /js/env.js route; .html-variant redirects verified already covered; webhook provider default whcc→luma + warn; sendAdminAlert wired to proof-gen/print/submit failures; fulfillmentSubmitter.js shared module + POST /api/admin/order/:token/resubmit + admin button; poem prompt UV fix
+- [x] E. Tracking: 24 pages on window.SBM_ENV gate via /js/env.js; real GA4 purchase (transaction_id + totalCents/100 + localStorage dedup) on order-confirmed; fbq Purchase + Google Ads conversion when configured; dead store.js purchase block removed
+- [x] Adversarial verify (2 verifiers, passed, minor-only findings) + integration boot test (8/8 checks) — workflow wf_a1e90635-41e, 7 agents
+- [x] Cleanup from verifier flags: "enhanced" photo claims removed (index, pet page); partner email "UV print" → archival print; human blog inline link off pet customizer
+- [ ] HANDOFF to designer session (owns customizer files): customize.html still has dead `typeof META_PIXEL_ID` gate — needs same env.js two-line change; mobile sticky preview eats 46-61% viewport and covers form fields (P1 from live UX audit); "Banjo" placeholder shows a stranger's name before typing (P1); zoom-to-read opens on photo panel not poem (P2); begin_checkout hardcoded 119.00
 - [ ] DAVID: real product photos; META_PIXEL_ID on Railway; verify Railway SMTP + FULFILLMENT_PROVIDER=luma; dress-rehearsal order
+- Minor accepted: private-mode localStorage dedup edge; resubmit concurrency guard; lumaOrderApi duplicate pending-row quirk (forbidden file this pass)
 
 ---
 

@@ -439,7 +439,10 @@
     if (!existingCropHint && (quality || statusMsg)) {
       const cropHint = document.createElement('p');
       cropHint.className = 'crop-hint';
-      cropHint.textContent = 'Drag the preview to reposition. Scroll to zoom.';
+      const isTouch = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+      cropHint.textContent = isTouch
+        ? 'Drag to reposition. Pinch to zoom.'
+        : 'Drag the preview to reposition. Scroll to zoom.';
       wrapper.appendChild(cropHint);
     }
 
@@ -518,13 +521,22 @@
       saveState();
     }, { passive: false });
 
-    // Touch drag
+    // Touch drag — with directional intent so the page can still scroll.
+    // On the small sticky preview, a vertical swipe should scroll the page, not
+    // get hijacked into panning the photo. We wait for the first meaningful move
+    // to decide intent:
+    //   • two fingers                          → pinch-zoom
+    //   • fullscreen zoom, photo already zoomed in, or a horizontal-dominant
+    //     drag                                 → pan the photo
+    //   • vertical-dominant drag at default zoom → let the page scroll
     let touchStartX = 0;
     let touchStartY = 0;
     let touchStartPanX = 0.5;
     let touchStartPanY = 0.5;
     let initialPinchDist = 0;
     let pinchStartZoom = 1;
+    let gestureMode = 'none'; // 'none' | 'undecided' | 'pan' | 'scroll' | 'pinch'
+    const INTENT_THRESHOLD = 8; // px of movement before committing to pan vs scroll
 
     canvas.addEventListener('touchstart', (e) => {
       if (!photoUploaded[panelId]) return;
@@ -534,22 +546,54 @@
         const crop = PreviewRenderer.getPhotoCrop(panelId);
         touchStartPanX = crop.panX;
         touchStartPanY = crop.panY;
+        gestureMode = 'undecided';
+        // Don't preventDefault yet — this gesture may belong to the page scroll.
       } else if (e.touches.length === 2) {
         initialPinchDist = Math.hypot(
           e.touches[1].clientX - e.touches[0].clientX,
           e.touches[1].clientY - e.touches[0].clientY
         );
         pinchStartZoom = PreviewRenderer.getPhotoCrop(panelId).zoom;
+        gestureMode = 'pinch';
+        e.preventDefault();
       }
-      e.preventDefault();
     }, { passive: false });
 
     canvas.addEventListener('touchmove', (e) => {
       if (!photoUploaded[panelId]) return;
       const crop = PreviewRenderer.getPhotoCrop(panelId);
-      if (e.touches.length === 1) {
-        const dx = e.touches[0].clientX - touchStartX;
-        const dy = e.touches[0].clientY - touchStartY;
+
+      // Pinch-zoom (two fingers) always wins.
+      if (e.touches.length === 2 || gestureMode === 'pinch') {
+        if (e.touches.length === 2) {
+          const dist = Math.hypot(
+            e.touches[1].clientX - e.touches[0].clientX,
+            e.touches[1].clientY - e.touches[0].clientY
+          );
+          const scale = dist / initialPinchDist;
+          PreviewRenderer.setPhotoCrop(panelId, pinchStartZoom * scale, crop.panX, crop.panY);
+          e.preventDefault();
+        }
+        return;
+      }
+
+      if (e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - touchStartX;
+      const dy = e.touches[0].clientY - touchStartY;
+
+      if (gestureMode === 'undecided') {
+        if (Math.abs(dx) < INTENT_THRESHOLD && Math.abs(dy) < INTENT_THRESHOLD) return;
+        const paneEl = canvas.closest('.preview-pane');
+        const inZoomMode = !!paneEl && paneEl.classList.contains('zoomed');
+        // Pan when adjusting is the clear intent; otherwise let the page scroll.
+        if (inZoomMode || crop.zoom > 1.01 || Math.abs(dx) > Math.abs(dy)) {
+          gestureMode = 'pan';
+        } else {
+          gestureMode = 'scroll';
+        }
+      }
+
+      if (gestureMode === 'pan') {
         const rect = canvas.getBoundingClientRect();
         const sensitivity = 1.5 / crop.zoom;
         PreviewRenderer.setPhotoCrop(
@@ -558,19 +602,14 @@
           touchStartPanX - (dx / rect.width) * sensitivity,
           touchStartPanY - (dy / rect.height) * sensitivity
         );
-      } else if (e.touches.length === 2) {
-        const dist = Math.hypot(
-          e.touches[1].clientX - e.touches[0].clientX,
-          e.touches[1].clientY - e.touches[0].clientY
-        );
-        const scale = dist / initialPinchDist;
-        PreviewRenderer.setPhotoCrop(panelId, pinchStartZoom * scale, crop.panX, crop.panY);
+        e.preventDefault();
       }
-      e.preventDefault();
+      // gestureMode === 'scroll' → do nothing; the browser scrolls the page.
     }, { passive: false });
 
     canvas.addEventListener('touchend', () => {
-      saveState();
+      if (gestureMode === 'pan' || gestureMode === 'pinch') saveState();
+      gestureMode = 'none';
     });
 
     canvas.style.cursor = 'grab';
