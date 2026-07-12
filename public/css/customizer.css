@@ -1526,7 +1526,11 @@
 .preview-pane.zoomed .layout-selector,
 .preview-pane.zoomed .style-selector,
 .preview-pane.zoomed #panel-toggle-wrap { display: none; }
-.preview-pane.zoomed .preview-zoom-btn {
+/* When zoomed to READ, only the Close button is pinned top-right. The swap
+   button shares the .preview-zoom-btn class, so it must be hidden here —
+   otherwise it stacks exactly on Close and traps the viewer (can't exit). */
+.preview-pane.zoomed #poem-flip-btn { display: none; }
+.preview-pane.zoomed #preview-zoom-btn {
   position: fixed;
   top: 12px;
   right: 14px;
