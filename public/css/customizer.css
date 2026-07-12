@@ -304,19 +304,18 @@
   background: #0a0908;
 }
 
-/* --- Auto Theme: 3D-printed frame in the pet's color, name + dates engraved ---
-   A real picture-frame look: uniform-width molding on all four sides with a
-   gradient that catches the light, sharp corners, no bevels. The name (and an
-   optional symbol) is engraved on the top rail, dates on the bottom rail. The
-   photo + poem sit on a light paper print recessed into the opening. */
-.frame-preview.theme-auto {
-  --molding: 40px;
-}
+/* --- Auto Theme: the pet tribute in the customer's chosen frame ---
+   A real picture-frame look: uniform molding on all four sides whose width
+   SCALES with the print size and the frame's real face width. The width comes
+   from --frame-width (face / (print + 2·face), set per size in preview.js),
+   so an 8x10 reads chunky (~9%) and a 20x30 reads slim (~3%), and a 3" ornate
+   signature frame reads far wider than the 0.875" standard — exactly as they
+   print. The molding gradient is set inline from the chosen frame's `molding`.
+   The photo + poem sit on light paper recessed into the frame (rabbet). */
 .frame-preview.theme-auto .frame-border {
-  padding: 0;
+  padding: var(--frame-width, 7%);
   border-radius: 2px;
-  display: flex;
-  flex-direction: column;
+  position: relative;
   background: linear-gradient(
     145deg,
     var(--frame-hi, #8a7560),
@@ -326,72 +325,28 @@
     var(--frame-lo, #4a3d31)
   );
   box-shadow:
-    0 12px 45px rgba(0, 0, 0, 0.45),
-    0 3px 14px rgba(0, 0, 0, 0.30),
-    inset 0 2px 0 rgba(255, 255, 255, 0.22),
-    inset 2px 0 0 rgba(255, 255, 255, 0.10),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.38),
-    inset -2px 0 0 rgba(0, 0, 0, 0.24);
-  transition: background 0.45s ease;
+    0 14px 46px rgba(0, 0, 0, 0.42),
+    0 4px 14px rgba(0, 0, 0, 0.28),
+    /* top/left rail catches light, bottom/right falls to shadow → 3D molding */
+    inset 0 2px 0 rgba(255, 255, 255, 0.24),
+    inset 2px 0 0 rgba(255, 255, 255, 0.12),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
+    inset -2px 0 0 rgba(0, 0, 0, 0.26);
+  transition: background 0.45s ease, padding 0.35s ease;
 }
-/* Engraved rails: top (name + symbol) and bottom (dates), equal height to the
-   side molding so all four borders read the same width. */
-.frame-preview.theme-auto .frame-name,
-.frame-preview.theme-auto .frame-dates {
-  flex: none;
-  height: var(--molding);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.3em;
-  text-align: center;
-  font-family: 'Cormorant Garamond', Georgia, serif;
-  color: var(--accent-color, #F4ECDD);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.42), 0 -1px 0 rgba(255, 255, 255, 0.12);
-  white-space: nowrap;
-  overflow: hidden;
-  padding: 0 12px;
-  transition: color 0.45s ease;
-}
-.frame-preview.theme-auto .frame-name {
-  font-weight: 500;
-  font-size: clamp(1rem, 5vw, 1.4rem);
-  letter-spacing: 0.04em;
-}
-.frame-preview.theme-auto .frame-dates {
-  font-size: clamp(0.66rem, 2.6vw, 0.85rem);
-  letter-spacing: 0.18em;
-}
-.frame-preview.theme-auto .frame-name.placeholder,
-.frame-preview.theme-auto .frame-dates.placeholder {
-  opacity: 0.4;
-  font-style: italic;
-}
-/* Engraved symbol (paw/heart) beside the name */
-.frame-preview.theme-auto .frame-icon {
-  display: inline-flex;
-  align-items: center;
-  width: 1.05em;
-  height: 1.05em;
-  flex: none;
-  filter: drop-shadow(0 1px 0.5px rgba(0, 0, 0, 0.4));
-}
-.frame-preview.theme-auto .frame-icon svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-  fill: currentColor;
-}
-.frame-preview.theme-auto .frame-icon:empty { display: none; }
-/* The print: light paper recessed into the frame opening (rabbet shadow).
-   Uniform molding on all four sides (top/bottom no longer come from text rails). */
+/* Rabbet: the print sits recessed behind the frame face, so the molding casts
+   a soft shadow onto the print's top and left edges. A directional inset
+   shadow on the paper itself sells the recess and aligns on any aspect ratio
+   (unlike a %-inset ring, whose top/side percentages resolve differently). */
 .frame-preview.theme-auto .mat-board {
-  margin: var(--molding);
-  padding: 5px;
+  margin: 0;
+  padding: 4px;
   background: #FAF7F2;
   box-shadow:
-    inset 0 2px 7px rgba(0, 0, 0, 0.30),
-    inset 0 -1px 3px rgba(0, 0, 0, 0.12);
+    inset 0 4px 9px -2px rgba(0, 0, 0, 0.34),
+    inset 4px 0 9px -2px rgba(0, 0, 0, 0.2),
+    inset 0 -2px 5px -2px rgba(255, 255, 255, 0.35),
+    inset -2px 0 5px -2px rgba(255, 255, 255, 0.22);
 }
 .frame-preview.theme-auto .preview-panels {
   background: #FAF7F2;
@@ -1589,6 +1544,10 @@ body.preview-zoom-open { overflow: hidden; }
   color: var(--color-muted); margin-bottom: 7px;
 }
 .frame-group-up { color: var(--color-accent, #C4A882); font-weight: 600; letter-spacing: 0; text-transform: none; }
+.frame-group-note {
+  font-size: 0.8rem; line-height: 1.5; color: var(--color-muted);
+  margin: -2px 0 9px; max-width: 46ch;
+}
 .frame-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .frame-chip {
   display: flex; align-items: center; gap: 7px;

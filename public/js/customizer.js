@@ -1579,12 +1579,16 @@
 
     container.innerHTML = fo.groups.map(g => {
       const up = g.upchargeCents ? ` <span class="frame-group-up">+$${(g.upchargeCents / 100).toFixed(0)}</span>` : '';
+      // The group note explains what a tier actually is — especially why the
+      // signature frames cost more (they're wider, ornate, solid-wood profiles,
+      // not just different colors).
+      const note = g.note ? `<p class="frame-group-note">${g.note}</p>` : '';
       const chips = (g.choices || []).map(c => `
         <button type="button" class="frame-chip${c.id === currentFrame ? ' active' : ''}" data-frame="${c.id}" title="${c.label}" aria-label="${c.label}">
           <span class="frame-chip-sw" style="background:${c.swatch}"></span>
           <span class="frame-chip-label">${c.label}</span>
         </button>`).join('');
-      return `<div class="frame-group"><div class="frame-group-label">${g.label}${up}</div><div class="frame-chip-row">${chips}</div></div>`;
+      return `<div class="frame-group"><div class="frame-group-label">${g.label}${up}</div>${note}<div class="frame-chip-row">${chips}</div></div>`;
     }).join('');
 
     container.querySelectorAll('.frame-chip').forEach(chip => {

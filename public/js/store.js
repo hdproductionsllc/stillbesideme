@@ -111,27 +111,43 @@
 
     if (!alreadySubscribed && !alreadyDismissed) {
       let shown = false;
-      let hasEngaged = false;
 
-      // Wait for real engagement before arming exit-intent
-      // (prevents popup on initial page load when cursor is near top)
-      document.addEventListener('mousemove', () => { hasEngaged = true; }, { once: true });
+      const show = () => {
+        if (shown || sessionStorage.getItem('sbm_popup_dismissed')) return;
+        shown = true;
+        popup.classList.add('active');
+      };
 
-      document.addEventListener('mouseout', (e) => {
-        if (shown || !hasEngaged) return;
-        if (e.clientY < 5 && e.relatedTarget === null) {
-          shown = true;
-          popup.classList.add('active');
+      // The popup only appears once someone has genuinely engaged with the
+      // page — never on arrival. "Engaged" means BOTH a real dwell (30s) AND
+      // meaningful scrolling (past ~40% of the page). This is a grief brand;
+      // nothing should ambush a visitor who just landed.
+      let dwelled = false;
+      let scrolled = false;
+      let armed = false;
+
+      const arm = () => {
+        if (armed || !(dwelled && scrolled)) return;
+        armed = true;
+
+        // Desktop: fire on true exit intent (cursor leaves the top edge toward
+        // the tab/close). Requires the mouse to actually cross clientY <= 0.
+        document.addEventListener('mouseout', (e) => {
+          if (e.clientY <= 0 && e.relatedTarget === null) show();
+        });
+
+        // Touch/no-mouse: there is no exit intent, so surface it gently a short
+        // while after they've already engaged, not on a fixed page-load timer.
+        if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+          setTimeout(show, 8000);
         }
-      });
+      };
 
-      // Mobile fallback: show after 45 seconds of engagement
-      setTimeout(() => {
-        if (!shown && !sessionStorage.getItem('sbm_popup_dismissed')) {
-          shown = true;
-          popup.classList.add('active');
-        }
-      }, 45000);
+      setTimeout(() => { dwelled = true; arm(); }, 30000);
+      window.addEventListener('scroll', () => {
+        const depth = (window.scrollY + window.innerHeight) / document.documentElement.scrollHeight;
+        if (depth > 0.4) { scrolled = true; arm(); }
+      }, { passive: true });
     }
   }
 

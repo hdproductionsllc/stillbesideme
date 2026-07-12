@@ -138,6 +138,7 @@
         "label": "Frame",
         "tier": "included",
         "upchargeCents": 0,
+        "note": "Slim 0.9\" gallery profile, solid wood - included with every size.",
         "choices": [
           { "id": "black",   "label": "Black",        "luma": 105001, "faceIn": 0.875, "swatch": "#1c1c1c", "molding": "linear-gradient(145deg, #232323, #2e2e2e 15%, #101010 40%, #1c1c1c 70%, #0a0a0a)", "default": true },
           { "id": "white",   "label": "White",        "luma": 105002, "faceIn": 0.875, "swatch": "#eeeae1", "molding": "linear-gradient(145deg, #fbf9f4, #ffffff 15%, #e4ded3 45%, #f0ebe2 70%, #d9d2c5)" },
@@ -149,7 +150,7 @@
         "label": "Signature frames",
         "tier": "signature",
         "upchargeCents": 6000,
-        "note": "Ornate solid-wood profiles",
+        "note": "Wide 3\" hand-finished solid-wood profiles - over triple the depth of the standard frame, with a sculpted ornate face. A heavier, gallery-weight piece that becomes the centerpiece of the wall.",
         "choices": [
           { "id": "driftwood", "label": "Driftwood Gray",      "luma": 105018, "faceIn": 3.0,    "swatch": "#9b978e", "molding": "linear-gradient(145deg, #a8a49b, #b8b4ab 15%, #86827a 45%, #9b978e 70%, #6f6b63)" },
           { "id": "pleinair",  "label": "Plein Air Espresso",  "luma": 105020, "faceIn": 2.5625, "swatch": "#4a3b2e", "molding": "linear-gradient(145deg, #5a4636, #6b5340 15%, #3a2c20 45%, #4a3b2e 70%, #2c2018)" },
