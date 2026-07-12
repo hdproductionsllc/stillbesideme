@@ -1,26 +1,28 @@
 /**
  * poemGenerator.js – AI memorial poem/letter generation via Anthropic Claude API.
  *
- * Primary model: Claude Fable 5 (claude-fable-5) — best available creative
- * writing. Falls back to Sonnet 4.6 on a refusal/error, and finally to a
- * template-based stub when no API key is configured, so the customizer
- * never breaks regardless of environment.
+ * Primary model: Claude Sonnet 5 (claude-sonnet-5) — near-Opus creative
+ * quality at ~1/3 the price of Fable 5 and faster, which is the right tier for
+ * a short poem (Fable 5 was overkill at $10/$50 per 1M + always-on thinking).
+ * Falls back to Haiku 4.5 on a refusal/error (cheapest, still capable), and
+ * finally to a template-based stub when no API key is configured, so the
+ * customizer never breaks regardless of environment.
  *
  * Supports pet tributes (poem OR first-person "letter from them" format)
  * and human memorials (Letter From Heaven).
  *
- * Fable 5 API notes (verified against the Claude API reference):
- * - Do NOT pass a `thinking` param (always-on; explicit config = 400)
- * - Do NOT pass temperature/top_p/top_k (400)
- * - New tokenizer ≈30% more tokens than Sonnet — hence MAX_TOKENS 1024
- * - May return stop_reason 'refusal' with empty content — must check
+ * API notes (verified against the Claude API reference):
+ * - Do NOT pass temperature/top_p/top_k on Sonnet 5 (non-default values = 400)
+ * - Sonnet 5 runs adaptive thinking by default; `effort: 'medium'` keeps the
+ *   poem quick and cheap without deep reasoning it doesn't need
+ * - A model may return stop_reason 'refusal' with empty content — must check
  *   before reading content[0]
  */
 
 const Anthropic = require('@anthropic-ai/sdk');
 
-const MODEL = 'claude-fable-5';
-const FALLBACK_MODEL = 'claude-sonnet-4-6';
+const MODEL = 'claude-sonnet-5';
+const FALLBACK_MODEL = 'claude-haiku-4-5';
 const MAX_TOKENS = 1024;
 
 const SYSTEM_PROMPT = `You are a master elegist who writes brief, luminous memorial verse and letters. Your work is printed beside their photo in a framed archival print that will hang on a family's wall for decades, so every word must earn its place.
@@ -142,7 +144,9 @@ async function callModel(api, model, prompt) {
     model,
     max_tokens: MAX_TOKENS,
     system: SYSTEM_PROMPT,
-    output_config: { effort: 'high' },
+    // A short poem doesn't need deep reasoning; medium effort keeps it quick
+    // and inexpensive while still polished.
+    output_config: { effort: 'medium' },
     messages: [{ role: 'user', content: prompt }],
   });
 
@@ -170,8 +174,8 @@ async function callModel(api, model, prompt) {
  *   category 'pet' + format 'letter' → letter from the pet's voice
  *   else                        → pet poem
  *
- * Model chain: Fable 5 → Sonnet 4.6 → template stub. The generationId is
- * tagged with the model that actually produced the text (ai-fable / ai-sonnet)
+ * Model chain: Sonnet 5 → Haiku 4.5 → template stub. The generationId is
+ * tagged with the model that actually produced the text (ai-sonnet / ai-haiku)
  * so quality and fallback rates are observable in the session history.
  */
 async function generate(details) {
@@ -196,7 +200,7 @@ async function generate(details) {
       const text = await callModel(api, model, prompt);
       return {
         poem: stripMarkdown(text),
-        generationId: `ai-${model === MODEL ? 'fable' : 'sonnet'}-${Date.now()}`,
+        generationId: `ai-${model === MODEL ? 'sonnet' : 'haiku'}-${Date.now()}`,
         stubbed: false,
       };
     } catch (err) {

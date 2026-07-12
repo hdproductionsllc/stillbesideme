@@ -654,18 +654,20 @@
     // Any frame text from a prior render is removed — the frame stays clean.
     removeFrameText();
 
-    // The insert is photo-paper: light background, dark ink for the text.
-    const ink = '#332C26';
+    // The insert is photo-paper: light background, deep near-espresso ink so
+    // the text reads crisply against the cream (mirrors tributeRenderer
+    // PAPER_PALETTE — keep the two in sync).
+    const ink = '#241E19';
     styleColors = {
       ...(styleColors || {}),
       tribute: {
         background: '#FAF7F2',
         name: ink,
-        dates: ink,
+        dates: mixHex(ink, '#FAF7F2', 0.08),
         divider: accent,
         poem: ink,
-        nickname: mixHex(ink, '#FAF7F2', 0.18),
-        family: mixHex(ink, '#FAF7F2', 0.28)
+        nickname: mixHex(ink, '#FAF7F2', 0.1),
+        family: mixHex(ink, '#FAF7F2', 0.18)
       }
     };
 

@@ -45,8 +45,8 @@
   // gold the print pipeline uses for dividers (tributeRenderer PAPER_PALETTE)
   // — keep them in sync so the preview divider matches the printed one.
   const DEFAULT_AUTO_COLORS = {
-    frame: '#6E5C4E', accent: '#C4A882', tone: 'dark',
-    mat: '#1f1b17', bevel: '#C4A882', text: '#FAF8F5'
+    frame: '#6E5C4E', accent: '#B8975E', tone: 'dark',
+    mat: '#1f1b17', bevel: '#B8975E', text: '#FAF8F5'
   };
 
   // Auto-matched print colors (colorMode: 'auto' templates)
@@ -1388,6 +1388,9 @@
         grid.querySelectorAll('.product-option').forEach(o => o.classList.remove('selected'));
         option.classList.add('selected');
         updateFrameSectionVisibility(product.sku);
+        // Rebuild the frame chooser so signature frames appear/disappear with
+        // the size (and a now-invalid signature choice resets to the default).
+        if (isFramedSku(product.sku) && template.frameOptions) buildFrameSelector();
         updatePurchaseButton();
         // Update preview to match frame proportions
         if (PreviewRenderer && PreviewRenderer.setFrameSize) {
@@ -1566,6 +1569,20 @@
     saveState();
   }
 
+  /** Shorter side of the selected print, in inches (for frame-size gating). */
+  function selectedShortSideIn() {
+    const p = getSelectedProduct();
+    const m = p && p.sku.match(/(\d+)x(\d+)/);
+    return m ? Math.min(parseInt(m[1], 10), parseInt(m[2], 10)) : 0;
+  }
+
+  /** Frame groups available for the current size (signature frames are gated
+      to larger prints via the group's minShortSideIn). */
+  function availableFrameGroups(fo) {
+    const shortSide = selectedShortSideIn();
+    return (fo.groups || []).filter(g => !g.minShortSideIn || shortSide >= g.minShortSideIn);
+  }
+
   function buildFrameSelector() {
     const container = document.getElementById('style-selector');
     const fo = template.frameOptions;
@@ -1573,11 +1590,17 @@
 
     container.style.display = '';
     container.className = 'frame-selector';
-    if (!currentFrame || !getFrameDef(currentFrame)) {
-      currentFrame = fo.default || (fo.groups[0].choices[0] && fo.groups[0].choices[0].id);
+
+    const groups = availableFrameGroups(fo);
+    // If the chosen frame isn't offered at this size (e.g. a signature frame
+    // after switching to a small print), fall back to the default frame.
+    const allowedIds = new Set(groups.reduce((a, g) => a.concat((g.choices || []).map(c => c.id)), []));
+    if (!currentFrame || !allowedIds.has(currentFrame)) {
+      currentFrame = allowedIds.has(fo.default) ? fo.default
+        : (groups[0] && groups[0].choices[0] && groups[0].choices[0].id);
     }
 
-    container.innerHTML = fo.groups.map(g => {
+    container.innerHTML = groups.map(g => {
       const up = g.upchargeCents ? ` <span class="frame-group-up">+$${(g.upchargeCents / 100).toFixed(0)}</span>` : '';
       // The group note explains what a tier actually is — especially why the
       // signature frames cost more (they're wider, ornate, solid-wood profiles,

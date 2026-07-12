@@ -27,19 +27,21 @@ const FONT_SERIF = "'Cormorant Garamond', Georgia, serif";
 
 // The light "paper insert" palette the customizer preview shows for
 // colorMode:"auto" templates (mirrors preview.js setColors — keep in sync).
-// Cream paper, dark ink, warm gold accent.
-const PAPER_INK = '#332C26';
+// Cream paper, deep near-espresso ink for strong readability, warm gold accent.
+// (The ink was lightened toward brown before; darkened here so the text reads
+// crisply against the cream, and the secondary lines aren't washed out.)
+const PAPER_INK = '#241E19';
 const PAPER_BG = '#FAF7F2';
 const PAPER_PALETTE = Object.freeze({
   background: PAPER_BG,
   name: PAPER_INK,
-  dates: PAPER_INK,
-  divider: '#C4A882',
+  dates: colorUtils.mix(PAPER_INK, PAPER_BG, 0.08),
+  divider: '#B8975E',
   poem: PAPER_INK,
-  nickname: colorUtils.mix(PAPER_INK, PAPER_BG, 0.18),
-  family: colorUtils.mix(PAPER_INK, PAPER_BG, 0.28),
+  nickname: colorUtils.mix(PAPER_INK, PAPER_BG, 0.1),
+  family: colorUtils.mix(PAPER_INK, PAPER_BG, 0.18),
   mat: PAPER_BG,
-  bevel: '#C4A882',
+  bevel: '#B8975E',
   tone: 'light',
 });
 

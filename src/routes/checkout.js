@@ -129,10 +129,17 @@ router.post('/checkout', async (req, res) => {
     const isFramed = typeof sku === 'string' && sku.startsWith('framed-');
     // Resolve the chosen frame + its upcharge from the template (never trust
     // the client's price). Unknown/absent frame falls back to the default.
+    // A frame group may be gated by print size (signature frames only on
+    // larger prints via minShortSideIn) — a group whose size floor the SKU
+    // doesn't meet is skipped, so a manipulated client can't buy a $60
+    // signature frame on an 8x10 where it isn't offered.
     let safeFrame = null;
     let frameUpcharge = 0;
     if (isFramed && template.frameOptions && Array.isArray(template.frameOptions.groups)) {
+      const sizeMatch = sku.match(/(\d+)x(\d+)/);
+      const shortSideIn = sizeMatch ? Math.min(Number(sizeMatch[1]), Number(sizeMatch[2])) : 0;
       for (const group of template.frameOptions.groups) {
+        if (group.minShortSideIn && shortSideIn < group.minShortSideIn) continue;
         const match = (group.choices || []).find(c => c.id === frameChoice);
         if (match) { safeFrame = match.id; frameUpcharge = group.upchargeCents || 0; break; }
       }
