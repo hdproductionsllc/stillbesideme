@@ -363,7 +363,12 @@ async function ensureUpgradeCredit(db, order) {
   const redeemBy = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60; // 30 days
 
   const Stripe = require('stripe');
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  // Pin a modern API version for this client. The Stripe account's default
+  // version is old enough that promotionCodes.create rejects the `coupon`
+  // parameter ("Received unknown parameter: coupon"); pinning here fixes the
+  // upgrade-credit mint without touching checkout/webhook clients, which work
+  // on the account default and are left alone deliberately.
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' });
 
   const coupon = await stripe.coupons.create({
     amount_off: 1995,
