@@ -585,42 +585,81 @@ async function start() {
   // Serve proof images from output directory
   app.use('/output', express.static(OUTPUT_DIR));
 
-  // Mailchimp email signup proxy (avoids exposing API key to browser)
+  // Email signup — captured into our own DB first (the source of truth, on the
+  // /data volume, so no signup is ever lost), then the admin is notified, then
+  // it's optionally forwarded to Mailchimp if that's ever configured.
   app.post('/api/subscribe', rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 10,
     message: { error: 'Too many signup attempts.' },
   }), express.json(), async (req, res) => {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email is required.' });
+    const { email, source } = req.body;
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !EMAIL_RE.test(String(email).trim())) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+    const clean = String(email).trim().toLowerCase();
+    const db = req.app.locals.db;
+
+    // Save to our DB. Only treat it as a NEW subscriber (and only alert once)
+    // if the address wasn't already captured.
+    let isNew = false;
+    try {
+      const existing = db.get('SELECT id FROM subscribers WHERE email = ?', [clean]);
+      if (!existing) {
+        db.run('INSERT INTO subscribers (email, source) VALUES (?, ?)',
+          [clean, String(source || 'signup').slice(0, 40)]);
+        isNew = true;
+      }
+    } catch (err) {
+      console.error('Subscriber save error:', err.message);
+    }
+
+    // Notify the admin of a genuinely new signup (best-effort — a mail failure
+    // must not fail the subscribe, and it's already saved either way).
+    if (isNew) {
+      try {
+        const emailService = require('./src/services/emailService');
+        await emailService.sendAdminAlert(
+          'New email subscriber',
+          `Someone signed up for updates.\n\nEmail: ${clean}\nSource: ${source || 'signup'}`
+        );
+      } catch (err) {
+        console.error('Subscriber admin alert failed:', err.message);
+      }
+    }
+
+    // Optional passthrough to Mailchimp if it's ever wired up (kept so a later
+    // switch needs only the two env vars, no code change).
     const apiKey = process.env.MAILCHIMP_API_KEY;
     const listId = process.env.MAILCHIMP_LIST_ID;
-    if (!apiKey || !listId) {
-      console.log('[Email Signup]', email);
-      return res.json({ success: true });
-    }
-    try {
-      const dc = apiKey.split('-')[1]; // e.g. us21
-      const response = await fetch(`https://${dc}.api.mailchimp.com/3.0/lists/${listId}/members`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `apikey ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email_address: email,
-          status: 'subscribed',
-        }),
-      });
-      const data = await response.json();
-      if (response.ok || data.title === 'Member Exists') {
-        return res.json({ success: true });
+    if (apiKey && listId) {
+      try {
+        const dc = apiKey.split('-')[1];
+        await fetch(`https://${dc}.api.mailchimp.com/3.0/lists/${listId}/members`, {
+          method: 'POST',
+          headers: { 'Authorization': `apikey ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email_address: clean, status: 'subscribed' }),
+        });
+      } catch (err) {
+        console.error('Mailchimp forward error:', err.message);
       }
-      return res.status(400).json({ error: 'Could not subscribe. Please try again.' });
-    } catch (err) {
-      console.error('Mailchimp error:', err);
-      res.status(500).json({ error: 'Subscription failed. Please try again.' });
     }
+
+    res.json({ success: true });
+  });
+
+  // Admin: export captured subscribers as CSV (admin token required).
+  app.get('/admin/subscribers.csv', (req, res) => {
+    if (!process.env.ADMIN_EXPORT_TOKEN || req.query.token !== process.env.ADMIN_EXPORT_TOKEN) {
+      return res.status(403).send('Forbidden');
+    }
+    const rows = req.app.locals.db.all('SELECT email, source, created_at FROM subscribers ORDER BY created_at DESC');
+    const csv = 'email,source,created_at\n' +
+      rows.map(r => `${r.email},${r.source || ''},${r.created_at}`).join('\n');
+    res.set('Content-Type', 'text/csv');
+    res.set('Content-Disposition', 'attachment; filename="subscribers.csv"');
+    res.send(csv);
   });
 
   // Sentry error handler (must be before 404 catch-all)
