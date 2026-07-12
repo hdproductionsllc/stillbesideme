@@ -164,11 +164,15 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
   // Header mirrors the preview: name, dates, divider. The nickname lives in
   // the footer (with the family line), exactly where the preview draws it.
 
+  // Header spacing is proportional to the name size (mirrors the preview's
+  // nameSize*1.2 / dateSize*1.6 rhythm) \u2014 a fixed pixel gap here crowded the
+  // dates against the name at print scale, where the name is ~136px tall.
+
   // Name
   if (name) {
     y += nameFontSize;
     elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="${FONT_SERIF}" font-size="${nameFontSize}" fill="${escSvg(colors.name)}" font-weight="500">${escSvg(name)}</text>`);
-    y += 10;
+    y += Math.round(nameFontSize * 0.34); // clears the name's descenders + breathing room
   }
 
   // Dates
@@ -176,14 +180,14 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
   if (dates) {
     y += datesFontSize;
     elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="${FONT_SERIF}" font-size="${datesFontSize}" fill="${escSvg(colors.dates)}" font-weight="300">${escSvg(dates)}</text>`);
-    y += 20;
+    y += Math.round(datesFontSize * 0.7);
   }
 
   // Divider
   const dividerW = Math.round(innerW * 0.3);
-  y += 10;
+  y += Math.round(datesFontSize * 0.35);
   elements.push(`<line x1="${(width - dividerW) / 2}" y1="${y}" x2="${(width + dividerW) / 2}" y2="${y}" stroke="${escSvg(colors.divider)}" stroke-width="2" />`);
-  y += 30;
+  y += Math.round(nameFontSize * 0.32);
 
   // Poem text (line-break aware, balanced word wrapping).
   //
