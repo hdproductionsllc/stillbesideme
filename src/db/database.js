@@ -132,4 +132,28 @@ async function init() {
   return wrapper;
 }
 
-module.exports = { init };
+/**
+ * Write a timestamped snapshot of the live database into DATA_DIR/backups and
+ * prune to the most recent `keep`. Returns the snapshot path. This protects
+ * against app-level corruption and gives an off-site pull point (paired with
+ * the gated download endpoint). `stamp` is passed in (callers have a clock;
+ * this module must not call Date() so it stays deterministic in tests).
+ */
+function backupNow(stamp, keep = 14) {
+  if (!db) throw new Error('Database not initialized');
+  const dir = path.join(DATA_DIR, 'backups');
+  fs.mkdirSync(dir, { recursive: true });
+  const dest = path.join(dir, `store-${stamp}.db`);
+  fs.writeFileSync(dest, Buffer.from(db.export()));
+
+  // Prune oldest, keep the newest `keep`.
+  const snaps = fs.readdirSync(dir)
+    .filter(f => f.startsWith('store-') && f.endsWith('.db'))
+    .sort(); // ISO-ish stamps sort lexically = chronologically
+  for (const old of snaps.slice(0, Math.max(0, snaps.length - keep))) {
+    try { fs.unlinkSync(path.join(dir, old)); } catch (e) { /* best effort */ }
+  }
+  return dest;
+}
+
+module.exports = { init, backupNow, DB_PATH };

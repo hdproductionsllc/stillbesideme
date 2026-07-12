@@ -159,6 +159,21 @@ async function start() {
   // Make db available to routes
   app.locals.db = db;
 
+  // Automated database backups → DATA_DIR/backups (rotating, keep 14). Protects
+  // against app-level corruption and gives an off-site pull point (paired with
+  // the gated /admin/api/backup download). Runs at boot, then daily.
+  const { backupNow } = require('./src/db/database');
+  const runBackup = () => {
+    try {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      backupNow(stamp);
+    } catch (err) {
+      console.error('DB backup failed:', err.message);
+    }
+  };
+  runBackup();
+  setInterval(runBackup, 24 * 60 * 60 * 1000).unref();
+
   // ── TEMPORARY: Letter From Heaven is off sale ─────────────────────────
   // 302 (temporary) redirects for LFH and its human-loss landing pages.
   // Registered before express.static so the .html files are not served.
@@ -572,6 +587,12 @@ async function start() {
   app.get('/admin/review/:token', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin-review.html'));
   });
+
+  // Admin dashboard — password-gated all-orders search, event timeline,
+  // support notes, and off-site DB backup download (see adminDashboard.js).
+  // Mounted after the tokenized /admin/order and /admin/review routes so those
+  // specific paths keep taking precedence.
+  app.use('/admin', require('./src/routes/adminDashboard'));
 
   // Order status page (token-based deep link from email, plus lookup form)
   app.use('/api/orders', require('./src/routes/orderStatus'));

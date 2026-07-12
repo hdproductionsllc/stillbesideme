@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Orders — Admin</title>
+<style>
+  :root { --bg:#1a1714; --panel:#26211c; --line:#3a332c; --text:#f4f1ea; --muted:#a89e90; --accent:#C4A882; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:5; }
+  header h1 { font-size:1rem; margin:0; font-weight:600; }
+  header .spacer { flex:1; }
+  header button, .btn { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:7px 12px; cursor:pointer; font-size:.85rem; }
+  header button:hover, .btn:hover { border-color:var(--accent); }
+  .wrap { display:flex; gap:0; height:calc(100vh - 57px); }
+  .list { width:46%; min-width:340px; border-right:1px solid var(--line); overflow:auto; }
+  .detail { flex:1; overflow:auto; padding:20px; }
+  .controls { display:flex; gap:8px; padding:12px 16px; position:sticky; top:0; background:var(--bg); border-bottom:1px solid var(--line); }
+  .controls input, .controls select { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:8px; font-size:.85rem; }
+  .controls input { flex:1; }
+  table { width:100%; border-collapse:collapse; font-size:.85rem; }
+  th { text-align:left; color:var(--muted); font-weight:500; padding:8px 16px; position:sticky; top:53px; background:var(--bg); font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; }
+  td { padding:9px 16px; border-top:1px solid var(--line); }
+  tr.row { cursor:pointer; }
+  tr.row:hover { background:var(--panel); }
+  tr.row.sel { background:#302921; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:.72rem; border:1px solid var(--line); white-space:nowrap; }
+  .note-dot { color:var(--accent); }
+  .muted { color:var(--muted); }
+  .detail h2 { font-size:1.1rem; margin:0 0 4px; }
+  .kv { display:grid; grid-template-columns:130px 1fr; gap:4px 12px; font-size:.86rem; margin:14px 0; }
+  .kv .k { color:var(--muted); }
+  .section { border-top:1px solid var(--line); margin-top:18px; padding-top:14px; }
+  .section h3 { font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:0 0 10px; }
+  textarea { width:100%; min-height:90px; background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:10px; font-family:inherit; font-size:.88rem; resize:vertical; }
+  .timeline { list-style:none; margin:0; padding:0; font-size:.82rem; }
+  .timeline li { padding:6px 0; border-bottom:1px solid var(--line); display:flex; gap:10px; }
+  .timeline .t { color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .timeline .ev { font-weight:500; }
+  .links a { color:var(--accent); text-decoration:none; margin-right:14px; font-size:.85rem; }
+  .empty { color:var(--muted); padding:40px 20px; text-align:center; }
+  .saved { color:var(--accent); font-size:.8rem; margin-left:10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Still Beside Me — Orders</h1>
+  <span class="spacer"></span>
+  <a class="btn" href="/admin/api/backup">Download DB backup</a>
+  <form method="POST" action="/admin/logout" style="margin:0"><button type="submit">Sign out</button></form>
+</header>
+<div class="wrap">
+  <div class="list">
+    <div class="controls">
+      <input id="q" placeholder="Search email, name, pet, order ID…" autocomplete="off">
+      <select id="status">
+        <option value="">All statuses</option>
+        <option>pending_payment</option>
+        <option>awaiting_review</option>
+        <option>proof_ready</option>
+        <option>change_requested</option>
+        <option>proof_approved</option>
+        <option>in_production</option>
+        <option>shipped</option>
+        <option>delivered</option>
+        <option>cancelled</option>
+      </select>
+    </div>
+    <table>
+      <thead><tr><th>Order</th><th>Customer</th><th>Status</th><th>Total</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div id="listEmpty" class="empty" style="display:none">No orders match.</div>
+  </div>
+  <div class="detail" id="detail"><div class="empty">Select an order to see its full history.</div></div>
+</div>
+<script>
+  const money = c => c != null ? '$' + (c/100).toFixed(2) : '—';
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+  let selId = null;
+
+  async function loadList() {
+    const q = document.getElementById('q').value.trim();
+    const status = document.getElementById('status').value;
+    const r = await fetch('/admin/api/orders?q=' + encodeURIComponent(q) + '&status=' + encodeURIComponent(status));
+    if (r.status === 401) { location.href = '/admin/login'; return; }
+    const data = await r.json();
+    const tb = document.getElementById('rows');
+    tb.innerHTML = data.orders.map(o => `
+      <tr class="row${o.id===selId?' sel':''}" data-id="${o.id}">
+        <td><strong>${o.shortId}</strong>${o.hasNotes?' <span class="note-dot" title="Has support notes">●</span>':''}<br><span class="muted">${esc(o.petName||'')}</span></td>
+        <td>${esc(o.customerName||'')}<br><span class="muted">${esc(o.email)}</span></td>
+        <td><span class="pill">${o.status.replace(/_/g,' ')}</span></td>
+        <td>${money(o.totalCents)}</td>
+      </tr>`).join('');
+    document.getElementById('listEmpty').style.display = data.orders.length ? 'none' : 'block';
+    tb.querySelectorAll('.row').forEach(tr => tr.onclick = () => loadDetail(tr.dataset.id));
+  }
+
+  async function loadDetail(id) {
+    selId = id;
+    document.querySelectorAll('.row').forEach(r => r.classList.toggle('sel', r.dataset.id === id));
+    const r = await fetch('/admin/api/orders/' + encodeURIComponent(id));
+    if (r.status === 401) { location.href = '/admin/login'; return; }
+    const { order: o, events } = await r.json();
+    const ship = o.shipping;
+    const shipStr = ship ? [ship.name, ship.address1, ship.address2, [ship.city, ship.state, ship.zip].filter(Boolean).join(', ')].filter(Boolean).join('<br>') : '<span class="muted">— (digital or not yet paid)</span>';
+    const links = [];
+    if (o.adminToken) links.push(`<a href="/admin/review/${o.adminToken}" target="_blank">Review page</a>`, `<a href="/admin/order/${o.adminToken}" target="_blank">Fulfillment page</a>`);
+    if (o.proofToken) links.push(`<a href="/order/${o.proofToken}" target="_blank">Customer status</a>`);
+    document.getElementById('detail').innerHTML = `
+      <h2>${o.shortId} <span class="pill">${o.status.replace(/_/g,' ')}</span></h2>
+      <div class="links">${links.join('')}</div>
+      <div class="kv">
+        <span class="k">Customer</span><span>${esc(o.customerName||'—')} &nbsp; <span class="muted">${esc(o.email||'')}</span></span>
+        <span class="k">Pet</span><span>${esc(o.petName||'—')}</span>
+        <span class="k">Product</span><span>${esc(o.sku)} · ${money(o.totalCents)}</span>
+        <span class="k">Ship to</span><span>${shipStr}</span>
+        <span class="k">Tracking</span><span>${o.tracking ? esc(o.tracking.carrier||'')+' '+(o.tracking.url?`<a href="${esc(o.tracking.url)}" target="_blank">${esc(o.tracking.number)}</a>`:esc(o.tracking.number)) : '<span class="muted">—</span>'}</span>
+        <span class="k">Fulfillment</span><span>${esc(o.fulfillmentProvider||'—')}</span>
+        <span class="k">Stripe PI</span><span class="muted">${esc(o.stripePaymentIntentId||'—')}</span>
+        <span class="k">Created</span><span>${esc(o.createdAt)}</span>
+        <span class="k">Order ID</span><span class="muted">${esc(o.id)}</span>
+      </div>
+      <div class="section"><h3>Support notes</h3>
+        <textarea id="notes" placeholder="Add a note (e.g. customer called, reshipping to new address)…">${esc(o.adminNotes)}</textarea>
+        <div style="margin-top:8px"><button class="btn" id="saveNotes">Save note</button><span id="notesSaved" class="saved" style="display:none">Saved</span></div>
+      </div>
+      <div class="section"><h3>Poem</h3><div style="white-space:pre-wrap;font-size:.88rem">${esc(o.poemText||'—')}</div></div>
+      <div class="section"><h3>Full timeline (${events.length})</h3>
+        <ul class="timeline">${events.map(e => `<li><span class="t">${esc(e.at)}</span><span class="ev">${esc(e.type.replace(/_/g,' '))}</span></li>`).join('')}</ul>
+      </div>`;
+    document.getElementById('saveNotes').onclick = async () => {
+      const notes = document.getElementById('notes').value;
+      const rr = await fetch('/admin/api/orders/' + encodeURIComponent(id) + '/notes', {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ notes })
+      });
+      if (rr.ok) { const s = document.getElementById('notesSaved'); s.style.display='inline'; setTimeout(()=>s.style.display='none', 2000); loadList(); }
+    };
+  }
+
+  let t;
+  document.getElementById('q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(loadList, 200); });
+  document.getElementById('status').addEventListener('change', loadList);
+  loadList();
+</script>
+</body>
+</html>
