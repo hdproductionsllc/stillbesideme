@@ -321,7 +321,7 @@ async function sendApprovalConfirmation(to, orderData, statusPageUrl) {
         and professionally framed. You'll receive tracking information by email once it ships.
       </p>
       <p style="color:#9B9590;font-size:0.9rem;margin-top:24px;">
-        Estimated delivery: 5&ndash;10 business days
+        Estimated delivery: 8&ndash;12 business days
       </p>
       ${statusPageUrl ? `
       <p style="margin-top:24px;">

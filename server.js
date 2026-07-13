@@ -174,12 +174,15 @@ async function start() {
   runBackup();
   setInterval(runBackup, 24 * 60 * 60 * 1000).unref();
 
-  // ── TEMPORARY: Letter From Heaven is off sale ─────────────────────────
-  // 302 (temporary) redirects for LFH and its human-loss landing pages.
-  // Registered before express.static so the .html files are not served.
-  // To restore LFH: delete this block and remove "hidden": true from
-  // src/data/templates/letter-from-heaven.json.
-  const lfhOffSaleRedirects = [
+  // ── Letter From Heaven is discontinued ────────────────────────────────
+  // LFH and its human-loss landing pages are permanently off sale, so they
+  // return 410 Gone (not a 302). 410 tells Google to DROP these URLs and stop
+  // showing their stale "$84.95 / handcrafted frame" snippets; a 302 kept them
+  // indexed as "temporarily moved". Registered before express.static so the
+  // .html files never serve. To restore LFH: delete this block and remove
+  // "hidden": true from src/data/templates/letter-from-heaven.json (the .html
+  // files still exist on disk).
+  const lfhGonePages = [
     '/letter-from-heaven',
     '/loss-of-mother-gift',
     '/loss-of-father-gift',
@@ -194,13 +197,28 @@ async function start() {
     '/memorial-gift-for-anniversary-of-death',
     '/sympathy-gift-for-coworker'
   ];
-  for (const p of lfhOffSaleRedirects) {
-    app.get([p, `${p}.html`], (req, res) => res.redirect(302, '/'));
+  const lfhGoneHtml =
+    '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+    '<meta name="robots" content="noindex">' +
+    '<title>No longer available &middot; Still Beside Me</title>' +
+    '<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;' +
+    'font-family:Georgia,\'Times New Roman\',serif;background:#faf8f5;color:#2a2a2a;text-align:center;padding:24px}' +
+    '.g{max-width:34rem}h1{font-size:1.6rem;font-weight:600;margin:0 0 12px}' +
+    'p{color:#6b6560;line-height:1.6;margin:0 0 24px}' +
+    'a{display:inline-block;background:#8B9D83;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px}</style>' +
+    '</head><body><div class="g"><h1>This tribute is no longer available</h1>' +
+    '<p>We now focus on personalized pet memorial tributes &ndash; a poem written from your memories, ' +
+    'printed beside their photo and framed.</p>' +
+    '<a href="/">See our pet tributes</a></div></body></html>';
+  for (const p of lfhGonePages) {
+    app.get([p, `${p}.html`], (req, res) => res.status(410).type('html').send(lfhGoneHtml));
   }
+  // Old LFH builder URL → the live pet builder (permanent move).
   app.get(['/customize/letter-from-heaven', '/customize/letter-from-heaven.html'], (req, res) => {
-    res.redirect(302, '/customize/pet-tribute');
+    res.redirect(301, '/customize/pet-tribute');
   });
-  // ── end temporary LFH block ───────────────────────────────────────────
+  // ── end discontinued LFH block ────────────────────────────────────────
 
   // Client-side analytics config — /js/env.js exposes ONLY the public ad/pixel
   // IDs that are actually set. Registered before express.static so it always

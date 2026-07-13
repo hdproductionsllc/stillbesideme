@@ -2,6 +2,35 @@
 
 ---
 
+## Pass 14 — Timeline unification + LFH 410 cleanup (2026-07-13)
+
+External audit flagged "the site has no single product truth." Verified against code: the LIVE product is coherent (one pet tribute, 4 sizes $79–$249, 11×14 default). The audit's "3 competing products" was **stale search index** (old $97 3D-frame + $84.95 human-memorial snippets), not the live site. Two REAL issues survived: (1) fragmented delivery promise across live pages, (2) LFH off-sale routes use **302** (temporary) → Google keeps the old URLs indexed and keeps showing the stale $84.95 snippets. David's call: **LFH is dead/shelved indefinitely → switch to 410 Gone.**
+
+Canonical delivery wording everywhere: **"Your design proof arrives within 24 hours. After you approve it, your framed tribute typically arrives within 8–12 business days."** (`shipping-policy.html` already = 8–12 via 5–7 production + 3–5 shipping — it's the source of truth, left as-is.)
+
+### Workstream 1 — Unify delivery timeline (was: 7–10 days / 5–10 biz days / 8–12 biz days) ✓ DONE
+- [x] index.html — schema FAQ + visible FAQ (4 spots): → "about 8–12 business days after you approve your proof"
+- [x] pet-memorial-gifts.html — schema + visible → 8–12
+- [x] sympathy-gifts.html — schema + 2 visible → 8–12
+- [x] memorial-gifts.html → 8–12
+- [x] order-confirmed.html — "5–10 business days after approval" → 8–12
+- [x] proof-approval.html — "Estimated delivery: 5–10 business days" → 8–12
+- [x] src/services/emailService.js — approval email → 8–12
+- Left untouched (correct): refund processing (5–10, different thing), support "1 business day", "proof within 24 hours"
+
+### Workstream 2 — LFH routes: 302 → 410 Gone ✓ DONE
+- [x] server.js — loop now returns `410 Gone` with a branded noindex body + link to /
+- [x] `/customize/letter-from-heaven` → `/customize/pet-tribute` upgraded 302 → **301** (permanent)
+- [x] .html files stay shadowed on disk (never served); V2 = delete them
+
+### Verify ✓ DONE (live server, port 3457)
+- [x] Grep: no "7-10"/"7–10"/"5–10 business" left in live delivery copy
+- [x] `node --check` server.js + emailService.js pass
+- [x] curl: all 12 dead URLs → 410 (clean + .html); old builder → 301; home/pet/sympathy/shipping/builder → 200
+- [x] curl: 410 body renders "no longer available"; homepage serves "8–12 business days"; sitemap clean of off-sale URLs
+
+---
+
 ## Pass 13 — Full-sweep: preview↔print fidelity, mobile, pixel, Luma guards, SEO (2026-07-11)
 
 David: "full sweep… site works on mobile and desktop, designer accurately reflects the final product, all products map to real Luma products, SEO optimized, live today." Three audit agents swept (Luma mapping / frontend fidelity / SEO); all 8 Luma subcategories verified live against the production API (all 6 shared options valid on every frame; 103001+bleed 36 valid). David ruled: fix-forward, no 2.0 fork; the light cream paper insert is THE product.
