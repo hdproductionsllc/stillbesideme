@@ -140,10 +140,9 @@
         "upchargeCents": 0,
         "note": "Slim 0.9\" gallery profile, solid wood - included with every size.",
         "choices": [
-          { "id": "black",   "label": "Black",        "luma": 105001, "faceIn": 0.875, "swatch": "#1c1c1c", "molding": "linear-gradient(145deg, #232323, #2e2e2e 15%, #101010 40%, #1c1c1c 70%, #0a0a0a)", "default": true },
-          { "id": "white",   "label": "White",        "luma": 105002, "faceIn": 0.875, "swatch": "#eeeae1", "molding": "linear-gradient(145deg, #fbf9f4, #ffffff 15%, #e4ded3 45%, #f0ebe2 70%, #d9d2c5)" },
-          { "id": "oak",     "label": "Oak",          "luma": 105003, "faceIn": 0.875, "swatch": "#c8a97e", "molding": "linear-gradient(145deg, #d8b988, #e6cfa3 15%, #b58e5f 45%, #cba97f 70%, #a97e50)" },
-          { "id": "natural", "label": "Natural Wood", "luma": 105008, "faceIn": 0.875, "swatch": "#b5895a", "molding": "linear-gradient(145deg, #c99a63, #d8ac74 15%, #a2703f 45%, #b98a52 70%, #8f6234)" }
+          { "id": "black", "label": "Black", "luma": 105001, "faceIn": 0.875, "swatch": "#1c1c1c", "default": true },
+          { "id": "white", "label": "White", "luma": 105002, "faceIn": 0.875, "swatch": "#eeeae1" },
+          { "id": "oak",   "label": "Oak",   "luma": 105003, "faceIn": 0.875, "swatch": "#c8a97e" }
         ]
       },
       {
@@ -151,10 +150,11 @@
         "tier": "signature",
         "upchargeCents": 6000,
         "minShortSideIn": 16,
-        "note": "Wide 2.5-3\" solid-wood gallery profiles - roughly triple the face of the standard frame, one with a gold sight-edge. A heavier, gallery-weight piece that anchors the wall. Available on 16x20 and larger, where the wide profile looks intentional.",
+        "note": "Wide 2.5-3\" solid-wood gallery profiles - roughly triple the face of the standard frame, two finished with a gold sight-edge. A heavier, gallery-weight piece that anchors the wall. Available on 16x20 and larger, where the wide profile looks intentional.",
         "choices": [
           { "id": "driftwood", "label": "Driftwood Gray",      "luma": 105018, "faceIn": 3.0,    "swatch": "#9b978e" },
-          { "id": "pleinair",  "label": "Plein Air Espresso",  "luma": 105020, "faceIn": 2.5625, "swatch": "#4a3b2e" }
+          { "id": "pleinair",  "label": "Plein Air Espresso",  "luma": 105020, "faceIn": 2.5625, "swatch": "#4a3b2e", "texture": "espresso" },
+          { "id": "blackgold", "label": "Black with Gold",     "luma": 105015, "faceIn": 3.0,    "swatch": "#141414", "texture": "blackgold" }
         ]
       }
     ]
