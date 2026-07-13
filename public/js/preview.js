@@ -635,7 +635,7 @@
       const tex = frameDef.texture || (frameDef.id === 'pleinair' ? 'espresso' : frameDef.id) || 'black';
       // ?v bumps whenever the frame textures are re-cut, so browsers/CDN fetch
       // the new art instead of a cached old PNG (same filenames).
-      border.style.setProperty('--frame-tex', 'url("/images/frames/' + tex + '.png?v=2")');
+      border.style.setProperty('--frame-tex', 'url("/images/frames/' + tex + '.png?v=3")');
       border.style.setProperty('--frame-fallback', frameDef.swatch || '#2a2a2a');
     }
     // Recompute frame face width for the current size/layout.
