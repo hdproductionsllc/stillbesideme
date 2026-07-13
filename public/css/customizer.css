@@ -313,26 +313,30 @@
    print. The molding gradient is set inline from the chosen frame's `molding`.
    The photo + poem sit on light paper recessed into the frame (rabbet). */
 .frame-preview.theme-auto .frame-border {
-  padding: var(--frame-width, 7%);
+  padding: 0;
   border-radius: 2px;
   position: relative;
-  background: linear-gradient(
-    145deg,
-    var(--frame-hi, #8a7560),
-    var(--frame-color, #6E5C4E) 16%,
-    var(--frame-lo, #4a3d31) 42%,
-    var(--frame-color, #6E5C4E) 70%,
-    var(--frame-lo, #4a3d31)
-  );
+  /* Photographic frame via 9-slice border-image (real mitered corners + wood
+     grain, generated in /images/frames). border-image needs a px border width,
+     so --fw-px is computed from the rendered size in preview.js (updateFrameWidthPx)
+     and recomputed on resize; --frame-tex + --frame-fallback are set per chosen
+     frame in setFrame(). If the image fails to load, the solid fallback shows. */
+  border-style: solid;
+  border-color: var(--frame-fallback, #2a2a2a);
+  border-width: var(--fw-px, 22px);
+  border-image-source: var(--frame-tex, none);
+  border-image-slice: 46;
+  border-image-repeat: round;
   box-shadow:
     0 14px 46px rgba(0, 0, 0, 0.42),
-    0 4px 14px rgba(0, 0, 0, 0.28),
-    /* top/left rail catches light, bottom/right falls to shadow → 3D molding */
-    inset 0 2px 0 rgba(255, 255, 255, 0.24),
-    inset 2px 0 0 rgba(255, 255, 255, 0.12),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
-    inset -2px 0 0 rgba(0, 0, 0, 0.26);
-  transition: background 0.45s ease, padding 0.35s ease;
+    0 4px 14px rgba(0, 0, 0, 0.28);
+  transition: border-width 0.35s ease;
+}
+/* Frameless products: no molding at all. */
+.frame-preview.no-frame.theme-auto .frame-border {
+  border-width: 0;
+  border-image: none;
+  box-shadow: none;
 }
 /* Rabbet: the print sits recessed behind the frame face, so the molding casts
    a soft shadow onto the print's top and left edges. A directional inset

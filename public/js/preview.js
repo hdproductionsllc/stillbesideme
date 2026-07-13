@@ -168,6 +168,17 @@
 
   // Frame size from selected product SKU (e.g. [11, 14] for "framed-11x14")
   let frameDims = null;
+  let lastFacePct = null;  // frame face as % of the framed piece (for --fw-px)
+  let _fwResizeTimer = null;
+
+  // border-image needs a pixel border width; derive it from the rendered
+  // framed-piece width × the current face percentage. Recomputed on resize.
+  function updateFrameWidthPx() {
+    const frameRoot = document.getElementById('frame-preview');
+    if (!frameRoot || lastFacePct == null) return;
+    const w = frameRoot.offsetWidth;
+    if (w > 0) frameRoot.style.setProperty('--fw-px', (w * lastFacePct / 100).toFixed(1) + 'px');
+  }
 
   // Chosen frame definition { id, faceIn, molding, swatch } from template.frameOptions
   let currentFrame = null;
@@ -387,7 +398,9 @@
       var frameRoot = document.getElementById('frame-preview');
       if (frameRoot) {
         var facePct = (FRAME_FACE_IN / (w + 2 * FRAME_FACE_IN)) * 100;
+        lastFacePct = facePct;
         frameRoot.style.setProperty('--frame-width', facePct.toFixed(2) + '%');
+        updateFrameWidthPx();
       }
 
       // Printed-mat templates: the panels region represents the openings
@@ -609,17 +622,23 @@
     });
   }
 
-  // Apply the customer's chosen frame — molding color live on the border and
-  // real face width (via applyGridStyles) so the preview matches what ships.
+  // Apply the customer's chosen frame — a photographic 9-slice texture on the
+  // border + real face width (via applyGridStyles) so the preview matches what
+  // ships. pleinair uses the espresso asset; everything else maps by id.
   function setFrame(frameDef) {
     if (!frameDef) return;
     currentFrame = frameDef;
     const border = container && container.closest('.frame-preview')
       ? container.closest('.frame-preview').querySelector('.frame-border')
       : document.querySelector('#frame-preview .frame-border');
-    if (border && frameDef.molding) border.style.background = frameDef.molding;
+    if (border) {
+      const tex = frameDef.texture || (frameDef.id === 'pleinair' ? 'espresso' : frameDef.id) || 'black';
+      border.style.setProperty('--frame-tex', 'url("/images/frames/' + tex + '.png")');
+      border.style.setProperty('--frame-fallback', frameDef.swatch || '#2a2a2a');
+    }
     // Recompute frame face width for the current size/layout.
     applyGridStyles(currentLayout);
+    updateFrameWidthPx();
     queueRender();
   }
 
@@ -705,9 +724,16 @@
       requestAnimationFrame(function () {
         sizeCanvases();
         render();
+        updateFrameWidthPx(); // layout settled — set the px frame width
       });
     });
   }
+
+  // Keep the px frame width correct as the viewport resizes.
+  window.addEventListener('resize', function () {
+    clearTimeout(_fwResizeTimer);
+    _fwResizeTimer = setTimeout(updateFrameWidthPx, 120);
+  });
 
   // ── Custom Ratio API (for divider drag) ────────────────────
 
