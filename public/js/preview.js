@@ -699,7 +699,7 @@
     // The insert is photo-paper: light background, deep near-espresso ink so
     // the text reads crisply against the cream (mirrors tributeRenderer
     // PAPER_PALETTE — keep the two in sync).
-    const ink = '#241E19';
+    const ink = '#14100C';
     styleColors = {
       ...(styleColors || {}),
       tribute: {
@@ -988,7 +988,7 @@
     function measurePoem(fontSize) {
       var lh = fontSize * 1.55;
       var blankH = lh * 0.5;
-      ctx.font = '400 ' + Math.round(fontSize) + 'px "Cormorant Garamond", serif';
+      ctx.font = '500 ' + Math.round(fontSize) + 'px "Cormorant Garamond", serif';
       var lines = wrapText(ctx, poemText, maxTextWidth * 0.92);
       var total = 0;
       for (var i = 0; i < lines.length; i++) {
@@ -1081,7 +1081,7 @@
       var zoneH = footerTop - pad - y;
       var startY = y + Math.max(0, (zoneH - poem.totalH) / 2);
 
-      ctx.font = '400 ' + Math.round(poem.fontSize) + 'px "Cormorant Garamond", serif';
+      ctx.font = '500 ' + Math.round(poem.fontSize) + 'px "Cormorant Garamond", serif';
       // Sample poem renders muted so it reads as a placeholder
       ctx.fillStyle = poemIsSample ? mixHex(colors.poem, colors.bg, 0.55) : colors.poem;
 

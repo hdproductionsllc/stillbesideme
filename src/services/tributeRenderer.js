@@ -30,7 +30,7 @@ const FONT_SERIF = "'Cormorant Garamond', Georgia, serif";
 // Cream paper, deep near-espresso ink for strong readability, warm gold accent.
 // (The ink was lightened toward brown before; darkened here so the text reads
 // crisply against the cream, and the secondary lines aren't washed out.)
-const PAPER_INK = '#241E19';
+const PAPER_INK = '#14100C';
 const PAPER_BG = '#FAF7F2';
 const PAPER_PALETTE = Object.freeze({
   background: PAPER_BG,
@@ -236,7 +236,7 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
         continue;
       }
       y += fit.lh;
-      elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="${FONT_SERIF}" font-size="${poemSize}" fill="${escSvg(colors.poem)}" font-weight="400">${escSvg(line)}</text>`);
+      elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="${FONT_SERIF}" font-size="${poemSize}" fill="${escSvg(colors.poem)}" font-weight="500">${escSvg(line)}</text>`);
     }
     y += 16;
   }
