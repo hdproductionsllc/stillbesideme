@@ -54,7 +54,13 @@
   --frame-width: 18px;
   --mat-padding: 22px;
   --panel-gap: 3px;
-  max-width: 480px;
+  /* Fill the preview pane instead of floating small in it. The frame grows to
+     whichever is smaller: a hard width cap, or the height the pane can spare
+     once the controls/selectors below take their share (the 320px reserve) —
+     scaled by the frame's real aspect ratio (--frame-ar, set per size/layout
+     in preview.js) so a tall portrait never overflows the viewport. Mobile
+     media queries below override this with a small fixed cap. */
+  max-width: min(900px, calc((100vh - 57px - 300px) * var(--frame-ar, 1.27)));
   width: 100%;
   border-radius: 2px;
   position: relative;

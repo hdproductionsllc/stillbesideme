@@ -424,8 +424,16 @@
         if (w - b > 0 && h - b > 0) { w = w - b; h = h - b; }
       }
       container.style.aspectRatio = w + '/' + h;
+      // Expose the frame's aspect so CSS can size it to fill the pane by the
+      // limiting dimension (see .frame-preview max-width).
+      if (frameRoot) frameRoot.style.setProperty('--frame-ar', (w / h).toFixed(3));
     } else {
       container.style.aspectRatio = layout.aspectRatio;
+      var lp = layout.aspectRatio.split('/');
+      var fr2 = document.getElementById('frame-preview');
+      if (fr2 && lp.length === 2) {
+        fr2.style.setProperty('--frame-ar', (parseFloat(lp[0]) / parseFloat(lp[1])).toFixed(3));
+      }
     }
   }
 
