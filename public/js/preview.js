@@ -285,6 +285,19 @@
       sizeCanvases();
       queueRender();
     });
+
+    // Single source of truth for canvas fill: whenever the panels container
+    // actually changes size — frame-size change, layout swap, zoom-to-read
+    // toggle, font load reflow, sticky repositioning — re-match every backing
+    // store and repaint. This removes the timing races the double-rAF hacks
+    // were guarding against and guarantees the art always fills the frame.
+    if (typeof ResizeObserver !== 'undefined' && container) {
+      const ro = new ResizeObserver(() => {
+        sizeCanvases();
+        queueRender();
+      });
+      ro.observe(container);
+    }
   }
 
   async function loadFonts() {
@@ -779,10 +792,16 @@
       const w = el.clientWidth;
       const h = el.clientHeight;
       if (w === 0 || h === 0) continue;
+      // Only size the backing store (drawing resolution). The canvas's DISPLAY
+      // size is owned by CSS (.panel canvas { width:100%; height:100% }), so it
+      // always fills its grid cell — even if this measurement is momentarily
+      // stale after a reflow. A stale backing store just scales to fill (soft
+      // for a frame) rather than leaving a cream gap; the ResizeObserver below
+      // refreshes it crisp the moment the cell settles. Never write an explicit
+      // px display size here — that is what previously left the art top-aligned
+      // and short inside a taller frame opening.
       panel.canvas.width = Math.round(w * dpr);
       panel.canvas.height = Math.round(h * dpr);
-      panel.canvas.style.width = w + 'px';
-      panel.canvas.style.height = h + 'px';
     }
   }
 
@@ -941,8 +960,10 @@
     const dateSize = Math.round(10.5 * scale);
     const nickSize = Math.round(13.5 * scale);
     const famSize = Math.round(10 * scale);
-    // Poem carries the insert now that dates are on the frame — give it presence
-    const poemBaseSize = (nameOnFrame ? 16 : 13) * scale;
+    // The poem is the product — readability comes first. Cormorant at weight
+    // 400 (not the thin 300) reads crisp and confident even at preview scale,
+    // and a larger base gives it real presence on the insert.
+    const poemBaseSize = (nameOnFrame ? 16 : 15) * scale;
 
     // ── Measure fixed element heights ──
 
@@ -959,7 +980,7 @@
     function measurePoem(fontSize) {
       var lh = fontSize * 1.55;
       var blankH = lh * 0.5;
-      ctx.font = '300 ' + Math.round(fontSize) + 'px "Cormorant Garamond", serif';
+      ctx.font = '400 ' + Math.round(fontSize) + 'px "Cormorant Garamond", serif';
       var lines = wrapText(ctx, poemText, maxTextWidth * 0.92);
       var total = 0;
       for (var i = 0; i < lines.length; i++) {
@@ -1052,7 +1073,7 @@
       var zoneH = footerTop - pad - y;
       var startY = y + Math.max(0, (zoneH - poem.totalH) / 2);
 
-      ctx.font = '300 ' + Math.round(poem.fontSize) + 'px "Cormorant Garamond", serif';
+      ctx.font = '400 ' + Math.round(poem.fontSize) + 'px "Cormorant Garamond", serif';
       // Sample poem renders muted so it reads as a placeholder
       ctx.fillStyle = poemIsSample ? mixHex(colors.poem, colors.bg, 0.55) : colors.poem;
 

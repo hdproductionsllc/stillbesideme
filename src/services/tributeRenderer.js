@@ -153,7 +153,7 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
   const nameFontSize = Math.round(width * 0.065);
   const nicknameFontSize = Math.round(width * 0.03);
   const datesFontSize = Math.round(width * 0.028);
-  const poemFontSize = Math.round(width * 0.028);
+  const poemFontSize = Math.round(width * 0.032);
   const familyFontSize = Math.round(width * 0.026);
   const lineHeight = 1.55;
 
@@ -236,7 +236,7 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
         continue;
       }
       y += fit.lh;
-      elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="${FONT_SERIF}" font-size="${poemSize}" fill="${escSvg(colors.poem)}" font-weight="300">${escSvg(line)}</text>`);
+      elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="${FONT_SERIF}" font-size="${poemSize}" fill="${escSvg(colors.poem)}" font-weight="400">${escSvg(line)}</text>`);
     }
     y += 16;
   }
