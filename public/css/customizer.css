@@ -260,29 +260,37 @@
 /* 3-panel layout icons use CSS Grid */
 .layout-option-grid {
   display: grid;
-  gap: 1px;
-  padding: 4px;
+  gap: 1.5px;         /* thin cream gap reads as a mat line between panels */
+  padding: 0;         /* the frame is the border; paper fills to the edge */
 }
 
 .layout-option-grid .layout-icon-block {
-  border-radius: 1px;
   min-height: 0;
   min-width: 0;
 }
 
-/* Photo blocks */
+/* Photo block – a warm grey plate, like a photo sitting on the paper */
 .layout-option-grid .layout-icon-photo {
-  background: rgba(255, 255, 255, 0.25);
+  background: #cfc7ba;
 }
 
-/* Tribute blocks */
+/* Tribute block – cream paper carrying faint horizontal "text" lines so the
+   thumbnail clearly reads as photo + poem (our differentiator), not two boxes */
 .layout-option-grid .layout-icon-tribute {
-  background: rgba(196, 168, 130, 0.35);
+  background-color: #FAF7F2;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(20, 16, 12, 0.42) 0, rgba(20, 16, 12, 0.42) 1px,
+    transparent 1px, transparent 4px
+  );
+  background-position: center;
+  background-size: 62% 100%;
+  background-repeat: no-repeat;
 }
 
-/* Panel2 blocks */
+/* Second photo block (3-panel layouts) – a lighter plate */
 .layout-option-grid .layout-icon-panel2 {
-  background: rgba(255, 255, 255, 0.15);
+  background: #ded7cc;
 }
 
 /* --- Classic Dark Theme --- */
@@ -580,31 +588,36 @@
   display: flex;
   gap: var(--space-md);
   justify-content: center;
+  align-items: flex-end;     /* frames of different heights share a baseline */
   margin-bottom: var(--space-md);
   flex-wrap: wrap;
 }
 
+/* Each thumbnail is a miniature of the real framed piece: a dark molding
+   border around cream paper, sized to the layout's true orientation by
+   inline width/height (see layoutIconBoxStyle). Landscape reads wide, portrait
+   reads tall — the shape carries the choice. */
 .layout-option {
-  width: 56px;
-  height: 44px;
-  border-radius: 6px;
+  box-sizing: border-box;
+  border: 3px solid #1c1c1c;
+  border-radius: 2px;
   cursor: pointer;
-  border: 2px solid transparent;
-  transition: all 0.2s;
-  background: rgba(255, 255, 255, 0.06);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 5px;
-  gap: 2px;
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+  background: #FAF7F2;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .layout-option:hover {
-  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.5);
 }
 
 .layout-option.active {
-  border-color: var(--color-warm);
+  box-shadow:
+    0 0 0 2px var(--color-warm),
+    0 4px 10px rgba(0, 0, 0, 0.45);
 }
 
 /* Horizontal icon – two side-by-side boxes */
@@ -1433,12 +1446,8 @@
     display: none;
   }
 
-  /* Bigger touch targets for mobile */
-  .layout-option {
-    width: 56px;
-    height: 44px;
-    padding: 6px;
-  }
+  /* Size is set inline per orientation (layoutIconBoxStyle); keep the frame
+     border here so the thumbnails stay legible as framed minis on mobile. */
 
   .divider-handle.col {
     width: 24px;

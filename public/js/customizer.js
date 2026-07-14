@@ -151,6 +151,13 @@
       // Initialize preview renderer with container ID
       PreviewRenderer.init('preview-panels', template);
 
+      // Deter casual saving of the tribute art. The preview (photo + poem) is
+      // the product, so block the "Save image as…" context menu and drag-to-
+      // save on the canvases and photo thumbnails. Scoped to <canvas>/<img> so
+      // right-click still works normally on text, links and inputs. This is a
+      // deterrent, not DRM — screenshots and devtools can't be prevented.
+      protectImages();
+
       // Wire up photo crop interaction for main photo panel
       initPhotoCropInteraction('photo');
 
@@ -198,6 +205,21 @@
       console.error('Failed to load:', err);
       formPane.innerHTML = '<p style="padding:2rem;color:var(--color-error)">Something went wrong. <a href="/">Go back</a></p>';
     }
+  }
+
+  // Block right-click "Save image as…" and drag-to-desktop on the tribute
+  // canvases and photo thumbnails. Delegated at the document so it also covers
+  // canvases/images created later (layout swaps, uploads). Only images are
+  // affected — text, links and inputs keep their native context menu.
+  function protectImages() {
+    const isImageLike = (el) =>
+      el && (el.tagName === 'CANVAS' || el.tagName === 'IMG');
+    document.addEventListener('contextmenu', (e) => {
+      if (isImageLike(e.target)) e.preventDefault();
+    });
+    document.addEventListener('dragstart', (e) => {
+      if (isImageLike(e.target)) e.preventDefault();
+    });
   }
 
   // ── Guided Form Builder ──────────────────────────────────────
@@ -892,7 +914,7 @@
       const isActive = key === currentLayout ? ' active' : '';
       const icon = buildLayoutIcon(def);
       return `<div>
-        <div class="layout-option layout-option-grid${isActive}" data-layout="${key}" style="${layoutIconGridStyle(def)}">
+        <div class="layout-option layout-option-grid${isActive}" data-layout="${key}" style="${layoutIconGridStyle(def)}${layoutIconBoxStyle(def)}">
           ${icon}
         </div>
         <div class="layout-label">${def.label || key}</div>
@@ -917,8 +939,26 @@
   function layoutIconGridStyle(def) {
     const cols = def.columns.map(v => v + 'fr').join(' ');
     const rows = def.rows.map(v => v + 'fr').join(' ');
-    const areas = def.areas.map(r => '"' + r.join(' ') + '"').join(' ');
+    // Single-quote the area rows: this string goes into a double-quoted HTML
+    // style="" attribute, so double quotes here would terminate the attribute
+    // early and drop every declaration after it.
+    const areas = def.areas.map(r => "'" + r.join(' ') + "'").join(' ');
     return `grid-template-columns:${cols};grid-template-rows:${rows};grid-template-areas:${areas};`;
+  }
+
+  // Size each thumbnail to its frame's true orientation so Landscape reads as a
+  // wide little frame and Portrait as a tall one — the shape itself carries the
+  // choice. Both fit inside the same square bounding box (contain), so a wide
+  // one is short and a tall one is narrow.
+  function layoutIconBoxStyle(def) {
+    const parts = (def.aspectRatio || '1/1').split('/');
+    const aw = parseFloat(parts[0]) || 1;
+    const ah = parseFloat(parts[1]) || 1;
+    const MAX = 60; // px, the longer side of the bounding box
+    let w, h;
+    if (aw >= ah) { w = MAX; h = Math.round(MAX * ah / aw); }
+    else { h = MAX; w = Math.round(MAX * aw / ah); }
+    return `width:${w}px;height:${h}px;`;
   }
 
   function buildLayoutIcon(def) {
