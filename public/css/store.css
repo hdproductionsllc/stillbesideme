@@ -585,7 +585,27 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
   position: relative;
 }
 
+/* Gallery spotlight behind the frame so the black molding reads against the
+   dark hero wall (the text side stays dark for legible white type). */
+.hero-mockup::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  top: 48%;
+  transform: translate(-50%, -50%);
+  width: 132%;
+  height: 128%;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center,
+    rgba(132, 118, 100, 0.52) 0%,
+    rgba(100, 88, 73, 0.24) 44%,
+    transparent 72%);
+}
+
 .hero-mockup .frame-mockup {
+  position: relative;
+  z-index: 1;
   max-width: 440px;
   width: 100%;
   /* Wall texture behind */

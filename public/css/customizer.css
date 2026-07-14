@@ -21,10 +21,15 @@
   position: sticky;
   top: 57px;
   height: calc(100vh - 57px);
-  /* Subtle wall texture */
+  /* Gallery wall: a warm spotlight lifts the area right behind the frame so a
+     black molding reads clearly against it, then falls to a soft dark vignette
+     at the edges — premium and lit, not muddy or flat-dark. */
   background:
-    radial-gradient(ellipse at 50% 40%, rgba(60, 50, 40, 0.3) 0%, transparent 70%),
-    #1a1714;
+    radial-gradient(ellipse 78% 64% at 50% 40%,
+      rgba(128, 114, 98, 0.50) 0%,
+      rgba(98, 86, 72, 0.24) 42%,
+      transparent 74%),
+    linear-gradient(168deg, #272119 0%, #171310 80%);
 }
 
 .form-pane {
