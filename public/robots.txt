@@ -3,4 +3,4 @@ Allow: /
 Disallow: /api/
 Disallow: /uploads/
 
-Sitemap: https://stillbesideme.com/sitemap.xml
+Sitemap: https://www.stillbesideme.com/sitemap.xml
