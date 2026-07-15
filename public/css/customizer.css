@@ -150,6 +150,9 @@
 /* ── On-photo reposition affordance ─────────────────────────────
    Signals that an uploaded photo can be dragged + zoomed, right on the
    photo (the cue used to live buried in the form pane). */
+/* Empty photo panel reads as a click target that opens the uploader. */
+.panel-photo:not(.is-adjustable),
+.panel-photo:not(.is-adjustable) canvas { cursor: pointer; }
 .panel.is-adjustable,
 .panel.is-adjustable canvas { cursor: grab; }
 .panel.is-adjustable.dragging,

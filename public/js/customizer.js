@@ -591,7 +591,6 @@
       const crop = PreviewRenderer.getPhotoCrop(panelId);
       startPanX = crop.panX;
       startPanY = crop.panY;
-      canvas.style.cursor = 'grabbing';
       if (panelEl) panelEl.classList.add('dragging');
       dismissPhotoHint(panelId);
       e.preventDefault();
@@ -612,7 +611,6 @@
     window.addEventListener('mouseup', () => {
       if (isDragging) {
         isDragging = false;
-        canvas.style.cursor = 'grab';
         if (panelEl) panelEl.classList.remove('dragging');
         saveState();
       }
@@ -722,7 +720,16 @@
       gestureMode = 'none';
     });
 
-    canvas.style.cursor = 'grab';
+    // Empty photo panel is a real upload button: clicking the on-canvas
+    // "Upload their photo" placeholder opens the file picker. Once a photo
+    // exists the click does nothing here — the panel becomes drag-to-reposition.
+    const slotId = panelId === 'photo' ? 'main' : panelId;
+    canvas.addEventListener('click', () => {
+      if (photoUploaded[panelId]) return;
+      const input = document.getElementById('upload-input-' + slotId);
+      if (input) input.click();
+    });
+    // Cursor is owned by CSS: pointer while empty, grab once a photo is loaded.
   }
 
   // ── Divider Handles ──────────────────────────────────────────
