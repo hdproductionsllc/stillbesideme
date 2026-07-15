@@ -228,7 +228,12 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
     };
 
     // Largest font (down to a floor) whose full text fits the available space.
-    const floorFont = Math.max(10, Math.round(width * 0.017));
+    // The floor must be low enough that the poem can ALWAYS shrink to fit — in
+    // portrait the tribute panel is wide-but-short, and a floor of ~0.017·w was
+    // too high, so a medium+ poem overflowed and the frame clipped the footer
+    // (nickname/family). At ~0.009·w the full tribute always fits; landscape
+    // panels are tall so they never reach this floor and keep their larger size.
+    const floorFont = Math.max(8, Math.round(width * 0.009));
     let fit = measurePoem(poemFontSize);
     let poemSize = poemFontSize;
     for (let fs = poemFontSize; fs >= floorFont; fs -= 1) {
