@@ -179,9 +179,11 @@ async function start() {
   // return 410 Gone (not a 302). 410 tells Google to DROP these URLs and stop
   // showing their stale "$84.95 / handcrafted frame" snippets; a 302 kept them
   // indexed as "temporarily moved". Registered before express.static so the
-  // .html files never serve. To restore LFH: delete this block and remove
-  // "hidden": true from src/data/templates/letter-from-heaven.json (the .html
-  // files still exist on disk).
+  // .html files never serve. The legacy human-loss landing pages (fabricated
+  // testimonials, stale $84.95 pricing, "handcrafted" frame language) have been
+  // deleted from public/; these routes keep their URLs returning 410 Gone. To
+  // restore LFH: recreate the pages and remove "hidden": true from
+  // src/data/templates/letter-from-heaven.json.
   const lfhGonePages = [
     '/letter-from-heaven',
     '/loss-of-mother-gift',
