@@ -157,6 +157,14 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
   const familyFontSize = Math.round(width * 0.026);
   const lineHeight = 1.55;
 
+  // Footer rhythm — proportional to width so the proof (small) and the 300 DPI
+  // print render the SAME relative spacing. Fixed-pixel gaps here made the
+  // nickname crowd the poem at print scale and diverge between the two sizes.
+  // These are used in BOTH the reserve calc and the draw, so they can't drift.
+  const poemToFooterGap = Math.round(width * 0.05);   // poem's last line → footer divider
+  const footerLineGap = Math.round(width * 0.024);    // divider → first footer line
+  const dividerStroke = Math.max(1, Math.round(width * 0.0016));
+
   // Content is built from y=0 and vertically centered afterwards via a
   // single <g> translate — keeps short poems from leaving dead space below.
   let y = 0;
@@ -188,7 +196,7 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
   // Divider
   const dividerW = Math.round(innerW * 0.3);
   y += Math.round(datesFontSize * 0.35);
-  elements.push(`<line x1="${(width - dividerW) / 2}" y1="${y}" x2="${(width + dividerW) / 2}" y2="${y}" stroke="${escSvg(colors.divider)}" stroke-width="2" />`);
+  elements.push(`<line x1="${(width - dividerW) / 2}" y1="${y}" x2="${(width + dividerW) / 2}" y2="${y}" stroke="${escSvg(colors.divider)}" stroke-width="${dividerStroke}" />`);
   y += Math.round(nameFontSize * 0.32);
 
   // Poem text (line-break aware, balanced word wrapping).
@@ -202,9 +210,9 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
     // Height the footer block below the poem will consume (so we reserve it):
     // divider, optional nickname line, optional family line.
     const familyReserve = (nickname || familyName)
-      ? 16
-        + (nickname ? 24 + nicknameFontSize : 0)
-        + (familyName ? (nickname ? Math.round(nicknameFontSize * 0.9) : 24) + familyFontSize : 0)
+      ? poemToFooterGap
+        + (nickname ? footerLineGap + nicknameFontSize : 0)
+        + (familyName ? (nickname ? Math.round(nicknameFontSize * 0.9) : footerLineGap) + familyFontSize : 0)
         + Math.round(familyFontSize * 0.4)
       : 0;
     const poemAvailH = maxContentH - y - familyReserve;
@@ -238,7 +246,7 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
       y += fit.lh;
       elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="${FONT_SERIF}" font-size="${poemSize}" fill="${escSvg(colors.poem)}" font-weight="500">${escSvg(line)}</text>`);
     }
-    y += 16;
+    y += poemToFooterGap;
   }
 
   // Footer mirrors the preview: divider, then the nickname in quotes, then
@@ -246,15 +254,15 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
   // Smith family") — not the old stacked prefix/name pair.
   if (nickname || familyName) {
     const divW2 = Math.round(innerW * 0.15);
-    elements.push(`<line x1="${(width - divW2) / 2}" y1="${y}" x2="${(width + divW2) / 2}" y2="${y}" stroke="${escSvg(colors.divider)}" stroke-width="1.5" />`);
+    elements.push(`<line x1="${(width - divW2) / 2}" y1="${y}" x2="${(width + divW2) / 2}" y2="${y}" stroke="${escSvg(colors.divider)}" stroke-width="${dividerStroke}" />`);
 
     if (nickname) {
-      y += 24 + nicknameFontSize;
+      y += footerLineGap + nicknameFontSize;
       elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="${FONT_SERIF}" font-size="${nicknameFontSize}" fill="${escSvg(colors.nickname)}" font-style="italic" font-weight="400">“${escSvg(nickname)}”</text>`);
     }
 
     if (familyName) {
-      y += (nickname ? Math.round(nicknameFontSize * 0.9) : 24) + familyFontSize;
+      y += (nickname ? Math.round(nicknameFontSize * 0.9) : footerLineGap) + familyFontSize;
       const prefix = familyPrefix || 'Forever loved by';
       elements.push(`<text x="${width / 2}" y="${y}" text-anchor="middle" font-family="${FONT_SERIF}" font-size="${familyFontSize}" fill="${escSvg(colors.family)}" font-style="italic" font-weight="300">${escSvg(`${prefix} ${familyName}`)}</text>`);
     }

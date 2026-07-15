@@ -67,8 +67,13 @@ async function generateProof(order) {
     const dpiScale = totalW / printDims.width;
     panels = calculateMatLayout(layout, totalW, totalH, data.printSpec, dpiScale);
   } else {
+    // Use the TRUE print aspect ratio (not a generic 1600x1000) so the proof
+    // is an exact scaled-down preview of the printed file — same composition,
+    // same panel proportions, same footer spacing. A hardcoded ratio made the
+    // emailed proof (1.6) disagree with the 14/11 print the customer receives.
+    const printDims = calculatePrintDimensions(order.product_sku, layout);
     totalW = isLandscapeLayout(layout) ? 1600 : 1000;
-    totalH = isLandscapeLayout(layout) ? 1000 : 1600;
+    totalH = Math.round(totalW * (printDims.height / printDims.width));
     panels = calculateLayout(layout, totalW, totalH, data.customRatios);
   }
 
