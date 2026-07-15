@@ -147,6 +147,68 @@
   display: block;
 }
 
+/* ── On-photo reposition affordance ─────────────────────────────
+   Signals that an uploaded photo can be dragged + zoomed, right on the
+   photo (the cue used to live buried in the form pane). */
+.panel.is-adjustable,
+.panel.is-adjustable canvas { cursor: grab; }
+.panel.is-adjustable.dragging,
+.panel.is-adjustable.dragging canvas { cursor: grabbing; }
+
+/* Fading "Drag to reposition" pill, centered near the bottom of the photo. */
+.photo-adjust-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 92%;
+  padding: 4px 10px;
+  background: rgba(20, 16, 12, 0.72);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 0.66rem;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  border-radius: 999px;
+  pointer-events: none;      /* never blocks the drag */
+  z-index: 8;
+  opacity: 1;
+  transition: opacity 0.55s ease;
+}
+.photo-adjust-hint.dismissed { opacity: 0; }
+.photo-adjust-ico { font-size: 0.85rem; line-height: 1; opacity: 0.9; }
+
+/* +/- zoom buttons, top-right corner of the photo. */
+.photo-zoom-ctrl {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 9;
+}
+.photo-zoom-ctrl button {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(20, 16, 12, 0.66);
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+.photo-zoom-ctrl button:hover { background: rgba(20, 16, 12, 0.9); }
+.photo-zoom-ctrl button:active { transform: translateY(1px); }
+
 /* ============================================================
    DIVIDER HANDLES – Draggable resize between panels
    ============================================================ */

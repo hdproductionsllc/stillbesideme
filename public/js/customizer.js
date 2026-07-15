@@ -394,6 +394,9 @@
     const localUrl = isHeic ? null : URL.createObjectURL(file);
     photoUploaded[panelId] = true;
     if (localUrl) PreviewRenderer.setPhoto(panelId, localUrl, '50% 50%');
+    // Now that there's a photo to move, surface the on-photo reposition
+    // affordance (drag hint + grab cursor + zoom buttons) right on the preview.
+    ensurePhotoAdjustUI(panelId);
 
     showUploadPreview(slotId, localUrl, wrapper, isHeic ? 'Preparing your photo…' : 'Uploading...');
 
@@ -505,11 +508,73 @@
     }
   }
 
+  // ── On-photo reposition affordance ─────────────────────────
+  //
+  // Drag-to-reposition worked but was undiscoverable — the only hint lived
+  // in the form pane, nowhere near the photo. Put the cue ON the photo: a
+  // fading "Drag to reposition" pill, a grab cursor, and +/- zoom buttons so
+  // resizing is discoverable too. Created only once a photo exists.
+
+  function ensurePhotoAdjustUI(panelId) {
+    const panelEl = document.getElementById('panel-' + panelId);
+    if (!panelEl) return;
+
+    if (!photoUploaded[panelId]) {
+      const h = panelEl.querySelector('.photo-adjust-hint');
+      const z = panelEl.querySelector('.photo-zoom-ctrl');
+      if (h) h.remove();
+      if (z) z.remove();
+      panelEl.classList.remove('is-adjustable');
+      return;
+    }
+
+    panelEl.classList.add('is-adjustable');
+
+    if (!panelEl.querySelector('.photo-adjust-hint')) {
+      const isTouch = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+      const hint = document.createElement('div');
+      hint.className = 'photo-adjust-hint';
+      hint.innerHTML = '<span class="photo-adjust-ico">⤢</span>'
+        + (isTouch ? 'Drag to reposition · pinch to zoom'
+                   : 'Drag to reposition · scroll to zoom');
+      panelEl.appendChild(hint);
+    }
+
+    if (!panelEl.querySelector('.photo-zoom-ctrl')) {
+      const zoom = document.createElement('div');
+      zoom.className = 'photo-zoom-ctrl';
+      zoom.innerHTML =
+        '<button type="button" data-z="in" aria-label="Zoom in">+</button>'
+        + '<button type="button" data-z="out" aria-label="Zoom out">−</button>';
+      zoom.querySelectorAll('button').forEach((b) => {
+        // Stop the mousedown/touchstart from also starting a photo drag.
+        ['mousedown', 'touchstart'].forEach((ev) =>
+          b.addEventListener(ev, (e) => e.stopPropagation()));
+        b.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const crop = PreviewRenderer.getPhotoCrop(panelId);
+          const delta = b.dataset.z === 'in' ? 0.25 : -0.25;
+          PreviewRenderer.setPhotoCrop(panelId, crop.zoom + delta, crop.panX, crop.panY);
+          dismissPhotoHint(panelId);
+          saveState();
+        });
+      });
+      panelEl.appendChild(zoom);
+    }
+  }
+
+  function dismissPhotoHint(panelId) {
+    const panelEl = document.getElementById('panel-' + panelId);
+    const hint = panelEl && panelEl.querySelector('.photo-adjust-hint');
+    if (hint) hint.classList.add('dismissed');
+  }
+
   // ── Photo Crop Interaction (drag to pan, scroll to zoom) ────
 
   function initPhotoCropInteraction(panelId) {
     const canvas = PreviewRenderer.getPhotoCanvas(panelId);
     if (!canvas) return;
+    const panelEl = canvas.closest('.panel');
 
     let isDragging = false;
     let dragStartX = 0;
@@ -527,6 +592,8 @@
       startPanX = crop.panX;
       startPanY = crop.panY;
       canvas.style.cursor = 'grabbing';
+      if (panelEl) panelEl.classList.add('dragging');
+      dismissPhotoHint(panelId);
       e.preventDefault();
     });
 
@@ -546,6 +613,7 @@
       if (isDragging) {
         isDragging = false;
         canvas.style.cursor = 'grab';
+        if (panelEl) panelEl.classList.remove('dragging');
         saveState();
       }
     });
@@ -557,6 +625,7 @@
       const crop = PreviewRenderer.getPhotoCrop(panelId);
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
       PreviewRenderer.setPhotoCrop(panelId, crop.zoom + delta, crop.panX, crop.panY);
+      dismissPhotoHint(panelId);
       saveState();
     }, { passive: false });
 
@@ -594,6 +663,7 @@
         );
         pinchStartZoom = PreviewRenderer.getPhotoCrop(panelId).zoom;
         gestureMode = 'pinch';
+        dismissPhotoHint(panelId);
         e.preventDefault();
       }
     }, { passive: false });
@@ -627,6 +697,7 @@
         // Pan when adjusting is the clear intent; otherwise let the page scroll.
         if (inZoomMode || crop.zoom > 1.01 || Math.abs(dx) > Math.abs(dy)) {
           gestureMode = 'pan';
+          dismissPhotoHint(panelId);
         } else {
           gestureMode = 'scroll';
         }
@@ -848,6 +919,10 @@
     const tmpUploaded = photoUploaded['photo'];
     photoUploaded['photo'] = photoUploaded['panel2'];
     photoUploaded['panel2'] = tmpUploaded;
+
+    // Keep the reposition affordance in sync with which panels now hold a photo.
+    ensurePhotoAdjustUI('photo');
+    ensurePhotoAdjustUI('panel2');
   }
 
   function addThirdPanel() {
