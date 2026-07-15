@@ -25,11 +25,11 @@
      black molding reads clearly against it, then falls to a soft dark vignette
      at the edges — premium and lit, not muddy or flat-dark. */
   background:
-    radial-gradient(ellipse 78% 64% at 50% 40%,
-      rgba(128, 114, 98, 0.50) 0%,
-      rgba(98, 86, 72, 0.24) 42%,
-      transparent 74%),
-    linear-gradient(168deg, #272119 0%, #171310 80%);
+    radial-gradient(ellipse 88% 74% at 50% 40%,
+      rgba(140, 125, 108, 0.56) 0%,
+      rgba(108, 95, 80, 0.30) 45%,
+      transparent 78%),
+    linear-gradient(168deg, #2f2820 0%, #1c1712 80%);
 }
 
 .form-pane {

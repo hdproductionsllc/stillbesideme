@@ -594,13 +594,13 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
   left: 50%;
   top: 48%;
   transform: translate(-50%, -50%);
-  width: 132%;
-  height: 128%;
+  width: 144%;
+  height: 138%;
   pointer-events: none;
   background: radial-gradient(ellipse at center,
-    rgba(132, 118, 100, 0.52) 0%,
-    rgba(100, 88, 73, 0.24) 44%,
-    transparent 72%);
+    rgba(144, 128, 110, 0.58) 0%,
+    rgba(110, 97, 82, 0.30) 46%,
+    transparent 76%);
 }
 
 .hero-mockup .frame-mockup {
