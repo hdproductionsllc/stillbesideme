@@ -142,7 +142,7 @@
         "choices": [
           { "id": "black", "label": "Black", "luma": 105001, "faceIn": 0.875, "swatch": "#1c1c1c", "default": true },
           { "id": "white", "label": "White", "luma": 105002, "faceIn": 0.875, "swatch": "#eeeae1" },
-          { "id": "oak",   "label": "Oak",   "luma": 105003, "faceIn": 0.875, "swatch": "#c8a97e" }
+          { "id": "oak",   "label": "Natural Wood",   "luma": 105003, "faceIn": 0.875, "swatch": "#c8a97e" }
         ]
       },
       {
