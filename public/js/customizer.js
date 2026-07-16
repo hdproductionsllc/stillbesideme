@@ -534,9 +534,10 @@
       const isTouch = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
       const hint = document.createElement('div');
       hint.className = 'photo-adjust-hint';
-      hint.innerHTML = '<span class="photo-adjust-ico">⤢</span>'
-        + (isTouch ? 'Drag to reposition · pinch to zoom'
-                   : 'Drag to reposition · scroll to zoom');
+      // Keep it short — it sits on a narrow half-frame photo panel, and the
+      // +/- buttons already communicate zoom. (isTouch kept for future copy.)
+      void isTouch;
+      hint.innerHTML = '<span class="photo-adjust-ico">⤢</span>Drag to reposition';
       panelEl.appendChild(hint);
     }
 

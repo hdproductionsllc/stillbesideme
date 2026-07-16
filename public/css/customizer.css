@@ -1482,6 +1482,10 @@
   }
   .preview-stage.mini .frame-preview { max-width: 150px; }
   .preview-stage.mini .preview-controls { display: none; }
+  /* On the tiny pinned thumbnail the on-photo drag hint + zoom buttons are
+     clutter you can't meaningfully use — hide them until the preview is full. */
+  .preview-stage.mini .photo-adjust-hint,
+  .preview-stage.mini .photo-zoom-ctrl { display: none; }
 
   /* Focused inputs scroll to just below the pinned preview, never behind it. */
   html { scroll-padding-top: 210px; }
