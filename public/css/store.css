@@ -1472,10 +1472,18 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
    ============================================================ */
 
 @media (max-width: 1024px) {
+  /* Lead with the product on mobile: the framed tribute IS the pitch, so show
+     it first (headline sits right below it) instead of pushing it under a full
+     screen of text and below the fold. */
   .hero-inner {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
     text-align: center;
-    gap: var(--space-2xl);
+    gap: var(--space-xl);
+  }
+
+  .hero-mockup {
+    order: -1;
   }
 
   .hero-mockup .frame-mockup {

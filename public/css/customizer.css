@@ -161,13 +161,12 @@
 /* Fading "Drag to reposition" pill, centered near the bottom of the photo. */
 .photo-adjust-hint {
   position: absolute;
-  left: 50%;
+  left: 8px;
   bottom: 8px;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 5px;
-  max-width: 92%;
+  max-width: calc(100% - 60px);   /* never runs under the zoom buttons */
   padding: 4px 10px;
   background: rgba(20, 16, 12, 0.72);
   color: #fff;
@@ -184,11 +183,12 @@
 .photo-adjust-hint.dismissed { opacity: 0; }
 .photo-adjust-ico { font-size: 0.85rem; line-height: 1; opacity: 0.9; }
 
-/* +/- zoom buttons, top-right corner of the photo. */
+/* +/- zoom buttons, bottom-right corner — kept off the pet's face (usually
+   centered/upper), diagonally opposite the drag hint so they never overlap. */
 .photo-zoom-ctrl {
   position: absolute;
-  top: 7px;
-  right: 7px;
+  bottom: 8px;
+  right: 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
