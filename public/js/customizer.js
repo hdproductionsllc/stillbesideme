@@ -2194,6 +2194,26 @@
 
   // ── Preview zoom (magnifier for small tribute text) ─────────
 
+  // On mobile the framed preview floats: big at the top of the flow, then it
+  // shrinks to a compact thumbnail pinned under the header once you scroll into
+  // the form — so the tribute stays visible and updates live as you type.
+  function initMobilePreviewPin() {
+    const stage = document.querySelector('.preview-stage');
+    if (!stage) return;
+    const mq = window.matchMedia('(max-width: 1024px)');
+    let ticking = false;
+    function apply() {
+      ticking = false;
+      if (!mq.matches) { stage.classList.remove('mini'); return; }
+      stage.classList.toggle('mini', window.scrollY > 200);
+    }
+    window.addEventListener('scroll', () => {
+      if (!ticking) { ticking = true; requestAnimationFrame(apply); }
+    }, { passive: true });
+    if (mq.addEventListener) mq.addEventListener('change', apply);
+    apply();
+  }
+
   function initPreviewZoom() {
     const btn = document.getElementById('preview-zoom-btn');
     const pane = document.querySelector('.preview-pane');
@@ -2231,5 +2251,6 @@
   init();
   initPreviewZoom();
   initPoemFlip();
+  initMobilePreviewPin();
 
 })();

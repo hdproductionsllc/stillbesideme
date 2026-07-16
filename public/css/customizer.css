@@ -1441,20 +1441,18 @@
 @media (max-width: 1024px) {
   .customizer {
     flex-direction: column;
+    /* Dark canvas behind the promoted preview + selectors (see display:contents
+       below); the form pane paints its own light surface over its region. */
+    background: #1a1714;
   }
 
-  /* Only the frame + zoom/swap controls pin (`.preview-stage`); the pane itself
-     is static so the layout/style selectors below scroll away with the form.
-     This keeps the pinned block short — the frame stays visible while you
-     adjust layout up top, and the whole form is reachable beneath it. A tall
-     portrait frame no longer overflows the viewport and breaks stickiness. */
-  .preview-pane {
-    flex: none;
-    position: static;
-    height: auto;
-    z-index: 20;
-    padding: 0 0 var(--space-md);
-    justify-content: center;
+  /* The live preview must float the whole way down the form so you watch the
+     tribute build as you type. Promote it out of its short pane
+     (display:contents) so the sticky stage pins relative to the entire
+     customizer column, not just the preview region. Not while zoomed — the
+     fullscreen reader needs a real positioned box. */
+  .preview-pane:not(.zoomed) {
+    display: contents;
   }
 
   .preview-stage {
@@ -1464,14 +1462,29 @@
     width: 100%;
     background: #1a1714;
     padding: var(--space-md) var(--space-md) var(--space-sm);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    transition: padding 0.25s ease;
   }
 
+  /* Bigger by default at the top of the flow (the preview was too small)… */
   .frame-preview {
     --frame-width: 12px;
     --mat-padding: 14px;
-    max-width: 280px;
+    max-width: 340px;
+    transition: max-width 0.25s ease;
   }
+
+  /* …then shrink to a compact live thumbnail once you scroll into the form, so
+     the tribute stays visible without stealing the form's screen. Toggled by
+     initMobilePreviewPin() in customizer.js. */
+  .preview-stage.mini {
+    padding: 6px var(--space-md);
+  }
+  .preview-stage.mini .frame-preview { max-width: 150px; }
+  .preview-stage.mini .preview-controls { display: none; }
+
+  /* Focused inputs scroll to just below the pinned preview, never behind it. */
+  html { scroll-padding-top: 210px; }
 
   /* Thinner molding on small screens so the frame stays compact in the sticky pane. */
   .frame-preview.theme-auto {
@@ -1542,8 +1555,9 @@
   .frame-preview {
     --frame-width: 8px;
     --mat-padding: 10px;
-    max-width: 230px;
+    max-width: 300px;
   }
+  .preview-stage.mini .frame-preview { max-width: 132px; }
 
   .frame-preview.theme-auto {
     --molding: 18px;
