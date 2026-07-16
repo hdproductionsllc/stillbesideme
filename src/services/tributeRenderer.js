@@ -22,6 +22,10 @@ if (!process.env.FONTCONFIG_PATH) {
 
 const TEMPLATES_DIR = path.join(__dirname, '..', 'data', 'templates');
 
+// Every renderer writes its output under the same root — on Railway this is the
+// mounted volume (OUTPUT_DIR=/data/output), so all artifacts persist together.
+const OUTPUT_ROOT = process.env.OUTPUT_DIR || path.join(__dirname, '..', '..', 'output');
+
 // The typeface the customizer preview uses — vendored in src/assets/fonts.
 const FONT_SERIF = "'Cormorant Garamond', Georgia, serif";
 
@@ -687,6 +691,31 @@ function resolveOrderData(order) {
   };
 }
 
+// ─── Output Emission ─────────────────────────────────────────────────
+
+/**
+ * Write a rendered buffer under OUTPUT_ROOT and return its public URL.
+ *
+ * `/output` is served as unauthenticated static (server.js) because Luma's
+ * servers must fetch print files and printouts anonymously. Anything emitted
+ * here is public to anyone holding the URL — which is why the URLs are keyed
+ * by unguessable order ids, and why nothing secret is ever rendered into one.
+ *
+ * @param {string} subdir — directory under OUTPUT_ROOT (created if absent)
+ * @param {string} filename
+ * @param {Buffer} buffer
+ * @returns {{ absPath: string, relativeUrl: string }}
+ */
+function emitToOutput(subdir, filename, buffer) {
+  const dir = path.join(OUTPUT_ROOT, subdir);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+  const absPath = path.join(dir, filename);
+  fs.writeFileSync(absPath, buffer);
+
+  return { absPath, relativeUrl: `/output/${subdir}/${filename}` };
+}
+
 module.exports = {
   loadTemplate,
   escSvg,
@@ -699,4 +728,8 @@ module.exports = {
   resolveColors,
   renderPhotoCover,
   resolveOrderData,
+  emitToOutput,
+  OUTPUT_ROOT,
+  FONT_SERIF,
+  PAPER_PALETTE,
 };

@@ -252,6 +252,39 @@ router.post('/sympathy/generate', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/gift-note/generate – one editable draft of the sender's note.
+ *
+ * Rate limited separately from /sympathy/generate and more generously (8/hour).
+ * The sympathy tool's 3/hour is tuned for a free SEO toy open to the whole
+ * internet; this runs inside the customizer for someone who is mid-purchase and
+ * already spending a 5/hour poem budget on the same session. A buyer who taps
+ * "help me write it" a few times while drafting must not hit a wall — the cost
+ * of a Haiku call is nothing next to the cost of stalling a checkout.
+ */
+router.post('/gift-note/generate', async (req, res) => {
+  if (!req.session.giftNoteGenerations) req.session.giftNoteGenerations = [];
+
+  const oneHourAgo = Date.now() - 60 * 60 * 1000;
+  req.session.giftNoteGenerations = req.session.giftNoteGenerations.filter(t => t > oneHourAgo);
+
+  if (req.session.giftNoteGenerations.length >= 8) {
+    return res.status(429).json({
+      error: 'You\'ve drafted several notes recently. Please wait a bit before trying again.',
+      retryAfter: Math.ceil((req.session.giftNoteGenerations[0] + 60 * 60 * 1000 - Date.now()) / 1000),
+    });
+  }
+
+  try {
+    const result = await sympathyGenerator.generateGiftNote(req.body || {});
+    req.session.giftNoteGenerations.push(Date.now());
+    res.json(result);
+  } catch (err) {
+    console.error('Gift note generation error:', err);
+    res.status(500).json({ error: 'Something went wrong drafting the note. Please try again.' });
+  }
+});
+
 // Error handler for multer
 router.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {

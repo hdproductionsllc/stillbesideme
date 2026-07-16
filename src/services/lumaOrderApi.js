@@ -349,6 +349,17 @@ async function placeOrder(orderId, db) {
     }],
   };
 
+  // Gift note card. Luma's `printouts` takes up to 3 publicly-fetchable URLs,
+  // prints each on a sheet, and encloses them — which is why /output is served
+  // unauthenticated (their servers fetch it anonymously, exactly like the print
+  // file above). Only present on gift orders whose sender wrote a note; the key
+  // is omitted entirely otherwise rather than sent as an empty array.
+  if (order.note_file_url) {
+    payload.printouts = [`${BASE_URL()}${order.note_file_url}`];
+    payload.specialInstructions =
+      'Includes 1 printout: a personal note from the sender. Please enclose it with the framed print.';
+  }
+
   // Insert tracking row
   db.run(
     `INSERT INTO luma_orders (order_id, status, request_json)

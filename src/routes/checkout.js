@@ -51,6 +51,34 @@ function sanitizePhotoCrops(raw) {
   return Object.keys(out).length ? out : null;
 }
 
+/**
+ * Keep only the fields the template declares, each clamped to its declared
+ * maxLength. An allowlist rather than a filter: the blob it produces is spread
+ * into fields_json alongside trusted server-derived keys (style, colors,
+ * frameChoice…), so an unknown client key landing here could shadow one of them.
+ *
+ * poemText is excluded deliberately — it travels in its own column and is
+ * validated separately; letting a 600-char field cap truncate a poem would be
+ * a silent data loss.
+ */
+function sanitizeFields(raw, template) {
+  if (!raw || typeof raw !== 'object') return {};
+
+  const out = {};
+  for (const field of template.memoryFields || []) {
+    if (field.type === 'poem-selector') continue;
+
+    const value = raw[field.id];
+    if (typeof value !== 'string') continue;
+
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+
+    out[field.id] = field.maxLength ? trimmed.slice(0, field.maxLength) : trimmed;
+  }
+  return out;
+}
+
 /** Load a template by ID (cached after first read). */
 const templateCache = {};
 function loadTemplate(templateId) {
@@ -146,6 +174,18 @@ router.post('/checkout', async (req, res) => {
       if (!safeFrame) safeFrame = template.frameOptions.default || null;
     }
 
+    // Clamp customer-authored text to the lengths the template declares. The
+    // client's `maxlength` is cosmetic — every other value posted here (colors,
+    // ratios, crops, frame) is re-derived or sanitized server-side, and `fields`
+    // was the one hole. It matters most for giftNote: it is rendered onto a
+    // fixed-height sheet of paper, so an unbounded note doesn't just look wrong,
+    // it silently runs off the page Luma prints.
+    const safeFields = sanitizeFields(fields, template);
+
+    // Order type drives which fields are shown, printed, and sent to Luma —
+    // an arbitrary client string must not flow through as one of them.
+    const safeOrderType = orderType === 'gift' ? 'gift' : 'self';
+
     // Create order
     const orderId = uuidv4();
     const totalCents = product.price + frameUpcharge;
@@ -158,7 +198,7 @@ router.post('/checkout', async (req, res) => {
         req.sessionID,
         templateId,
         sku,
-        JSON.stringify({ ...fields, style, layout, orderType, frameIcon: safeFrameIcon, poemFirst: !!poemFirst, ...(safeFrame ? { frameChoice: safeFrame } : {}), ...(safeColors ? { colors: safeColors } : {}), ...(safeRatios ? { customRatios: safeRatios } : {}), ...(safeCrops ? { photoCrops: safeCrops } : {}) }),
+        JSON.stringify({ ...safeFields, style, layout, orderType: safeOrderType, frameIcon: safeFrameIcon, poemFirst: !!poemFirst, ...(safeFrame ? { frameChoice: safeFrame } : {}), ...(safeColors ? { colors: safeColors } : {}), ...(safeRatios ? { customRatios: safeRatios } : {}), ...(safeCrops ? { photoCrops: safeCrops } : {}) }),
         JSON.stringify(photos),
         poemText.trim(),
         totalCents

@@ -120,6 +120,17 @@ async function start() {
   app.use('/api/poems', expensiveLimiter);
   app.use('/api/sympathy', expensiveLimiter);
   app.use('/api/images/upload', expensiveLimiter);
+  // Gift-note drafting gets its OWN bucket rather than joining expensiveLimiter.
+  // That middleware is one instance, so every path mounted on it shares a single
+  // 10-per-15-min counter — a buyer who drafts notes while regenerating poems
+  // would burn the poem budget and get 429'd in the middle of a purchase.
+  app.use('/api/gift-note', rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 15,
+    message: { error: 'Too many requests. Please try again in a few minutes.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  }));
   app.use('/api/checkout', rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 20,
@@ -621,6 +632,16 @@ async function start() {
   });
   app.get('/order/:token', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'order-status.html'));
+  });
+
+  // Recipient-facing tribute page — the sender texts this link on day one and
+  // the QR on the printed note card points at the same URL. Keyed by gift_token,
+  // NOT proof_token: this link is printed on paper and forwarded to strangers,
+  // so it must not carry the order total, the buyer's details, or the power to
+  // approve a proof. See src/routes/tribute.js.
+  app.use('/api/tribute', require('./src/routes/tribute'));
+  app.get('/tribute/:token', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'tribute.html'));
   });
 
   // Serve proof images from output directory

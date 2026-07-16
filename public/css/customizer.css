@@ -1288,6 +1288,41 @@
   border: 1px solid rgba(196, 168, 130, 0.12);
 }
 
+/* --- Gift note assist --- */
+.gift-note-assist {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-top: var(--space-xs);
+}
+
+.gift-note-assist-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--color-accent, #B8975E);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.gift-note-assist-btn:hover { opacity: 0.8; }
+
+.gift-note-assist-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  text-decoration: none;
+}
+
+.gift-note-assist-status {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
 /* --- Animated poem reveal --- */
 .poem-generating {
   text-align: center;

@@ -119,6 +119,8 @@
     { "id": "favoriteMemory", "label": "A favorite memory", "sublabel": "The one that makes you smile through tears", "type": "textarea", "required": false, "maxLength": 300, "feedsPoem": true },
     { "id": "favoriteThing", "label": "Their favorite toy or treat?", "sublabel": "The thing they couldn't live without", "type": "text", "required": false, "maxLength": 60, "feedsPoem": true },
     { "id": "familyName", "label": "Who will miss them most?", "sublabel": "Your family name or your name", "type": "text", "required": false, "maxLength": 80, "placeholder": "The Hamilton family", "displayOn": "tribute" },
+    { "id": "giftNote", "label": "Your note to them", "sublabel": "Printed on cream paper and tucked in the box – so it arrives from you, not from us", "type": "textarea", "required": false, "maxLength": 600, "placeholder": "Sarah, I couldn't stop thinking about you this week…", "showWhen": { "orderType": "gift" } },
+    { "id": "giftFrom", "label": "Sign it from", "sublabel": "So they know who it's from – the box itself won't say", "type": "text", "required": true, "maxLength": 40, "placeholder": "David", "showWhen": { "orderType": "gift" } },
     { "id": "poemText", "label": "Tribute poem", "type": "poem-selector" }
   ],
 

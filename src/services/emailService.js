@@ -99,9 +99,33 @@ async function sendAdminAlert(subject, textBody) {
  * This goes out within seconds of payment, before the proof is generated,
  * so the customer is reassured that we received their order.
  */
-async function sendOrderConfirmation(to, orderData, statusPageUrl) {
+async function sendOrderConfirmation(to, orderData, statusPageUrl, giftUrl = null) {
   const { orderId, templateName, sku, totalCents } = orderData;
   const shortId = orderId.substring(0, 8).toUpperCase();
+
+  // The one thing flowers still beat us on is speed: they arrive tomorrow, this
+  // takes a week and a half on purpose. So a gift sender gets something they can
+  // send TODAY — a link to the tribute page, which fills in as the piece is made
+  // and which the recipient can also reach later via the QR on the printed note.
+  // It is deliberately theirs to send, not ours: we never email the recipient,
+  // because we don't ask for their address and the message should come from a
+  // friend, not from a company they've never heard of.
+  const giftBlock = giftUrl ? `
+      <div style="background:#FAF7F2;border:1px solid #E8E4DF;border-radius:8px;padding:20px;margin-bottom:24px;">
+        <p style="color:#2C2C2C;line-height:1.6;margin:0 0 12px;font-weight:600;">
+          Want them to know today?
+        </p>
+        <p style="color:#2C2C2C;line-height:1.6;margin:0 0 12px;">
+          Their tribute is being made by hand, so it will take a little while to reach them &mdash;
+          which is rather the point: it arrives once the flowers have gone.
+          But if you'd like them to know now, text them this link. It fills in as the piece is finished,
+          and it's the same link printed on the note in their box.
+        </p>
+        <p style="margin:0;word-break:break-all;">
+          <a href="${giftUrl}" style="color:#8B9D83;font-weight:600;">${giftUrl}</a>
+        </p>
+      </div>
+  ` : '';
 
   const html = wrapHtml(`
     <div style="background:#fff;border-radius:12px;padding:32px;margin-bottom:24px;">
@@ -120,6 +144,8 @@ async function sendOrderConfirmation(to, orderData, statusPageUrl) {
       <p style="color:#2C2C2C;line-height:1.6;margin-bottom:24px;">
         Nothing goes to print until you've approved how it looks &mdash; so take your time when the proof arrives.
       </p>
+
+      ${giftBlock}
 
       <div style="text-align:center;margin-bottom:16px;">
         <a href="${statusPageUrl}"
@@ -211,6 +237,8 @@ async function sendReviewRequest(order, { reviewUrl, proofImageUrl }) {
     favoriteThing: 'Favorite thing',
     familyName: 'Family',
     name: 'Name',
+    giftNote: 'Gift note (printed & enclosed)',
+    giftFrom: 'Gift note signed',
   };
   const answerRows = Object.entries(FIELD_LABELS)
     .filter(([key]) => fields[key])

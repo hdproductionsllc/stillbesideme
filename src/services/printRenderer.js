@@ -9,21 +9,14 @@
  */
 
 const sharp = require('sharp');
-const path = require('path');
 const fs = require('fs');
 
 const {
   resolveOrderData, buildTributeSvg, isLandscapeLayout, calculateLayout,
-  calculateMatLayout, buildMatOverlaySvg, renderPhotoCover,
+  calculateMatLayout, buildMatOverlaySvg, renderPhotoCover, emitToOutput,
 } = require('./tributeRenderer');
 
-const OUTPUT_ROOT = process.env.OUTPUT_DIR || path.join(__dirname, '..', '..', 'output');
-const PRINT_DIR = path.join(OUTPUT_ROOT, 'print-ready');
-
-// Ensure output directory exists
-if (!fs.existsSync(PRINT_DIR)) {
-  fs.mkdirSync(PRINT_DIR, { recursive: true });
-}
+const PRINT_SUBDIR = 'print-ready';
 
 const DPI = 300;
 
@@ -135,11 +128,8 @@ async function generatePrintFile(order) {
     .toBuffer();
 
   // Save to disk
-  const filename = `${order.id}.jpg`;
-  const printPath = path.join(PRINT_DIR, filename);
-  fs.writeFileSync(printPath, printBuffer);
-
-  const printRelativeUrl = `/output/print-ready/${filename}`;
+  const { absPath: printPath, relativeUrl: printRelativeUrl } =
+    emitToOutput(PRINT_SUBDIR, `${order.id}.jpg`, printBuffer);
   const sizeMB = (printBuffer.length / (1024 * 1024)).toFixed(1);
 
   console.log(`Print-ready generated: ${printRelativeUrl} (${totalW}x${totalH}, ${sizeMB}MB)`);

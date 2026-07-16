@@ -252,7 +252,7 @@
               ? 'You\'re creating a meaningful gift \u2013 we\'ll guide you through it.'
               : 'Each detail helps us write their tribute.';
           }
-          updateFormLabelsForOrderType();
+          updateFormForOrderType();
           saveState();
         });
       });
@@ -284,12 +284,14 @@
     // 2-N. Memory fields (everything except poem-selector)
     const memSection = createSection('Tell us about them');
 
-    // Gift-mode helper note (only for templates with giftLabels)
+    // Gift-mode helper note (only for templates with giftLabels). Uses the same
+    // declarative visibility rule as gift-only fields \u2014 see createField.
     if (template.giftLabels) {
       const giftNote = document.createElement('p');
       giftNote.id = 'gift-detail-note';
       giftNote.className = 'gift-detail-note';
       giftNote.textContent = 'Share what you know. The more details, the more personal the ' + poemLabel().toLowerCase() + ' \u2013 but even just a name and photo make a beautiful tribute.';
+      giftNote.dataset.showWhenOrderType = 'gift';
       giftNote.style.display = orderType === 'gift' ? '' : 'none';
       memSection.appendChild(giftNote);
     }
@@ -1063,6 +1065,14 @@
     const group = document.createElement('div');
     group.className = 'field-group';
 
+    // Declarative visibility: a field can name the order type it belongs to
+    // (template `showWhen`). The wrapper carries the rule so the order-type
+    // sweep in updateFormForOrderType can find it without knowing field ids.
+    if (field.showWhen && field.showWhen.orderType) {
+      group.dataset.showWhenOrderType = field.showWhen.orderType;
+      group.style.display = orderType === field.showWhen.orderType ? '' : 'none';
+    }
+
     let inputHtml = '';
     const sublabelHtml = field.sublabel ? `<span class="sublabel">${field.sublabel}</span>` : '';
     const placeholder = field.placeholder || '';
@@ -1109,7 +1119,72 @@
       });
     }
 
+    if (field.id === 'giftNote' && input) {
+      group.appendChild(createGiftNoteAssist(input, field));
+    }
+
     return group;
+  }
+
+  /**
+   * "Help me write it" for the gift note.
+   *
+   * A condolence sender is comparing this to sending flowers, which takes
+   * ninety seconds — a blank textarea asking them to compose a memorial message
+   * is where they abandon. So we draft, and they edit. Crucially it only ever
+   * FILLS the box: the sender still reads it, changes a word, and signs it, and
+   * that edit is what makes the note theirs. It never sends on their behalf.
+   */
+  function createGiftNoteAssist(input, field) {
+    const wrap = document.createElement('div');
+    wrap.className = 'gift-note-assist';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-link gift-note-assist-btn';
+    btn.textContent = 'Not sure what to say? Draft one for me';
+
+    const status = document.createElement('span');
+    status.className = 'gift-note-assist-status';
+
+    btn.addEventListener('click', async () => {
+      // Overwriting words someone already wrote is never worth the convenience.
+      if (input.value.trim() && !confirm('Replace what you\'ve written with a new draft?')) return;
+
+      btn.disabled = true;
+      status.textContent = 'Writing…';
+
+      try {
+        const fields = PreviewRenderer.getFields();
+        const res = await fetch('/api/gift-note/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            petName: fields.petName || '',
+            petType: fields.petType || '',
+            memory: fields.favoriteMemory || fields.personality || '',
+            recipientName: fields.familyName || '',
+            senderName: fields.giftFrom || '',
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not draft a note.');
+
+        input.value = (data.draft || '').slice(0, field.maxLength || 600);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.focus();
+        status.textContent = 'Yours to change — every word.';
+      } catch (err) {
+        status.textContent = err.message || 'Could not draft a note. Please try again.';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    wrap.appendChild(btn);
+    wrap.appendChild(status);
+    return wrap;
   }
 
   // ── Poem Section ────────────────────────────────────────────
@@ -1529,9 +1604,15 @@
     return section;
   }
 
-  // ── Order Type Label Updates ─────────────────────────────────
+  // ── Order Type Form Updates ──────────────────────────────────
 
-  function updateFormLabelsForOrderType() {
+  function updateFormForOrderType() {
+    // Visibility first, and unconditionally: gift-only fields must resolve even
+    // for templates that carry no giftLabels at all.
+    document.querySelectorAll('[data-show-when-order-type]').forEach((el) => {
+      el.style.display = el.dataset.showWhenOrderType === orderType ? '' : 'none';
+    });
+
     // Read label maps from template.giftLabels (only pet templates have this)
     if (!template.giftLabels) return;
 
@@ -1546,9 +1627,6 @@
         if (optTag) labelEl.appendChild(optTag);
       }
     }
-
-    const giftNote = document.getElementById('gift-detail-note');
-    if (giftNote) giftNote.style.display = orderType === 'gift' ? '' : 'none';
 
     const personalitySub = document.querySelector('#field-personality')?.parentElement?.querySelector('.sublabel');
     const memorySub = document.querySelector('#field-favoriteMemory')?.parentElement?.querySelector('.sublabel');
@@ -1917,6 +1995,16 @@
       return;
     }
 
+    // A gift ships white-label to the recipient, so without a "from" the box
+    // is anonymous — they'd have no idea which friend sent it. The note stays
+    // optional; the sender's name does not.
+    if (orderType === 'gift' && !(fields.giftFrom || '').trim()) {
+      alert('Please add your name so they know who this gift is from.');
+      const el = document.getElementById('field-giftFrom');
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); }
+      return;
+    }
+
     // Real checkout intent — fire GA4 + Meta with the true order value.
     // (The marketing pages' CTA-click event is top-of-funnel only; this is
     // the one that carries the amount the customer is about to pay.)
@@ -2167,7 +2255,7 @@
             ? 'You\'re creating a meaningful gift \u2013 we\'ll guide you through it.'
             : 'Each detail helps us write their tribute.';
         }
-        updateFormLabelsForOrderType();
+        updateFormForOrderType();
       }
 
       // Restore regen count

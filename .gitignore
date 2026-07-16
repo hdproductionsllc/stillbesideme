@@ -5,3 +5,14 @@ data/*.db
 data/sessions/
 .env
 src/assets/fonts/cache/
+
+# Business / strategy docs — this repo is PUBLIC. Never publish these.
+# (Only untracked files can be protected here; see note re: already-tracked
+# strategy docs that need `git rm --cached` to remove.)
+Still_Beside_Me_Business_Plan.docx
+Still_Beside_Me_Business_Plan.pdf
+fable_to_opus
+Fable Operating Manual.md
+still-beside-me-claude-code-spec.md
+tasks/10x-action-plan.md
+cache/

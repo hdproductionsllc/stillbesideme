@@ -23,7 +23,7 @@ function getClient() {
 /**
  * Build the sympathy message prompt.
  */
-function buildPrompt({ relationship, name, context, tone }) {
+function buildPrompt({ relationship, name, context }) {
   return `You are writing 3 short sympathy messages for someone who has lost a loved one. These will be used in a card, text, or note.
 
 Details:
@@ -117,4 +117,72 @@ function generateStub({ relationship, name, context }) {
   };
 }
 
-module.exports = { generate };
+// ── Gift Note ────────────────────────────────────────────────────────
+//
+// A different job from the sympathy cards above, and deliberately a separate
+// prompt rather than a `tone` flag on the same one. The card tool hands someone
+// three options to copy out; this hands a buyer ONE draft they will edit in
+// place and sign. That edit-and-approve step is the point — it is what makes
+// the finished note theirs rather than ours, the same way nobody says Hallmark
+// wrote their sympathy card. So the draft is deliberately plain and slightly
+// under-written: it should read like a starting point the sender improves, not
+// a polished artifact they feel unable to touch.
+
+function buildGiftNotePrompt({ petName, recipientName, senderName, petType, memory }) {
+  return `Write ONE short note from a person to a grieving friend. It will be printed on paper and enclosed with a framed memorial tribute of the friend's pet that died.
+
+Details:
+- Grieving friend's name: ${recipientName || 'unknown'}
+- The pet who died: ${petName || 'their pet'}${petType ? ` (${petType})` : ''}
+- Something the sender knows about the pet: ${memory || 'nothing specific provided'}
+- The note is from: ${senderName || 'the sender'}
+
+Rules:
+- Write in the SENDER's voice, speaking directly to their friend. First person.
+- 2 to 4 sentences. Under 60 words.
+- Plain, warm, spoken language. What one friend actually says to another.
+- Name the pet if you know it.
+- Do NOT sign it — the name is added separately.
+- Do NOT speak as the pet, and do NOT describe the gift or the frame.
+- Never use "they're in a better place", "everything happens for a reason", "sorry for your loss", or "my deepest condolences".
+- Never use em dashes.
+
+Return ONLY the note text. No quotes, no labels, no explanation.`;
+}
+
+function giftNoteStub({ petName, recipientName }) {
+  const who = recipientName || 'Hey';
+  const pet = petName || 'them';
+  return `${who}, I've been thinking about you so much this week. I know what ${pet} meant to you, and I wanted you to have something that lasts. I'm here whenever you need me.`;
+}
+
+/**
+ * Generate a single editable gift-note draft.
+ * @returns {{ draft: string, generationId: string, stubbed: boolean }}
+ */
+async function generateGiftNote(details) {
+  const api = getClient();
+  if (!api) {
+    return { draft: giftNoteStub(details), generationId: `stub-${Date.now()}`, stubbed: true };
+  }
+
+  try {
+    const response = await api.messages.create({
+      model: MODEL,
+      max_tokens: MAX_TOKENS,
+      messages: [{ role: 'user', content: buildGiftNotePrompt(details) }],
+    });
+
+    const draft = response.content[0].text.trim().replace(/^["']|["']$/g, '');
+    if (!draft) {
+      return { draft: giftNoteStub(details), generationId: `stub-${Date.now()}`, stubbed: true };
+    }
+
+    return { draft, generationId: `ai-${Date.now()}`, stubbed: false };
+  } catch (err) {
+    console.error('Gift note generation API error:', err.message);
+    return { draft: giftNoteStub(details), generationId: `stub-${Date.now()}`, stubbed: true };
+  }
+}
+
+module.exports = { generate, generateGiftNote };

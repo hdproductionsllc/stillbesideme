@@ -102,11 +102,16 @@ async function handleCheckoutCompleted(session, db) {
     });
   }
 
-  // Generate proof token (customer-facing) + admin token (fulfillment actions).
-  // These are deliberately separate — the customer link must never be able
-  // to mark an order shipped.
+  // Generate proof token (customer-facing) + admin token (fulfillment actions)
+  // + gift token (recipient-facing).
+  // All three are deliberately separate, in descending order of authority: the
+  // customer link must never be able to mark an order shipped, and the gift
+  // link must never be able to approve a proof, download the print file, or
+  // reveal what the buyer paid. The gift token is printed as a QR code and
+  // texted to strangers, so it travels furthest and carries least.
   const proofToken = uuidv4();
   const adminToken = uuidv4();
+  const giftToken = uuidv4();
 
   // Update order with payment + shipping info, set to awaiting_review:
   // a human approves every proof before the customer sees it.
@@ -125,10 +130,11 @@ async function handleCheckoutCompleted(session, db) {
        shipping_json = COALESCE(?, shipping_json),
        proof_token = ?,
        admin_token = ?,
+       gift_token = ?,
        fulfillment_provider = ?,
        updated_at = datetime('now')
      WHERE id = ?`,
-    [paymentIntentId, email, shippingJson, proofToken, adminToken, provider, orderId]
+    [paymentIntentId, email, shippingJson, proofToken, adminToken, giftToken, provider, orderId]
   );
 
   // Log event
@@ -150,12 +156,15 @@ async function handleCheckoutCompleted(session, db) {
   if (email) {
     try {
       const refreshed = db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
+      // Gift senders get a link they can text today — see sendOrderConfirmation.
+      const orderFields = refreshed.fields_json ? JSON.parse(refreshed.fields_json) : {};
+      const giftUrl = orderFields.orderType === 'gift' ? `${baseUrl}/tribute/${giftToken}` : null;
       await emailService.sendOrderConfirmation(email, {
         orderId,
         templateName: refreshed.template_id,
         sku: refreshed.product_sku,
         totalCents: refreshed.total_cents,
-      }, statusPageUrl);
+      }, statusPageUrl, giftUrl);
       db.run(
         `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
         [orderId, 'order_confirmation_sent', JSON.stringify({ email })]

@@ -7,22 +7,15 @@
  */
 
 const sharp = require('sharp');
-const path = require('path');
 const fs = require('fs');
 
 const {
   resolveOrderData, buildTributeSvg, isLandscapeLayout, calculateLayout,
-  calculateMatLayout, buildMatOverlaySvg, renderPhotoCover,
+  calculateMatLayout, buildMatOverlaySvg, renderPhotoCover, emitToOutput,
 } = require('./tributeRenderer');
 const { calculatePrintDimensions } = require('./printRenderer');
 
-const OUTPUT_ROOT = process.env.OUTPUT_DIR || path.join(__dirname, '..', '..', 'output');
-const PROOFS_DIR = path.join(OUTPUT_ROOT, 'proofs');
-
-// Ensure proofs directory exists
-if (!fs.existsSync(PROOFS_DIR)) {
-  fs.mkdirSync(PROOFS_DIR, { recursive: true });
-}
+const PROOFS_SUBDIR = 'proofs';
 
 /**
  * Build a "PROOF" watermark overlay as SVG.
@@ -139,11 +132,8 @@ async function generateProof(order) {
     .toBuffer();
 
   // Save
-  const proofFilename = `${order.id}.jpg`;
-  const proofPath = path.join(PROOFS_DIR, proofFilename);
-  fs.writeFileSync(proofPath, proofBuffer);
-
-  const proofRelativeUrl = `/output/proofs/${proofFilename}`;
+  const { absPath: proofPath, relativeUrl: proofRelativeUrl } =
+    emitToOutput(PROOFS_SUBDIR, `${order.id}.jpg`, proofBuffer);
   console.log(`Proof generated: ${proofRelativeUrl} (${totalW}x${totalH})`);
 
   return { proofPath, proofRelativeUrl };
