@@ -271,26 +271,13 @@
   background: rgba(200, 160, 80, 0.9);
 }
 
-/* Touch devices have no hover, so the drag-to-resize handles would be invisible
-   and undiscoverable. Reveal the line faintly at all times and add a small
-   center grip pill so it clearly reads as draggable. */
+/* Touch devices: hide the resize handles entirely. Dragging a thin divider on
+   the small mobile preview is impractical, and the always-visible treatment
+   painted a gold bar straight across the artwork — a poor first impression of
+   the product. The Landscape/Portrait presets cover layout on touch; fine
+   photo/poem resizing stays a desktop (hover) nicety. */
 @media (hover: none) {
-  .divider-handle::after {
-    background: rgba(200, 160, 80, 0.4);
-  }
-  .divider-handle::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(214, 178, 108, 0.9);
-    border-radius: 999px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
-    z-index: 1;
-  }
-  .divider-handle.col::before { width: 5px; height: 28px; }
-  .divider-handle.row::before { width: 28px; height: 5px; }
+  .divider-handle { display: none; }
 }
 
 /* ============================================================
