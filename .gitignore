@@ -16,3 +16,9 @@ Fable Operating Manual.md
 still-beside-me-claude-code-spec.md
 tasks/
 cache/
+
+# Local runtime data (DB, backups, session files) — contains customer PII; repo is public
+data/
+
+# Local QA harness
+run_qa.js

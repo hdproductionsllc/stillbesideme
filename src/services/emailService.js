@@ -553,6 +553,10 @@ async function sendShippedEmail(to, orderData, tracking, statusPageUrl) {
 }
 
 module.exports = {
+  // Low-level shell + dispatcher, reused by src/services/vaultEmails.js so the
+  // Story Vault occasion emails share this brand wrapper and SMTP fallback.
+  wrapHtml,
+  send,
   sendAdminAlert,
   sendOrderConfirmation,
   sendProofEmail,

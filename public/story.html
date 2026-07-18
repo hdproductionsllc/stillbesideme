@@ -3,13 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- Google Analytics -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CM9DENCN96"></script>
-  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-CM9DENCN96');</script>
-  <script src="/js/env.js"></script>
-  <!-- Meta Pixel (config from /js/env.js; inert until metaPixelId is set) -->
-  <script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');if(window.SBM_ENV&&window.SBM_ENV.metaPixelId){fbq('init',window.SBM_ENV.metaPixelId);fbq('track','PageView');}</script>
-  <title>Order Confirmed | Still Beside Me</title>
+  <title>Their Story | Still Beside Me</title>
+  <meta name="description" content="A place to remember them.">
+  <!-- Private and tokenized — one vault per order. Never indexed. -->
   <meta name="robots" content="noindex, nofollow">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=2">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=2">
@@ -19,81 +15,83 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/store.css">
   <style>
-    .confirmation {
-      max-width: 640px;
+    .story-page {
+      max-width: 680px;
       margin: 0 auto;
       padding: var(--space-2xl) var(--space-md);
+    }
+    .story-brand {
       text-align: center;
-    }
-    .confirmation-icon {
-      font-size: 3rem;
-      margin-bottom: var(--space-md);
-    }
-    .confirmation h1 {
       font-family: var(--font-display);
-      font-size: 2rem;
-      font-weight: 400;
-      margin-bottom: var(--space-sm);
-    }
-    .confirmation .subtitle {
+      letter-spacing: 0.18em;
+      font-size: 0.8rem;
+      text-transform: uppercase;
       color: var(--color-muted);
-      font-size: 1.1rem;
+      margin-bottom: var(--space-2xl);
+    }
+    .story-brand a { color: inherit; text-decoration: none; }
+
+    .story-photo {
+      width: 100%;
+      border-radius: 8px;
+      box-shadow: var(--shadow-md, 0 8px 30px rgba(0,0,0,0.12));
+      display: block;
       margin-bottom: var(--space-xl);
-    }
-    .order-details {
-      background: var(--color-surface, #f9f6f2);
-      border-radius: 12px;
-      padding: var(--space-lg);
-      text-align: left;
-      margin-bottom: var(--space-xl);
-    }
-    .order-details h2 {
-      font-family: var(--font-display);
-      font-size: 1.2rem;
-      font-weight: 400;
-      margin-bottom: var(--space-md);
-    }
-    .detail-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 0.5rem 0;
-      border-bottom: 1px solid rgba(0,0,0,0.06);
-    }
-    .detail-row:last-child { border-bottom: none; }
-    .detail-label { color: var(--color-muted); }
-    .detail-value { font-weight: 600; }
-    .next-steps {
-      text-align: left;
-      margin-bottom: var(--space-xl);
-    }
-    .next-steps h2 {
-      font-family: var(--font-display);
-      font-size: 1.2rem;
-      font-weight: 400;
-      margin-bottom: var(--space-md);
-    }
-    .next-steps ol {
-      padding-left: 1.5rem;
-      line-height: 1.8;
-    }
-    .next-steps li { margin-bottom: 0.5rem; }
-    .loading-state {
-      padding: var(--space-2xl);
-      color: var(--color-muted);
-    }
-    .error-state {
-      padding: var(--space-2xl);
-      color: var(--color-error, #c0392b);
     }
 
-    /* --- "Remember them" opt-in card (shared with story.html) --- */
+    .story-name {
+      text-align: center;
+      font-family: var(--font-display);
+      font-size: 2.4rem;
+      margin-bottom: var(--space-lg);
+    }
+    .story-rule {
+      width: 60px;
+      height: 1px;
+      background: var(--color-accent, #B8975E);
+      border: 0;
+      margin: 0 auto var(--space-xl);
+    }
+
+    .story-poem {
+      text-align: center;
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      line-height: 1.85;
+      white-space: pre-wrap;
+      margin-bottom: var(--space-2xl);
+    }
+
+    .story-memories {
+      margin-bottom: var(--space-2xl);
+    }
+    .story-memory {
+      margin-bottom: var(--space-lg);
+    }
+    .story-memory h2 {
+      font-family: var(--font-body, inherit);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 0.72rem;
+      color: var(--color-muted);
+      margin: 0 0 var(--space-2xs, 4px);
+    }
+    .story-memory p {
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      line-height: 1.6;
+      margin: 0;
+      white-space: pre-wrap;
+    }
+
+    /* --- "Remember them" opt-in card (shared with order-confirmed.html) --- */
     #remember-card:empty { display: none; }
     .remember-card {
       border: 1px solid var(--color-border);
       background: var(--color-bg, #FAF8F5);
       border-radius: var(--radius, 8px);
       padding: var(--space-xl);
-      margin: var(--space-xl) 0 0;
+      margin: var(--space-2xl) 0;
       text-align: left;
     }
     .remember-card h2 {
@@ -148,21 +146,134 @@
     .remember-card .rc-decline:hover { color: var(--color-primary); }
     .remember-card .rc-status { margin: var(--space-md) 0 0; min-height: 1.2em; color: var(--color-success); }
     .remember-card .rc-muted-note { color: var(--color-muted); font-style: italic; margin: 0; }
+
+    .story-footer {
+      text-align: center;
+      border-top: 1px solid var(--color-border, #E8E4DF);
+      padding-top: var(--space-lg);
+      color: var(--color-muted);
+      font-size: 0.9rem;
+    }
+    .story-footer a { color: inherit; }
+
+    .story-error {
+      text-align: center;
+      padding: var(--space-2xl) var(--space-md);
+    }
+    [hidden] { display: none !important; }
   </style>
 </head>
 <body>
-  <header class="site-header">
-    <div class="container">
-      <a href="/" class="site-logo">Still Beside Me</a>
+  <div class="story-page">
+    <div class="story-brand"><a href="/">Still Beside Me</a></div>
+
+    <div id="loading" class="story-error">Loading…</div>
+
+    <div id="error" class="story-error" hidden>
+      <h1>This page isn't available</h1>
+      <p>The link may be mistyped or no longer active.</p>
+      <p><a href="/">Visit Still Beside Me</a></p>
     </div>
-  </header>
 
-  <main class="confirmation" id="confirmation">
-    <div class="loading-state" id="loading">Loading your order details...</div>
-  </main>
+    <main id="content" hidden>
+      <section id="photo-section" hidden>
+        <img id="photo" class="story-photo" alt="" />
+      </section>
 
-  <!-- Reusable "remember them" opt-in card. Embedded verbatim in story.html
-       too, so both surfaces render an identical component. -->
+      <h1 class="story-name" id="pet-name"></h1>
+      <hr class="story-rule" />
+
+      <section id="poem-section" hidden>
+        <div class="story-poem" id="poem"></div>
+      </section>
+
+      <section id="memories" class="story-memories"></section>
+
+      <!-- The "remember them" card — birthday/gotcha/passing opt-in form.
+           Deliberately left empty here; another agent fills it. -->
+      <section id="remember-card"></section>
+
+      <div class="story-footer">
+        <p>Made by <a href="/">Still Beside Me</a> — memorial art, made personal.</p>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      var token = window.location.pathname.split('/').filter(Boolean).pop();
+
+      var $ = function (id) { return document.getElementById(id); };
+      function show(el) { el.hidden = false; }
+      function hide(el) { el.hidden = true; }
+
+      function fail() {
+        hide($('loading'));
+        show($('error'));
+      }
+
+      if (!token || token === 'story') { return fail(); }
+
+      fetch('/api/vault/' + encodeURIComponent(token))
+        .then(function (r) {
+          if (!r.ok) throw new Error('not found');
+          return r.json();
+        })
+        .then(function (d) {
+          hide($('loading'));
+          show($('content'));
+
+          var name = d.petName || '';
+          $('pet-name').textContent = name;
+          document.title = (name ? name + '’s Story' : 'Their Story') + ' | Still Beside Me';
+
+          if (d.photoUrl) {
+            var photo = $('photo');
+            photo.src = d.photoUrl;
+            photo.alt = name ? 'A photo of ' + name : 'A photo';
+            show($('photo-section'));
+          }
+
+          if (d.poemText) {
+            $('poem').textContent = d.poemText;
+            show($('poem-section'));
+          }
+
+          renderMemories(d.memories || {});
+
+          // Expose the loaded data + token so the remember-card module (loaded
+          // separately) can render into #remember-card without re-fetching.
+          window.__vault = { token: token, data: d };
+          document.dispatchEvent(new CustomEvent('vault:loaded', { detail: window.__vault }));
+        })
+        .catch(fail);
+
+      function renderMemories(m) {
+        var rows = [
+          { label: 'They also went by', value: m.nicknames },
+          { label: 'What made them special', value: m.personality },
+          { label: 'A favorite memory', value: m.favoriteMemory },
+          { label: 'Loved by', value: m.familyName }
+        ];
+        var host = $('memories');
+        rows.forEach(function (row) {
+          if (!row.value) return;
+          var wrap = document.createElement('div');
+          wrap.className = 'story-memory';
+          var h = document.createElement('h2');
+          h.textContent = row.label;
+          var p = document.createElement('p');
+          p.textContent = row.value;
+          wrap.appendChild(h);
+          wrap.appendChild(p);
+          host.appendChild(wrap);
+        });
+      }
+    })();
+  </script>
+
+  <!-- Reusable "remember them" opt-in card. Also embedded verbatim in
+       order-confirmed.html so both surfaces render an identical component. -->
   <script>
     window.SBMRememberCard = (function () {
       var MONTHS = ['January','February','March','April','May','June','July',
@@ -341,167 +452,23 @@
 
       return { render: render };
     })();
-  </script>
 
-  <script>
-  (function() {
-    const params = new URLSearchParams(window.location.search);
-    const sessionId = params.get('session_id');
-    const container = document.getElementById('confirmation');
-
-    // Conversion tracking. Fires once per order (localStorage dedup keyed by
-    // order id), never on refresh, and never breaks the page if it fails.
-    // Readable GA4 item_name derived from the SKU so digital, print-only, and
-    // framed rungs each report distinctly. Falls back gracefully.
-    function itemNameForSku(sku) {
-      if (!sku) return 'Pet Tribute';
-      if (sku.indexOf('digital-') === 0) return 'Digital Keepsake';
-      if (sku.indexOf('print-') === 0) return 'Print only (' + sku.replace('print-', '') + ')';
-      if (sku.indexOf('framed-') === 0) return 'Framed Pet Tribute (' + sku.replace('framed-', '') + ')';
-      return sku;
-    }
-
-    function trackPurchase(order) {
-      try {
-        if (!order || !order.orderId) return;
-        const dedupKey = 'sbm_purchase_' + order.orderId;
-        if (localStorage.getItem(dedupKey)) return;
-        localStorage.setItem(dedupKey, '1');
-
-        const value = order.totalCents ? Math.round(order.totalCents) / 100 : 0;
-        const env = window.SBM_ENV || {};
-
-        // GA4 purchase
-        if (typeof gtag === 'function') {
-          gtag('event', 'purchase', {
-            transaction_id: order.orderId,
-            value: value,
-            currency: 'USD',
-            items: order.sku ? [{
-              item_id: order.sku,
-              item_name: itemNameForSku(order.sku),
-              price: value,
-              quantity: 1,
-            }] : [],
-          });
-
-          // Google Ads conversion (only when configured via /js/env.js)
-          if (env.googleAdsId && env.googleAdsLabel) {
-            gtag('config', env.googleAdsId);
-            gtag('event', 'conversion', {
-              send_to: env.googleAdsId + '/' + env.googleAdsLabel,
-              value: value,
-              currency: 'USD',
-              transaction_id: order.orderId,
-            });
-          }
-        }
-
-        // Meta Pixel purchase (only when the pixel is live)
-        if (env.metaPixelId && typeof fbq === 'function') {
-          fbq('track', 'Purchase', { value: value, currency: 'USD' });
-        }
-      } catch (e) {
-        // Tracking must never interfere with the confirmation page.
+    // On the story page the vault data is already loaded — render the editable
+    // card with the family's current saved state.
+    document.addEventListener('vault:loaded', function (e) {
+      var v = e.detail || {};
+      var host = document.getElementById('remember-card');
+      if (host && window.SBMRememberCard) {
+        window.SBMRememberCard.render(host, {
+          token: v.token,
+          petName: (v.data && v.data.petName) || '',
+          dates: (v.data && v.data.dates) || {},
+          optIn: !!(v.data && v.data.optIn),
+          optOut: !!(v.data && v.data.optOut),
+          context: 'story'
+        });
       }
-    }
-
-    if (!sessionId) {
-      container.innerHTML = '<div class="error-state">No order found. <a href="/">Return to store</a></div>';
-      return;
-    }
-
-    fetch(`/api/orders/confirmation?session_id=${encodeURIComponent(sessionId)}`)
-      .then(r => r.json())
-      .then(order => {
-        if (order.error) {
-          container.innerHTML = `
-            <div class="confirmation-icon">&#10003;</div>
-            <h1>Thank you for your order!</h1>
-            <p class="subtitle">Your payment was received. We're preparing your tribute now.</p>
-            <p style="color:var(--color-muted)">If you have questions, email us at support@stillbesideme.com</p>
-            <p style="margin-top:var(--space-xl)"><a href="/" class="btn btn-warm">Return to Store</a></p>
-          `;
-          return;
-        }
-
-        const total = order.totalCents ? `$${(order.totalCents / 100).toFixed(2)}` : '';
-        const shipping = order.shipping;
-        const shippingHtml = shipping
-          ? `<div class="detail-row"><span class="detail-label">Ships to</span><span class="detail-value">${shipping.name || ''}<br>${shipping.address1 || ''}${shipping.address2 ? ', ' + shipping.address2 : ''}<br>${shipping.city || ''}, ${shipping.state || ''} ${shipping.zip || ''}</span></div>`
-          : '';
-
-        container.innerHTML = `
-          <div class="confirmation-icon">&#10003;</div>
-          <h1>Thank you for your order</h1>
-          <p class="subtitle">Your design proof is being created now. Check your email to review and approve it.</p>
-
-          <div class="order-details">
-            <h2>Order Summary</h2>
-            <div class="detail-row">
-              <span class="detail-label">Order</span>
-              <span class="detail-value">${order.orderId.substring(0, 8).toUpperCase()}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Product</span>
-              <span class="detail-value">${order.sku.replace('framed-', 'Framed ').replace('x', ' x ')}"</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Total</span>
-              <span class="detail-value">${total}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Shipping</span>
-              <span class="detail-value">Free</span>
-            </div>
-            ${shippingHtml}
-            ${order.email ? `<div class="detail-row"><span class="detail-label">Confirmation sent to</span><span class="detail-value">${order.email}</span></div>` : ''}
-          </div>
-
-          <div class="next-steps">
-            <h2>What happens next</h2>
-            <ol>
-              <li>We're creating your design proof now &mdash; <strong>check your email</strong></li>
-              <li>Review and approve your proof (you'll get a link to see exactly how it will look)</li>
-              <li>Once approved, printed on archival paper and professionally framed</li>
-              <li>Shipped to your door (8&ndash;12 business days after approval)</li>
-            </ol>
-          </div>
-
-          <p style="display:flex;gap:var(--space-sm);justify-content:center;flex-wrap:wrap">
-            ${order.proofToken
-              ? `<a href="/order/${order.proofToken}" class="btn btn-warm">Track your order</a>`
-              : `<a href="/order" class="btn btn-warm">Track your order</a>`}
-            <a href="/" class="btn btn-link">Return to Store</a>
-          </p>
-
-          <section id="remember-card"></section>
-        `;
-
-        trackPurchase(order);
-
-        // Gentle "remember them" opt-in. Renders only when the confirmation
-        // payload carries the vault token (see report note); otherwise it
-        // degrades to nothing so the page is never broken.
-        var rememberHost = document.getElementById('remember-card');
-        if (rememberHost && window.SBMRememberCard) {
-          window.SBMRememberCard.render(rememberHost, {
-            token: order.vaultToken || null,
-            petName: order.petName || '',
-            dates: order.vaultDates || {},
-            context: 'confirmation'
-          });
-        }
-      })
-      .catch(() => {
-        container.innerHTML = `
-          <div class="confirmation-icon">&#10003;</div>
-          <h1>Thank you for your order!</h1>
-          <p class="subtitle">Your payment was received. We're preparing your tribute now.</p>
-          <p style="margin-top:var(--space-xl)"><a href="/" class="btn btn-warm">Return to Store</a></p>
-        `;
-      });
-  })();
+    });
   </script>
 </body>
 </html>

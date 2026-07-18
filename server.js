@@ -185,6 +185,21 @@ async function start() {
   runBackup();
   setInterval(runBackup, 24 * 60 * 60 * 1000).unref();
 
+  // Story Vault date engine → sends birthday / gotcha / anniversary emails to
+  // opted-in families. Same daily-timer shape as the backup above, but gated
+  // OFF by default: it only runs when DATE_ENGINE_ENABLED === 'true', so it
+  // stays dormant until deliberately switched on in production (no accidental
+  // emails from dev or a fresh deploy). At most one email per occasion per year
+  // is enforced by the engine + a UNIQUE log constraint.
+  if (process.env.DATE_ENGINE_ENABLED === 'true') {
+    const { checkAndSend } = require('./src/services/dateEngine');
+    const runDateEngine = () => {
+      checkAndSend().catch((err) => console.error('Vault date engine failed:', err.message));
+    };
+    runDateEngine();
+    setInterval(runDateEngine, 24 * 60 * 60 * 1000).unref();
+  }
+
   // ── Letter From Heaven is discontinued ────────────────────────────────
   // LFH and its human-loss landing pages are permanently off sale, so they
   // return 410 Gone (not a 302). 410 tells Google to DROP these URLs and stop
@@ -642,6 +657,17 @@ async function start() {
   app.use('/api/tribute', require('./src/routes/tribute'));
   app.get('/tribute/:token', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'tribute.html'));
+  });
+
+  // Story Vault — the private, tokenized page that keeps a pet's tribute alive
+  // after the frame ships, and (opt-in) sends gentle reminders on the pet's
+  // birthday, gotcha day, and anniversary of passing. Keyed by its own vault
+  // token: it grants only reading the story, setting the dates, or
+  // unsubscribing — never anything about the order, buyer, or price. The
+  // date-triggered emails are driven by the DATE_ENGINE_ENABLED timer below.
+  app.use('/api/vault', require('./src/routes/vault'));
+  app.get('/story/:token', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'story.html'));
   });
 
   // Serve proof images from output directory

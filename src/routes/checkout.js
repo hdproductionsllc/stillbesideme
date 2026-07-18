@@ -297,6 +297,14 @@ router.get('/orders/confirmation', async (req, res) => {
   const fieldsData = order.fields_json ? JSON.parse(order.fields_json) : {};
   const shipping = order.shipping_json ? JSON.parse(order.shipping_json) : null;
 
+  // Story vault (created by the payment webhook): the confirmation page uses
+  // this to show the "may we remember them with you?" opt-in card. A missing
+  // vault (legacy orders, webhook race) just means no card — never an error.
+  const vault = db.get(
+    'SELECT token, pet_name, birthday_mmdd, gotcha_mmdd, passing_mmdd, passing_year FROM vaults WHERE order_id = ?',
+    [order.id]
+  );
+
   res.json({
     orderId: order.id,
     status: order.status,
@@ -308,6 +316,14 @@ router.get('/orders/confirmation', async (req, res) => {
     shipping,
     style: fieldsData.style,
     createdAt: order.created_at,
+    vaultToken: vault ? vault.token : null,
+    petName: (vault && vault.pet_name) || fieldsData.petName || '',
+    vaultDates: vault ? {
+      birthday: vault.birthday_mmdd,
+      gotchaDay: vault.gotcha_mmdd,
+      passingDay: vault.passing_mmdd,
+      passingYear: vault.passing_year,
+    } : {},
   });
 });
 

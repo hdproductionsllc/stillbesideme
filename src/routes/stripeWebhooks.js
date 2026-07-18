@@ -148,6 +148,36 @@ async function handleCheckoutCompleted(session, db) {
     })]
   );
 
+  // Create the Story Vault for this now-paid order. This lives here, not in
+  // checkout.js, for one hard reason: checkout.js inserts a 'pending_payment'
+  // order with no customer email (Stripe collects it during checkout) — and a
+  // vault with no email can never send. Both the buyer's email and the paid
+  // status first exist together at THIS moment, so this is where a real vault
+  // belongs. The vault token is a v4 UUID, minted the same way as the proof/
+  // admin/gift tokens above. Dates are best-effort prefill from the free-text
+  // birthDate/passDate fields: only a real month+day becomes an mmdd (a bare
+  // year like "2014" never does), and a passing year is kept when present.
+  const vaultToken = uuidv4();
+  try {
+    // Everything here is best-effort: a malformed fields_json (or any other
+    // surprise) must never block the confirmation email / proof steps below.
+    const vaultFields = order.fields_json ? JSON.parse(order.fields_json) : {};
+    const bd = parsePetDate(vaultFields.birthDate);
+    const pd = parsePetDate(vaultFields.passDate);
+    db.run(
+      `INSERT INTO vaults (order_id, email, pet_name, token, birthday_mmdd, passing_mmdd, passing_year)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [orderId, email, vaultFields.petName || '', vaultToken, bd.mmdd, pd.mmdd, pd.year]
+    );
+    db.run(
+      `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+      [orderId, 'vault_created', JSON.stringify({ token: vaultToken })]
+    );
+  } catch (err) {
+    // Non-fatal — a missing vault must never block a paid order from proceeding.
+    console.error(`Failed to create story vault for order ${orderId}:`, err.message);
+  }
+
   // Step 1: send immediate order-confirmation email — don't make the customer wait for proof
   const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
   const statusPageUrl = `${baseUrl}/order/${proofToken}`;
@@ -252,4 +282,64 @@ function handleCheckoutExpired(session, db) {
   console.log(`Order ${orderId} cancelled (checkout expired)`);
 }
 
+/**
+ * Best-effort parse of a customer's free-text birth/pass date into
+ * { mmdd, year }. The birthDate/passDate fields accept anything ("2014",
+ * "March 15, 2014", "3/15/2014", "2014-03-15"), so this is deliberately
+ * forgiving — but it returns an mmdd ONLY when a real month AND day are present.
+ * A bare year yields { mmdd: null, year } so it can seed passing_year without
+ * ever fabricating a fake anniversary date. Anything unparseable yields nulls.
+ */
+function parsePetDate(raw) {
+  if (typeof raw !== 'string') return { mmdd: null, year: null };
+  const s = raw.trim();
+  if (!s) return { mmdd: null, year: null };
+
+  const pad = (n) => String(n).padStart(2, '0');
+  // Per-month day cap (Feb allows 29; the date engine rolls leap day forward).
+  const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const ok = (mm, dd) => mm >= 1 && mm <= 12 && dd >= 1 && dd <= DAYS_IN_MONTH[mm - 1];
+
+  // Bare year — a real month+day is required for an mmdd.
+  if (/^\d{4}$/.test(s)) return { mmdd: null, year: Number(s) };
+
+  // ISO: YYYY-MM-DD
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) {
+    const mm = Number(m[2]), dd = Number(m[3]);
+    return { mmdd: ok(mm, dd) ? `${pad(mm)}-${pad(dd)}` : null, year: Number(m[1]) };
+  }
+
+  // Numeric slashes: M/D/YYYY, M/D/YY, or M/D
+  m = s.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+  if (m) {
+    const mm = Number(m[1]), dd = Number(m[2]);
+    const year = m[3] ? Number(m[3].length === 2 ? '20' + m[3] : m[3]) : null;
+    return { mmdd: ok(mm, dd) ? `${pad(mm)}-${pad(dd)}` : null, year };
+  }
+
+  // Month name + day (+ optional year), in any order ("March 15, 2014",
+  // "15 March", "Mar 15 2014").
+  const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+  const lower = s.toLowerCase();
+  const monMatch = lower.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/);
+  const yearMatch = lower.match(/\b(\d{4})\b/);
+  // A day number that is not part of the 4-digit year.
+  const dayMatch = lower.replace(/\b\d{4}\b/, '').match(/\b(\d{1,2})\b/);
+  if (monMatch && dayMatch) {
+    const mm = MONTHS[monMatch[1]];
+    const dd = Number(dayMatch[1]);
+    const year = yearMatch ? Number(yearMatch[1]) : null;
+    return { mmdd: ok(mm, dd) ? `${pad(mm)}-${pad(dd)}` : null, year };
+  }
+
+  // Fall back to any year we can see (e.g. "March 2014") so passing_year is
+  // still captured even without a usable day.
+  if (yearMatch) return { mmdd: null, year: Number(yearMatch[1]) };
+
+  return { mmdd: null, year: null };
+}
+
 module.exports = router;
+// Exposed for unit tests only; not part of the route surface.
+module.exports.parsePetDate = parsePetDate;
