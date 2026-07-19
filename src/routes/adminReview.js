@@ -100,12 +100,20 @@ function buildFulfillmentPreview(order, fields) {
     height = landscape ? short : long;
   }
 
+  // Which insert card ships in the box (mirrors noteCardRenderer's resolver).
+  const isGift = fields && fields.orderType === 'gift';
+  const insertCard = (fields && fields.giftNote)
+    ? `Personal note from ${(fields.giftFrom || 'the sender')}`
+    : isGift
+      ? `Gift card from ${(fields && fields.giftFrom) || 'the sender'}`
+      : 'Thank-you card with their Story Vault QR';
+
   const base = {
     orientation: landscape ? 'Landscape' : 'Portrait',
     width,
     height,
     colors: (fields && fields.colors) || null,
-    giftNote: !!(fields && fields.giftNote),
+    insertCard,
     shipping,
     printFileReady: !!order.print_file_url,
   };

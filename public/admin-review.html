@@ -186,7 +186,7 @@
         if (Array.isArray(f.options) && f.options.length) {
           rows.push(frow('Finish', f.options.map(esc).join('<br>')));
         }
-        rows.push(frow('Gift note printout', f.giftNote ? 'Yes — printed and enclosed in the box' : 'None'));
+        rows.push(frow('Enclosed card', esc(f.insertCard || (f.giftNote ? 'Personal note from the sender' : 'Thank-you card'))));
         if (f.shipping) {
           const s = f.shipping;
           rows.push(frow('Ships to', [s.name, s.address1, s.address2, [s.city, s.state, s.zip].filter(Boolean).join(', ')].filter(Boolean).map(esc).join('<br>')));

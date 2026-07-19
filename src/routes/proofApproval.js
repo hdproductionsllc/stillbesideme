@@ -141,32 +141,34 @@ router.post('/:token/approve', async (req, res) => {
     return res.status(500).json({ error: 'Failed to generate your print file. Our team has been notified.' });
   }
 
-  // Gift note card — rendered here, beside the print file, because the QR on it
-  // points at a tribute page that only exists once the poem is final. Returns
-  // null for self-purchases and for gifts sent without a note.
+  // Insert card — EVERY physical box gets one (Luma printouts are free):
+  // the sender's personal note, a generic gift card, or a thank-you card with
+  // a Story Vault QR for self purchases. Rendered here, beside the print file,
+  // because the QR points at a page that only exists once the poem is final.
   //
-  // Deliberately non-fatal, unlike the print render above: a missing note card
-  // costs the sender their message, but a hard failure here would strand an
+  // Deliberately non-fatal, unlike the print render above: a missing card
+  // costs the box its letter, but a hard failure here would strand an
   // approved order that is otherwise ready to print. Log it, alert, ship the
   // frame.
   try {
     const { generateNoteCard } = require('../services/noteCardRenderer');
-    const noteResult = await generateNoteCard(order);
+    const vault = db.get('SELECT token FROM vaults WHERE order_id = ?', [order.id]);
+    const noteResult = await generateNoteCard(order, { vaultToken: vault ? vault.token : null });
     if (noteResult) {
       db.run('UPDATE orders SET note_file_url = ?, updated_at = datetime(\'now\') WHERE id = ?',
         [noteResult.noteRelativeUrl, order.id]);
-      console.log(`Note card generated for order ${order.id}: ${noteResult.noteRelativeUrl}`);
+      console.log(`Insert card (${noteResult.variant}) generated for order ${order.id}: ${noteResult.noteRelativeUrl}`);
     }
   } catch (err) {
-    console.error(`Failed to generate note card for order ${order.id}:`, err.message);
+    console.error(`Failed to generate insert card for order ${order.id}:`, err.message);
     db.run(
       `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
       [order.id, 'note_render_failed', JSON.stringify({ error: err.message })]
     );
     try {
       await emailService.sendAdminAlert(
-        `Order ${order.id.substring(0, 8).toUpperCase()}: gift note card failed to render`,
-        `The frame will still print, but the sender's note will not be in the box.\n\n` +
+        `Order ${order.id.substring(0, 8).toUpperCase()}: insert card failed to render`,
+        `The frame will still print, but the card will not be in the box.\n\n` +
         `Order ID: ${order.id}\nError: ${err.message}`
       );
     } catch (alertErr) {

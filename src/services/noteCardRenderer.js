@@ -1,20 +1,27 @@
 /**
- * Note Card Renderer — the sender's message, printed and dropped in the box.
+ * Insert Card Renderer — the card in every box.
  *
- * A framed tribute that arrives with no word from the sender is a half-finished
- * gift: the recipient gets a beautiful object and no idea who thought of them.
- * This renders that missing word as an A4 sheet Luma includes in the package
- * (the `printouts` field on the order — up to 3 publicly-fetchable URLs, which
- * Luma prints on A4 and encloses).
+ * Every physical order encloses exactly one card (Luma's `printouts` — free,
+ * up to 3 publicly-fetchable URLs printed and enclosed); only the words change:
+ *
+ *   personal-note — gift order, sender wrote a message. Their words, signed.
+ *   gift-card     — gift order, no message. A warm line from the (required)
+ *                   sender name, so the box is never anonymous.
+ *   thank-you     — self purchase. A thank-you with a care line.
  *
  * A4 is Luma's constraint, not a choice: we don't control the stock or the fold.
  * So the design leans on what we DO control — the cream paper palette and the
  * Cormorant of the tribute itself — so the sheet reads as a letter that belongs
  * with the frame rather than a packing slip that came with it.
  *
- * The QR points at /tribute/{gift_token}: the same URL the sender texts on day
- * one. It must never point at /order/{proof_token}, which reveals the order
- * total and grants proof-approval — see 010-gift-note.sql.
+ * QR targets, by variant:
+ *   gift variants → /tribute/{gift_token}  — the recipient-safe tribute page,
+ *                   the same URL the sender texts on day one.
+ *   thank-you     → /story/{vault_token}   — the buyer's own Story Vault page
+ *                   (with the remember-them date opt-in), falling back to the
+ *                   tribute page when no vault exists.
+ * Neither may ever be /order/{proof_token}, which reveals the order total and
+ * grants proof approval — see 010-gift-note.sql.
  *
  * Output: output/note-cards/{orderId}.jpg
  */
@@ -64,7 +71,7 @@ function ornament(cx, y, half = 150) {
  * top-down cursor would leave a short note stranded against the top of the page
  * with a dead zone beneath it.
  */
-function buildNoteSvg({ recipientName, noteLines, senderName, qrCaption, qr }) {
+function buildNoteSvg({ recipientName, noteLines, senderName, qrCaption, qrSubline, qr }) {
   const c = PAPER_PALETTE;
   const cx = PAGE_W / 2;
 
@@ -115,14 +122,16 @@ function buildNoteSvg({ recipientName, noteLines, senderName, qrCaption, qr }) {
   );
   parts.push(
     `<text x="${cx}" y="${qr.top + qr.size + pad + 52}" font-family="${FONT_SERIF}" font-size="30" ` +
-    `fill="${c.family}" text-anchor="middle" font-style="italic">A living tribute page, made just for them</text>`
+    `fill="${c.family}" text-anchor="middle" font-style="italic">${escSvg(qrSubline)}</text>`
   );
 
   // Quiet brand footer — warmth to the recipient, not a receipt. (The recipient
   // did not order anything; a "thank you for your order" would break the moment.)
+  // "Made with care", never "by hand" — the truth pass bans handcrafted claims;
+  // the print is giclée and the frame is professionally assembled, not handmade.
   parts.push(
     `<text x="${cx}" y="${PAGE_H - MARGIN + 8}" font-family="${FONT_SERIF}" font-size="30" ` +
-    `fill="${c.dates}" text-anchor="middle" letter-spacing="3">Made by hand, for you · stillbesideme.com</text>`
+    `fill="${c.dates}" text-anchor="middle" letter-spacing="3">Made with care, for you · stillbesideme.com</text>`
   );
 
   // Measure the letter block, then center it between brand mark and QR ornament.
@@ -138,13 +147,14 @@ function buildNoteSvg({ recipientName, noteLines, senderName, qrCaption, qr }) {
   // clamp is what keeps them from reaching that point in the first place.
   let y = Math.max(regionTop, regionTop + (regionBottom - regionTop - blockH) / 2);
 
-  // Salutation — omitted entirely when we have no recipient name rather than
-  // printing a hollow "For friend".
+  // Salutation — the resolver authors the full line ("For Rebecca",
+  // "In memory of Roger"); omitted entirely when there is nothing to say
+  // rather than printing a hollow greeting.
   if (recipientName) {
     y += salutationSize;
     parts.push(
       `<text x="${cx}" y="${Math.round(y)}" font-family="${FONT_SERIF}" font-size="${salutationSize}" ` +
-      `fill="${c.name}" text-anchor="middle" font-weight="400">For ${escSvg(recipientName)}</text>`
+      `fill="${c.name}" text-anchor="middle" font-weight="400">${escSvg(recipientName)}</text>`
     );
     y += Math.round(DPI * 0.22);
     parts.push(ornament(cx, Math.round(y), 120));
@@ -165,12 +175,12 @@ function buildNoteSvg({ recipientName, noteLines, senderName, qrCaption, qr }) {
     }
   }
 
-  // Signature
+  // Signature (en dash by house rule — em dashes are banned project-wide)
   if (senderName) {
     y += GAP_SIGN + signSize;
     parts.push(
       `<text x="${cx}" y="${Math.round(y)}" font-family="${FONT_SERIF}" font-size="${signSize}" ` +
-      `fill="${c.name}" text-anchor="middle" font-style="italic">— ${escSvg(senderName)}</text>`
+      `fill="${c.name}" text-anchor="middle" font-style="italic">– ${escSvg(senderName)}</text>`
     );
   }
 
@@ -184,41 +194,108 @@ function buildNoteSvg({ recipientName, noteLines, senderName, qrCaption, qr }) {
 }
 
 /**
- * Render the gift note card for an order.
+ * Decide which card this order's box carries and what it says.
+ *
+ * Returns null only when there is nothing sensible to print (no QR target at
+ * all — legacy orders predating both tokens).
+ */
+function resolveInsertContent(order, fields, template, vaultToken) {
+  const noteText = (fields.giftNote || '').trim();
+  const isGift = fields.orderType === 'gift';
+  const shipping = order.shipping_json ? JSON.parse(order.shipping_json) : null;
+  const recipientFirst = (shipping?.name || '').trim().split(/\s+/)[0] || '';
+  const senderName = (fields.giftFrom || '').trim();
+  const subjectName = (fields[(template.tributeMapping || {}).name] || '').trim();
+
+  const tributeUrl = order.gift_token ? `${BASE_URL()}/tribute/${order.gift_token}` : null;
+  const storyUrl = vaultToken ? `${BASE_URL()}/story/${vaultToken}` : null;
+
+  const tributeCaption = subjectName
+    ? `SCAN TO SEE ${subjectName.toUpperCase()}'S TRIBUTE`
+    : 'SCAN TO SEE THEIR TRIBUTE';
+
+  // A written message always wins, whatever the order type — the sender's own
+  // words, exactly as before. (giftNote is only capturable in gift mode, but a
+  // stored note must never be silently replaced by generic copy.)
+  if (noteText) {
+    if (!tributeUrl) return null;
+    return {
+      variant: 'personal-note',
+      recipientName: recipientFirst ? `For ${recipientFirst}` : '',
+      bodyText: noteText,
+      senderName,
+      qrUrl: tributeUrl,
+      qrCaption: tributeCaption,
+      qrSubline: 'A living tribute page, made just for them',
+    };
+  }
+
+  // Gift without a message: the box must still say who it's from — giftFrom is
+  // required at checkout for gift orders, so the sender line is always there.
+  if (isGift) {
+    if (!tributeUrl) return null;
+    return {
+      variant: 'gift-card',
+      recipientName: recipientFirst ? `For ${recipientFirst}` : '',
+      bodyText:
+        `This was made for you, with love.\n\n` +
+        `${subjectName ? `A tribute to ${subjectName}, printed` : 'A tribute, printed'} on archival paper\n` +
+        `and professionally framed.`,
+      senderName,
+      qrUrl: tributeUrl,
+      qrCaption: tributeCaption,
+      qrSubline: 'A living tribute page, made just for them',
+    };
+  }
+
+  // Self purchase: a thank-you with a care line. QR goes to their Story Vault
+  // page (remember-them opt-in) when one exists, else the tribute page.
+  const qrUrl = storyUrl || tributeUrl;
+  if (!qrUrl) return null;
+  return {
+    variant: 'thank-you',
+    recipientName: subjectName ? `In memory of ${subjectName}` : '',
+    bodyText:
+      `Thank you for letting us help remember ${subjectName || 'them'}.\n\n` +
+      `This tribute was printed on archival paper\n` +
+      `and professionally framed. Kept out of direct sunlight,\n` +
+      `it will hold its color for decades.`,
+    senderName: '',
+    qrUrl,
+    qrCaption: subjectName
+      ? `SCAN TO VISIT ${subjectName.toUpperCase()}'S PAGE`
+      : 'SCAN TO VISIT THEIR PAGE',
+    qrSubline: storyUrl ? 'Their story, kept. Visit anytime.' : 'A living tribute page, made just for them',
+  };
+}
+
+/**
+ * Render the insert card for an order — one card in every physical box.
  *
  * @param {object} order — full order row
- * @returns {Promise<{notePath, noteRelativeUrl}|null>} null when the order
- *          carries no gift note (a self-purchase, or a gift sent without words)
+ * @param {object} [opts] — { vaultToken } for the self-purchase Story Vault QR
+ * @returns {Promise<{notePath, noteRelativeUrl, variant}|null>} null only when
+ *          the order has no QR target at all (legacy pre-token orders)
  */
-async function generateNoteCard(order) {
+async function generateNoteCard(order, opts = {}) {
   // Deliberately NOT resolveOrderData: that resolves photos and throws without
   // one. A note card is words on paper — it has no photo, and coupling it to
   // one would block the no-photo tributes the sympathy-gift case needs.
   const fields = order.fields_json ? JSON.parse(order.fields_json) : {};
 
-  const noteText = (fields.giftNote || '').trim();
-  if (!noteText) return null; // nothing to say — no sheet in the box
-
-  if (!order.gift_token) {
-    throw new Error(`Order ${order.id} has no gift_token — cannot build the tribute QR`);
-  }
-
   const template = loadTemplate(order.template_id);
   if (!template) throw new Error(`Template not found: ${order.template_id}`);
 
-  const shipping = order.shipping_json ? JSON.parse(order.shipping_json) : null;
-  const recipientName = (shipping?.name || '').trim().split(/\s+/)[0] || '';
-  const senderName = (fields.giftFrom || '').trim();
-  const subjectName = (fields[(template.tributeMapping || {}).name] || '').trim();
-  const petName = subjectName || 'their tribute';
+  const content = resolveInsertContent(order, fields, template, opts.vaultToken || null);
+  if (!content) {
+    console.warn(`Order ${order.id}: no QR target (no gift/vault token) — no insert card`);
+    return null;
+  }
+
+  const { recipientName, bodyText, senderName, qrUrl: tributeUrl, qrCaption, qrSubline } = content;
 
   const innerW = PAGE_W - MARGIN * 2;
-  const noteLines = wrapText(noteText, charsPerLine(innerW, 56));
-
-  const tributeUrl = `${BASE_URL()}/tribute/${order.gift_token}`;
-  const qrCaption = subjectName
-    ? `SCAN TO SEE ${petName.toUpperCase()}'S TRIBUTE`
-    : 'SCAN TO SEE THEIR TRIBUTE';
+  const noteLines = wrapText(bodyText, charsPerLine(innerW, 56));
 
   // QR geometry, bottom-anchored. 1.4in puts a version-5 code at ~0.9mm per
   // module — clear of the ~0.5mm scan floor, with room for ink spread on
@@ -232,7 +309,7 @@ async function generateNoteCard(order) {
     topRuleY: qrTop - Math.round(DPI * 0.6),
   };
 
-  const svg = buildNoteSvg({ recipientName, noteLines, senderName, qrCaption, qr });
+  const svg = buildNoteSvg({ recipientName, noteLines, senderName, qrCaption, qrSubline, qr });
 
   // QR rendered directly at final pixel size — scaling a QR after the fact
   // softens the module edges and costs scan reliability. margin:2 builds a
@@ -260,9 +337,9 @@ async function generateNoteCard(order) {
     emitToOutput(NOTE_SUBDIR, `${order.id}.jpg`, noteBuffer);
 
   const sizeMB = (noteBuffer.length / (1024 * 1024)).toFixed(1);
-  console.log(`Note card generated: ${noteRelativeUrl} (${PAGE_W}x${PAGE_H}, ${sizeMB}MB)`);
+  console.log(`Insert card generated (${content.variant}): ${noteRelativeUrl} (${PAGE_W}x${PAGE_H}, ${sizeMB}MB)`);
 
-  return { notePath, noteRelativeUrl };
+  return { notePath, noteRelativeUrl, variant: content.variant };
 }
 
-module.exports = { generateNoteCard };
+module.exports = { generateNoteCard, resolveInsertContent };

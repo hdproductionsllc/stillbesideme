@@ -163,7 +163,7 @@ async function sendOrderConfirmation(to, orderData, statusPageUrl, giftUrl = nul
           Want them to know today?
         </p>
         <p style="color:#2C2C2C;line-height:1.6;margin:0 0 12px;">
-          Their tribute is being made by hand, so it will take a little while to reach them &mdash;
+          Their tribute is being made with care, so it will take a little while to reach them &mdash;
           which is rather the point: it arrives once the flowers have gone.
           But if you'd like them to know now, text them this link. It fills in as the piece is finished,
           and it's the same link printed on the note in their box.
