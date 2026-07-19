@@ -230,6 +230,70 @@ router.post('/api/orders/:id/resend-emails', requireAdmin, async (req, res) => {
   res.json({ success: true, results });
 });
 
+// Re-pull email + shipping address from the Stripe checkout session and fill
+// any missing fields on the order. Recovery for orders damaged by the Stripe
+// API-version drift (shipping moved to collected_information.shipping_details;
+// the webhook missed it before 2026-07-19). Only fills blanks — never
+// overwrites data already on the order.
+router.post('/api/orders/:id/sync-stripe', requireAdmin, async (req, res) => {
+  const db = req.app.locals.db;
+  const o = db.get('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+  if (!o) return res.status(404).json({ error: 'Order not found' });
+  if (!o.stripe_session_id) return res.status(400).json({ error: 'Order has no Stripe session id' });
+
+  try {
+    const Stripe = require('stripe');
+    // Pin a modern API version so collected_information is available
+    // (the account default is too old to return it).
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' });
+    const session = await stripe.checkout.sessions.retrieve(o.stripe_session_id, {
+      expand: ['collected_information.shipping_details'],
+    });
+
+    const collected = session.collected_information?.shipping_details
+      || session.shipping_details
+      || session.shipping
+      || null;
+    let shippingJson = null;
+    if (collected) {
+      const addr = collected.address || {};
+      shippingJson = JSON.stringify({
+        name: collected.name || '',
+        address1: addr.line1 || '',
+        address2: addr.line2 || '',
+        city: addr.city || '',
+        state: addr.state || '',
+        zip: addr.postal_code || '',
+        country: addr.country || 'US',
+      });
+    }
+    const email = session.customer_details?.email || '';
+
+    db.run(
+      `UPDATE orders SET
+         email = COALESCE(NULLIF(email, ''), ?),
+         shipping_json = COALESCE(shipping_json, ?),
+         updated_at = datetime('now')
+       WHERE id = ?`,
+      [email, shippingJson, o.id]
+    );
+    db.run(
+      'INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)',
+      [o.id, 'stripe_synced', JSON.stringify({ hadShipping: !!o.shipping_json, foundShipping: !!shippingJson, email })]
+    );
+
+    const updated = db.get('SELECT email, shipping_json FROM orders WHERE id = ?', [o.id]);
+    res.json({
+      success: true,
+      email: updated.email,
+      shipping: updated.shipping_json ? JSON.parse(updated.shipping_json) : null,
+    });
+  } catch (e) {
+    console.error(`Stripe sync failed for order ${o.id}:`, e.message);
+    res.status(502).json({ error: `Stripe sync failed: ${e.message}` });
+  }
+});
+
 // Off-site backup: download the live database file (gated).
 router.get('/api/backup', requireAdmin, (req, res) => {
   if (!DB_PATH || !fs.existsSync(DB_PATH)) return res.status(404).send('No database file found.');

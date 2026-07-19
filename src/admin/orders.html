@@ -132,6 +132,10 @@
         <button class="btn" id="resendEmails">Re-send order emails</button>
         <span id="resendResult" class="muted" style="margin-left:8px"></span>
       </div>
+      <div class="section"><h3>Stripe</h3>
+        <button class="btn" id="syncStripe">Re-pull email &amp; shipping from Stripe</button>
+        <span id="syncResult" class="muted" style="margin-left:8px"></span>
+      </div>
       <div class="section"><h3>Poem</h3><div style="white-space:pre-wrap;font-size:.88rem">${esc(o.poemText||'—')}</div></div>
       <div class="section"><h3>Full timeline (${events.length})</h3>
         <ul class="timeline">${events.map(e => `<li><span class="t">${esc(e.at)}</span><span class="ev">${esc(e.type.replace(/_/g,' '))}</span></li>`).join('')}</ul>
@@ -152,6 +156,21 @@
         out.textContent = rr.ok
           ? Object.entries(data.results).map(([k, v]) => `${k}: ${v}`).join(' · ')
           : (data.error || 'Failed');
+      } catch (e) {
+        out.textContent = 'Failed: ' + e.message;
+      }
+      btn.disabled = false;
+    };
+    document.getElementById('syncStripe').onclick = async (ev) => {
+      const btn = ev.currentTarget, out = document.getElementById('syncResult');
+      btn.disabled = true; out.textContent = 'Syncing…';
+      try {
+        const rr = await fetch('/admin/api/orders/' + encodeURIComponent(id) + '/sync-stripe', { method: 'POST' });
+        const data = await rr.json();
+        out.textContent = rr.ok
+          ? (data.shipping ? `Shipping: ${data.shipping.name}, ${data.shipping.city} ${data.shipping.state}` : 'No shipping on the Stripe session')
+          : (data.error || 'Failed');
+        if (rr.ok) loadDetail(id);
       } catch (e) {
         out.textContent = 'Failed: ' + e.message;
       }

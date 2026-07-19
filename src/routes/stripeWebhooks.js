@@ -86,8 +86,14 @@ async function handleCheckoutCompleted(session, db) {
   const paymentIntentId = session.payment_intent;
   const email = session.customer_details?.email || '';
 
-  // Save shipping address
-  const shippingDetails = session.shipping_details || session.shipping;
+  // Save shipping address. On current Stripe API versions the address lives at
+  // collected_information.shipping_details — top-level shipping_details was
+  // removed. The webhook endpoint (re-created 2026-07-06) delivers the new
+  // shape, which silently dropped shipping on the first real order; keep the
+  // legacy fields as fallbacks for older payload shapes.
+  const shippingDetails = session.collected_information?.shipping_details
+    || session.shipping_details
+    || session.shipping;
   let shippingJson = null;
   if (shippingDetails) {
     const addr = shippingDetails.address || {};
@@ -223,15 +229,25 @@ async function handleCheckoutCompleted(session, db) {
     const proofImageUrl = `${baseUrl}${proofRelativeUrl}`;
     const reviewUrl = `${baseUrl}/admin/review/${adminToken}`;
 
-    await emailService.sendReviewRequest(
-      db.get('SELECT * FROM orders WHERE id = ?', [orderId]),
-      { reviewUrl, proofImageUrl }
-    );
-
-    db.run(
-      `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
-      [orderId, 'review_requested', JSON.stringify({ proofUrl: proofRelativeUrl })]
-    );
+    // The review email gets its own try/catch: an email failure is NOT a proof
+    // failure, and conflating them (as before 2026-07-19) sends debugging down
+    // the wrong path. The proof is already saved above either way.
+    try {
+      await emailService.sendReviewRequest(
+        db.get('SELECT * FROM orders WHERE id = ?', [orderId]),
+        { reviewUrl, proofImageUrl }
+      );
+      db.run(
+        `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+        [orderId, 'review_requested', JSON.stringify({ proofUrl: proofRelativeUrl })]
+      );
+    } catch (emailErr) {
+      console.error(`Failed to send review request for order ${orderId}:`, emailErr.message);
+      db.run(
+        `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+        [orderId, 'review_email_failed', JSON.stringify({ error: emailErr.message, reviewUrl })]
+      );
+    }
 
     console.log(`Order ${orderId}: proof generated — awaiting human review at /admin/review/${adminToken}`);
   } catch (err) {
