@@ -173,6 +173,63 @@ router.post('/api/orders/:id/notes', requireAdmin, express.json(), (req, res) =>
   res.json({ success: true });
 });
 
+// Re-send the transactional emails for a paid order whose original sends
+// failed (e.g. an SMTP outage): customer order confirmation, and — when the
+// order is still waiting on review — the admin review request. Only re-sends;
+// never changes order state, so it is safe to repeat.
+router.post('/api/orders/:id/resend-emails', requireAdmin, async (req, res) => {
+  const db = req.app.locals.db;
+  const o = db.get('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+  if (!o) return res.status(404).json({ error: 'Order not found' });
+  if (o.status === 'pending_payment' || o.status === 'cancelled') {
+    return res.status(400).json({ error: `Order is ${o.status} — nothing to send.` });
+  }
+
+  const emailService = require('../services/emailService');
+  const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
+  const results = {};
+
+  if (o.email && o.proof_token) {
+    try {
+      let fields = {};
+      try { fields = o.fields_json ? JSON.parse(o.fields_json) : {}; } catch (e) { /* ignore */ }
+      const giftUrl = fields.orderType === 'gift' && o.gift_token ? `${baseUrl}/tribute/${o.gift_token}` : null;
+      await emailService.sendOrderConfirmation(o.email, {
+        orderId: o.id,
+        templateName: o.template_id,
+        sku: o.product_sku,
+        totalCents: o.total_cents,
+      }, `${baseUrl}/order/${o.proof_token}`, giftUrl);
+      results.confirmation = 'sent';
+    } catch (e) {
+      results.confirmation = `failed: ${e.message}`;
+    }
+  } else {
+    results.confirmation = 'skipped (no email on order)';
+  }
+
+  const reviewable = o.status === 'awaiting_review' || o.status === 'change_requested';
+  if (reviewable && o.admin_token && o.proof_url) {
+    try {
+      await emailService.sendReviewRequest(o, {
+        reviewUrl: `${baseUrl}/admin/review/${o.admin_token}`,
+        proofImageUrl: `${baseUrl}${o.proof_url}`,
+      });
+      results.review = 'sent';
+    } catch (e) {
+      results.review = `failed: ${e.message}`;
+    }
+  } else {
+    results.review = reviewable ? 'skipped (no proof yet)' : `skipped (status ${o.status})`;
+  }
+
+  db.run(
+    'INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)',
+    [o.id, 'emails_resent', JSON.stringify(results)]
+  );
+  res.json({ success: true, results });
+});
+
 // Off-site backup: download the live database file (gated).
 router.get('/api/backup', requireAdmin, (req, res) => {
   if (!DB_PATH || !fs.existsSync(DB_PATH)) return res.status(404).send('No database file found.');

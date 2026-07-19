@@ -171,19 +171,21 @@ router.get('/poems/:id', (req, res) => {
 /**
  * POST /api/poems/generate – AI poem generation via Anthropic Claude.
  * Falls back to template-based poem when API key is missing.
- * Rate limited: 5 generations per session per hour.
+ * Rate limited: 6 generations per session per hour — the customizer allows
+ * MAX_REGENERATIONS (3) per format and pet-tribute offers 2 formats
+ * (poem + letter), so the cap must cover 3 × 2 without a mid-purchase 429.
  * Caches all generated poems in the session so users can browse previous versions.
  */
 const poemGenerator = require('../services/poemGenerator');
 
 router.post('/poems/generate', async (req, res) => {
-  // Rate limiting – 5 per session per hour
+  // Rate limiting – 6 per session per hour (3 per format × 2 formats)
   if (!req.session.poemGenerations) req.session.poemGenerations = [];
 
   const oneHourAgo = Date.now() - 60 * 60 * 1000;
   req.session.poemGenerations = req.session.poemGenerations.filter(t => t > oneHourAgo);
 
-  if (req.session.poemGenerations.length >= 5) {
+  if (req.session.poemGenerations.length >= 6) {
     return res.status(429).json({
       error: 'You\'ve generated several poems recently. Please wait a bit before trying again.',
       retryAfter: Math.ceil((req.session.poemGenerations[0] + 60 * 60 * 1000 - Date.now()) / 1000)

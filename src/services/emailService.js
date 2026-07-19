@@ -1,6 +1,12 @@
 /**
- * Email Service – thin Nodemailer wrapper for proof workflow emails.
- * Works with any SMTP provider (Resend, SendGrid, Gmail, Mailtrap, etc).
+ * Email Service – proof workflow emails.
+ *
+ * Delivery is transport-agnostic: when SMTP_HOST points at Resend, mail goes
+ * out over Resend's HTTPS API (port 443) — Railway's network silently drops
+ * outbound SMTP connections (verified 2026-07-19: smtp.resend.com timed out
+ * from prod on every port while the HTTPS API delivered instantly). Any other
+ * SMTP_HOST still uses Nodemailer, now with hard timeouts so a hung socket
+ * can never stall the Stripe webhook path for minutes again.
  */
 
 const nodemailer = require('nodemailer');
@@ -11,13 +17,54 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3001';
 
 let transporter = null;
 
+function usesResendApi() {
+  return /resend/i.test(process.env.SMTP_HOST || '');
+}
+
+/** "a@x.com, b@y.com" → ["a@x.com", "b@y.com"] (Resend wants arrays). */
+function splitAddresses(value) {
+  return String(value).split(',').map(s => s.trim()).filter(Boolean);
+}
+
+/**
+ * Deliver via Resend's HTTPS API. SMTP_PASS is the Resend API key (that is
+ * what Resend SMTP auth uses), so no new env var is needed.
+ */
+async function sendViaResendApi(mailOptions) {
+  const fs = require('fs');
+  const { from, to, subject, html, text, cc, attachments } = mailOptions;
+
+  const payload = { from, to: splitAddresses(to), subject };
+  if (html) payload.html = html;
+  if (text) payload.text = text;
+  if (cc) payload.cc = splitAddresses(cc);
+  if (attachments && attachments.length) {
+    payload.attachments = attachments.map(a => ({
+      filename: a.filename,
+      content: a.path
+        ? fs.readFileSync(a.path).toString('base64')
+        : Buffer.from(a.content).toString('base64'),
+    }));
+  }
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.RESEND_API_KEY || process.env.SMTP_PASS}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(15000),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(`Resend API ${res.status}: ${body.message || JSON.stringify(body)}`);
+  }
+  return { messageId: body.id };
+}
+
 function getTransporter() {
   if (transporter) return transporter;
-
-  if (!process.env.SMTP_HOST) {
-    console.warn('Email: SMTP_HOST not configured — emails will be logged but not sent');
-    return null;
-  }
 
   transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
@@ -27,9 +74,28 @@ function getTransporter() {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    // Fail fast: an unreachable SMTP host must error in seconds, not hang the
+    // order pipeline (the default is effectively minutes).
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
   });
 
   return transporter;
+}
+
+/** Single delivery chokepoint for every email this service sends. */
+async function deliver(mailOptions) {
+  if (!process.env.SMTP_HOST) {
+    console.log(`Email (not sent — no SMTP): to=${mailOptions.to} subject="${mailOptions.subject}"`
+      + (mailOptions.text ? `\n${mailOptions.text}` : ''));
+    return { preview: true };
+  }
+  const result = usesResendApi()
+    ? await sendViaResendApi(mailOptions)
+    : await getTransporter().sendMail(mailOptions);
+  console.log(`Email sent: to=${mailOptions.to} subject="${mailOptions.subject}" messageId=${result.messageId}`);
+  return result;
 }
 
 /** Format price from cents */
@@ -58,17 +124,7 @@ function wrapHtml(bodyHtml) {
 }
 
 async function send(to, subject, html, extra = {}) {
-  const t = getTransporter();
-  const mailOptions = { from: FROM, to, subject, html, ...extra };
-
-  if (!t) {
-    console.log(`Email (not sent — no SMTP): to=${to} subject="${subject}"`);
-    return { preview: true };
-  }
-
-  const result = await t.sendMail(mailOptions);
-  console.log(`Email sent: to=${to} subject="${subject}" messageId=${result.messageId}`);
-  return result;
+  return deliver({ from: FROM, to, subject, html, ...extra });
 }
 
 /**
@@ -82,16 +138,7 @@ async function sendAdminAlert(subject, textBody) {
     console.warn(`Email: ADMIN_EMAIL not configured — admin alert not sent: "${subject}"`);
     return { skipped: true };
   }
-
-  const t = getTransporter();
-  if (!t) {
-    console.log(`Email (not sent — no SMTP): to=${ADMIN_EMAIL} subject="${subject}"\n${textBody}`);
-    return { preview: true };
-  }
-
-  const result = await t.sendMail({ from: FROM, to: ADMIN_EMAIL, subject, text: textBody });
-  console.log(`Email sent: to=${ADMIN_EMAIL} subject="${subject}" messageId=${result.messageId}`);
-  return result;
+  return deliver({ from: FROM, to: ADMIN_EMAIL, subject, text: textBody });
 }
 
 /**

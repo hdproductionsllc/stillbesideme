@@ -117,7 +117,17 @@ async function start() {
     standardHeaders: true,
     legacyHeaders: false,
   });
-  app.use('/api/poems', expensiveLimiter);
+  // Poem GENERATION gets its own bucket (same reasoning as gift-note below).
+  // The old '/api/poems' mount also counted the cheap library GET that every
+  // customizer page load fires, so a buyer using their full 6-generation
+  // budget (3 poems + 3 letters) could be 429'd mid-purchase.
+  app.use('/api/poems/generate', rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 12,
+    message: { error: 'Too many requests. Please try again in a few minutes.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  }));
   app.use('/api/sympathy', expensiveLimiter);
   app.use('/api/images/upload', expensiveLimiter);
   // Gift-note drafting gets its OWN bucket rather than joining expensiveLimiter.

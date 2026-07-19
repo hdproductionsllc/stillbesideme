@@ -128,6 +128,10 @@
         <textarea id="notes" placeholder="Add a note (e.g. customer called, reshipping to new address)…">${esc(o.adminNotes)}</textarea>
         <div style="margin-top:8px"><button class="btn" id="saveNotes">Save note</button><span id="notesSaved" class="saved" style="display:none">Saved</span></div>
       </div>
+      <div class="section"><h3>Emails</h3>
+        <button class="btn" id="resendEmails">Re-send order emails</button>
+        <span id="resendResult" class="muted" style="margin-left:8px"></span>
+      </div>
       <div class="section"><h3>Poem</h3><div style="white-space:pre-wrap;font-size:.88rem">${esc(o.poemText||'—')}</div></div>
       <div class="section"><h3>Full timeline (${events.length})</h3>
         <ul class="timeline">${events.map(e => `<li><span class="t">${esc(e.at)}</span><span class="ev">${esc(e.type.replace(/_/g,' '))}</span></li>`).join('')}</ul>
@@ -138,6 +142,20 @@
         method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ notes })
       });
       if (rr.ok) { const s = document.getElementById('notesSaved'); s.style.display='inline'; setTimeout(()=>s.style.display='none', 2000); loadList(); }
+    };
+    document.getElementById('resendEmails').onclick = async (ev) => {
+      const btn = ev.currentTarget, out = document.getElementById('resendResult');
+      btn.disabled = true; out.textContent = 'Sending…';
+      try {
+        const rr = await fetch('/admin/api/orders/' + encodeURIComponent(id) + '/resend-emails', { method: 'POST' });
+        const data = await rr.json();
+        out.textContent = rr.ok
+          ? Object.entries(data.results).map(([k, v]) => `${k}: ${v}`).join(' · ')
+          : (data.error || 'Failed');
+      } catch (e) {
+        out.textContent = 'Failed: ' + e.message;
+      }
+      btn.disabled = false;
     };
   }
 

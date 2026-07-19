@@ -27,9 +27,13 @@
 
   let template = null;
   let poems = [];
-  let regenerationCount = 0;
-  let poemHistory = [];       // up to 3 generated poems
-  let activePoemIndex = -1;   // which version is showing
+  // Generated tribute text is tracked PER FORMAT (poem vs letter): each format
+  // owns its own version history, visible version, and generation budget of
+  // MAX_REGENERATIONS. A shared counter used to make the letter tab a silent
+  // dead end once the poem's budget was spent.
+  let poemHistories = {};     // format id → generated versions (up to MAX each)
+  let activeIndices = {};     // format id → index of the version showing
+  let regenCounts = {};       // format id → generations used (initial + retries)
   let currentStyle = 'classic-dark';
   let currentLayout = 'side-by-side';
   let currentFrame = null; // chosen frame id from template.frameOptions
@@ -100,16 +104,35 @@
 
   // ── Poem Version History (module-level so both wireUp and restore can use) ──
 
+  /** The active format key ('poem' for templates without a format toggle). */
+  function fmtKey() {
+    return (template && template.poemFormats) ? poemFormat : 'poem';
+  }
+
+  /** Version history for the active format (created on first use). */
+  function fmtHistory() {
+    const k = fmtKey();
+    if (!poemHistories[k]) poemHistories[k] = [];
+    return poemHistories[k];
+  }
+
+  /** Generations used by the active format. */
+  function fmtRegenCount() {
+    return regenCounts[fmtKey()] || 0;
+  }
+
   function updateVersionTabs() {
     const vt = document.getElementById('poem-version-tabs');
     if (!vt) return;
-    if (poemHistory.length < 2) {
+    const history = fmtHistory();
+    if (history.length < 2) {
       vt.style.display = 'none';
       return;
     }
     vt.style.display = '';
-    vt.innerHTML = poemHistory.map((_, i) =>
-      `<button class="poem-version-tab${i === activePoemIndex ? ' active' : ''}" data-index="${i}">Version ${i + 1}</button>`
+    const active = activeIndices[fmtKey()] || 0;
+    vt.innerHTML = history.map((_, i) =>
+      `<button class="poem-version-tab${i === active ? ' active' : ''}" data-index="${i}">Version ${i + 1}</button>`
     ).join('');
     vt.querySelectorAll('.poem-version-tab').forEach(tab => {
       tab.addEventListener('click', () => {
@@ -119,13 +142,63 @@
   }
 
   function showPoemVersion(index) {
-    if (index < 0 || index >= poemHistory.length) return;
-    activePoemIndex = index;
+    const history = fmtHistory();
+    if (index < 0 || index >= history.length) return;
+    activeIndices[fmtKey()] = index;
     const rt = document.getElementById('poem-result-text');
-    if (rt) rt.textContent = poemHistory[index];
-    PreviewRenderer.setField('poemText', poemHistory[index]);
+    if (rt) rt.textContent = history[index];
+    PreviewRenderer.setField('poemText', history[index]);
     updateVersionTabs();
     saveState();
+  }
+
+  /** Regen button + counter line reflect the ACTIVE format's budget. */
+  function updateRegenUi() {
+    const regenCount = document.getElementById('regen-count');
+    const regenBtn = document.getElementById('poem-regenerate-btn');
+    if (!regenCount || !regenBtn) return;
+    const remaining = MAX_REGENERATIONS - fmtRegenCount();
+    if (remaining <= 0) {
+      regenCount.textContent = `No more versions of this ${poemLabel().toLowerCase()} – you can still edit it`;
+      regenBtn.disabled = true;
+    } else {
+      regenCount.textContent = `${remaining} more version${remaining === 1 ? '' : 's'} available`;
+      regenBtn.disabled = false;
+    }
+  }
+
+  /**
+   * Point the poem section at the active format: show its generated text if
+   * any exists, otherwise bring back the generate button so the first
+   * generation of THIS format is always reachable (each format has its own
+   * budget). Called on format toggle and after state restore.
+   */
+  function syncPoemSectionToFormat() {
+    const resultDiv = document.getElementById('poem-result');
+    const resultText = document.getElementById('poem-result-text');
+    const generateBtn = document.getElementById('generate-poem-btn');
+    const editArea = document.getElementById('poem-edit-area');
+    if (!resultDiv || !resultText || !generateBtn) return;
+
+    if (editArea) editArea.style.display = 'none';
+    const history = fmtHistory();
+    if (history.length > 0) {
+      const idx = Math.min(activeIndices[fmtKey()] || 0, history.length - 1);
+      activeIndices[fmtKey()] = idx;
+      resultText.textContent = history[idx];
+      PreviewRenderer.setField('poemText', history[idx]);
+      resultDiv.style.display = '';
+      generateBtn.style.display = 'none';
+    } else {
+      // Nothing generated in this format yet — the generate button IS the way
+      // in, so it must always come back here. (The preview keeps showing the
+      // other format's text until this one is generated.)
+      resultDiv.style.display = 'none';
+      generateBtn.style.display = '';
+      generateBtn.disabled = false;
+    }
+    updateVersionTabs();
+    updateRegenUi();
   }
 
   // ── Initialization ─────────────────────────────────────────
@@ -178,7 +251,10 @@
         PreviewRenderer.setPreviewHeader('Banjo', '2014 – 2026');
       }
       // Frame chooser (black/white/oak/natural + Signature upgrades).
-      if (template.frameOptions) buildFrameSelector();
+      if (template.frameOptions) {
+        buildFrameSelector();
+        initFrameScrollHint();
+      }
 
       // Restore saved state
       restoreState();
@@ -1269,7 +1345,10 @@
         : `Create Their ${poemLabel()}`;
     }
 
-    // Poem format toggle (poem vs letter from them)
+    // Poem format toggle (poem vs letter from them). Switching formats swaps
+    // in that format's own generated versions — or its generate button if
+    // nothing has been generated yet — so the letter is always reachable even
+    // after the poem's versions are used up.
     const formatToggle = document.getElementById('poem-format-toggle');
     if (formatToggle) {
       formatToggle.querySelectorAll('.order-type-option').forEach(btn => {
@@ -1279,6 +1358,7 @@
           btn.classList.add('active');
           updateGenerateButtonLabel();
           editBtn.textContent = `Edit ${poemLabel().toLowerCase()}`;
+          syncPoemSectionToFormat();
           saveState();
         });
       });
@@ -1394,14 +1474,15 @@
 
         hidePoemLoading();
         revealPoem(data.poem);
-        poemHistory.push(data.poem);
-        activePoemIndex = poemHistory.length - 1;
+        const history = fmtHistory();
+        history.push(data.poem);
+        activeIndices[fmtKey()] = history.length - 1;
         resultDiv.style.display = '';
         editArea.style.display = 'none';
         libraryArea.style.display = 'none';
 
-        regenerationCount++;
-        updateRegenCount();
+        regenCounts[fmtKey()] = fmtRegenCount() + 1;
+        updateRegenUi();
         updateVersionTabs();
         saveState();
 
@@ -1419,7 +1500,7 @@
     generateBtn.addEventListener('click', generatePoem);
 
     regenBtn.addEventListener('click', async () => {
-      if (regenerationCount >= MAX_REGENERATIONS) return;
+      if (fmtRegenCount() >= MAX_REGENERATIONS) return;
       regenBtn.disabled = true;
       regenBtn.textContent = 'Writing...';
 
@@ -1434,16 +1515,16 @@
 
         if (!res.ok) {
           regenBtn.textContent = 'Try another version';
-          regenBtn.disabled = regenerationCount >= MAX_REGENERATIONS;
+          updateRegenUi();
           alert(data.error || 'Something went wrong. Please try again.');
           return;
         }
 
         revealPoem(data.poem);
-        poemHistory.push(data.poem);
-        activePoemIndex = poemHistory.length - 1;
-        regenerationCount++;
-        updateRegenCount();
+        const history = fmtHistory();
+        history.push(data.poem);
+        activeIndices[fmtKey()] = history.length - 1;
+        regenCounts[fmtKey()] = fmtRegenCount() + 1;
         updateVersionTabs();
         saveState();
       } catch (err) {
@@ -1451,18 +1532,8 @@
       }
 
       regenBtn.textContent = 'Try another version';
-      regenBtn.disabled = regenerationCount >= MAX_REGENERATIONS;
+      updateRegenUi();
     });
-
-    function updateRegenCount() {
-      const remaining = MAX_REGENERATIONS - regenerationCount;
-      if (remaining <= 0) {
-        regenCount.textContent = `No more regenerations \u2013 you can still edit the ${poemLabel().toLowerCase()}`;
-        regenBtn.disabled = true;
-      } else {
-        regenCount.textContent = `${remaining} regeneration${remaining === 1 ? '' : 's'} remaining`;
-      }
-    }
 
     editBtn.addEventListener('click', () => {
       editTextarea.value = resultText.textContent;
@@ -1475,8 +1546,10 @@
       if (edited) {
         resultText.textContent = edited;
         PreviewRenderer.setField('poemText', edited);
-        if (activePoemIndex >= 0 && activePoemIndex < poemHistory.length) {
-          poemHistory[activePoemIndex] = edited;
+        const history = fmtHistory();
+        const idx = activeIndices[fmtKey()];
+        if (typeof idx === 'number' && idx >= 0 && idx < history.length) {
+          history[idx] = edited;
         }
         saveState();
       }
@@ -1963,6 +2036,47 @@
     const container = document.getElementById('style-selector');
     if (!container || !template.frameOptions) return;
     container.style.display = isFramedSku(sku) ? '' : 'none';
+    // A hidden chooser can never scroll into view — drop the hint with it.
+    if (!isFramedSku(sku)) dismissFrameScrollHint();
+  }
+
+  // ── Frame-chooser scroll hint ───────────────────────────────
+  // A test user never found the frame chooser: it sits below the fold (below
+  // the sticky preview on mobile, at the bottom of the preview pane on short
+  // desktop viewports) with nothing suggesting there is more to scroll to.
+  // A small pill on the preview stage points at it, and dissolves the moment
+  // the chooser is actually seen.
+
+  let frameHintObserver = null;
+
+  function dismissFrameScrollHint() {
+    const hint = document.getElementById('frame-scroll-hint');
+    if (frameHintObserver) { frameHintObserver.disconnect(); frameHintObserver = null; }
+    if (!hint) return;
+    hint.classList.add('dismissed');
+    setTimeout(() => hint.remove(), 350);
+  }
+
+  function initFrameScrollHint() {
+    const selector = document.getElementById('style-selector');
+    const stage = document.querySelector('.preview-stage');
+    if (!selector || !stage || !('IntersectionObserver' in window)) return;
+    if (document.getElementById('frame-scroll-hint')) return;
+
+    const hint = document.createElement('button');
+    hint.type = 'button';
+    hint.id = 'frame-scroll-hint';
+    hint.className = 'frame-scroll-hint';
+    hint.innerHTML = '<span>Scroll to choose your frame</span><span class="frame-scroll-hint-chev">⌄</span>';
+    hint.addEventListener('click', () => {
+      selector.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    stage.appendChild(hint);
+
+    frameHintObserver = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) dismissFrameScrollHint();
+    }, { threshold: 0.6 });
+    frameHintObserver.observe(selector);
   }
 
   function updatePurchaseButton() {
@@ -2079,8 +2193,9 @@
         style: currentStyle,
         layout: currentLayout,
         orderType,
-        poemHistory,
-        activePoemIndex,
+        poemHistories,
+        activeIndices,
+        regenCounts,
         poemFormat,
         photoCrop: PreviewRenderer.getPhotoCrop('photo'),
         panel2Crop: PreviewRenderer.getPhotoCrop('panel2'),
@@ -2098,7 +2213,6 @@
         customRatios: PreviewRenderer.getCustomRatios(),
         selectedProduct: document.querySelector('.product-option.selected .product-option-label')?.textContent,
         selectedSku: document.querySelector('.product-option.selected')?.dataset?.sku,
-        regenerationCount,
         timestamp: Date.now()
       };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(state));
@@ -2129,26 +2243,40 @@
           }
         }
 
-        // Restore poem
+        // Restore poem text into the preview; the poem SECTION is synced to the
+        // active format further down (after format + histories are restored).
         if (state.fields.poemText) {
           PreviewRenderer.setField('poemText', state.fields.poemText);
-          const resultDiv = document.getElementById('poem-result');
-          const resultText = document.getElementById('poem-result-text');
-          const generateBtn = document.getElementById('generate-poem-btn');
-          if (resultDiv && resultText) {
-            resultText.textContent = state.fields.poemText;
-            resultDiv.style.display = '';
-            generateBtn.style.display = 'none';
+          // No generated history means this text came from the poem library —
+          // show it directly (the per-format sync below won't run).
+          const hasHistory = (state.poemHistories && Object.keys(state.poemHistories).length > 0)
+            || (state.poemHistory && state.poemHistory.length > 0);
+          if (!hasHistory) {
+            const resultDiv = document.getElementById('poem-result');
+            const resultText = document.getElementById('poem-result-text');
+            const generateBtn = document.getElementById('generate-poem-btn');
+            if (resultDiv && resultText) {
+              resultText.textContent = state.fields.poemText;
+              resultDiv.style.display = '';
+              generateBtn.style.display = 'none';
+            }
           }
         }
 
-        // Restore poem history
-        if (state.poemHistory && state.poemHistory.length > 0) {
-          poemHistory = state.poemHistory;
-          activePoemIndex = typeof state.activePoemIndex === 'number' && state.activePoemIndex >= 0
+        // Restore per-format histories and budgets. Older saved states carry a
+        // single flat poemHistory + regenerationCount — credit those to the
+        // saved format so nobody gets surprise extra generations on reload.
+        if (state.poemHistories && typeof state.poemHistories === 'object') {
+          poemHistories = state.poemHistories;
+          activeIndices = state.activeIndices || {};
+          regenCounts = state.regenCounts || {};
+        } else if (state.poemHistory && state.poemHistory.length > 0) {
+          const legacyKey = state.poemFormat || 'poem';
+          poemHistories[legacyKey] = state.poemHistory;
+          activeIndices[legacyKey] = typeof state.activePoemIndex === 'number' && state.activePoemIndex >= 0
             ? state.activePoemIndex
-            : poemHistory.length - 1;
-          setTimeout(() => updateVersionTabs(), 50);
+            : state.poemHistory.length - 1;
+          regenCounts[legacyKey] = state.regenerationCount || state.poemHistory.length;
         }
       }
 
@@ -2210,6 +2338,12 @@
         }
       }
 
+      // Point the poem section at the restored format's own content/budget.
+      // (Wired via setTimeout(0) in createPoemSection, so defer one tick.)
+      if (Object.keys(poemHistories).length > 0) {
+        setTimeout(() => syncPoemSectionToFormat(), 50);
+      }
+
       // Restore auto-matched colors (colorMode: 'auto' templates)
       if (template.colorMode === 'auto' && state.currentColors && state.currentColors.mat) {
         autoColors = state.autoColors || null;
@@ -2256,11 +2390,6 @@
             : 'Each detail helps us write their tribute.';
         }
         updateFormForOrderType();
-      }
-
-      // Restore regen count
-      if (state.regenerationCount) {
-        regenerationCount = state.regenerationCount;
       }
 
       // Restore selected product
