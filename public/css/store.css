@@ -414,6 +414,37 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
   margin-top: 2px;
 }
 
+/* The mockup is a miniature of the printed landscape piece, so it must scale
+   like one: type, spacing, frame and mat all derive from the frame's width.
+   Without this, the fixed-px type above makes the poem pane grow TALLER as
+   the frame gets narrower, flipping the sample into a portrait shape we don't
+   sell (and stretching the hero spotlight with it). Container-query units
+   keep the composition self-similar at every width; the px sizes above remain
+   as the fallback for browsers without cqw support. Reference design width:
+   440px (the desktop hero), so 1cqw = 4.4px there. */
+@supports (font-size: 1cqw) {
+  .frame-mockup {
+    container-type: inline-size;
+    /* Containment strips the contents' intrinsic width, so the frame must
+       take its width from its parent (max-widths per context still cap it) —
+       otherwise content-sized parents (e.g. the centered mobile hero column)
+       collapse it to zero. */
+    width: 100%;
+    --frame-width: 3.2cqw;
+    --mat-padding: 3.6cqw;
+    --panel-gap: 0.45cqw;
+  }
+  .hero-mockup { width: 100%; }
+  .mockup-tribute { padding: 2.7cqw 2.3cqw; }
+  .mockup-tribute-name { font-size: 4cqw; margin-bottom: 0.45cqw; }
+  .mockup-tribute-dates { font-size: 2cqw; margin-bottom: 1.4cqw; }
+  .mockup-tribute-divider { width: 6.8cqw; margin: 1.4cqw 0; }
+  .mockup-tribute-poem { font-size: 2cqw; }
+  .mockup-tribute-poem.small-poem { font-size: 1.8cqw; }
+  .mockup-tribute-nickname { font-size: 1.8cqw; margin-top: 0.9cqw; }
+  .mockup-tribute-family { font-size: 1.65cqw; margin-top: 0.45cqw; }
+}
+
 /* Theme: Warm Natural */
 .frame-mockup.theme-warm .frame-border {
   background: linear-gradient(145deg, #b8956a, #c9a87c 15%, #a0804f 40%, #c4a06d 70%, #96783f);

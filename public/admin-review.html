@@ -43,6 +43,11 @@
     <div id="content" style="display:none">
       <div class="admin-card" id="order-card"></div>
 
+      <div class="admin-card" id="fulfillment-card" style="display:none">
+        <h2>What fulfillment receives</h2>
+        <div id="fulfillment"></div>
+      </div>
+
       <div class="admin-card">
         <h2>Their answers</h2>
         <div id="answers"></div>
@@ -120,6 +125,8 @@
           <div class="change-notes"><strong>Customer requested changes:</strong>\n${esc(o.changeRequestNotes)}</div>` : ''}
         `;
 
+        renderFulfillment(o.fulfillment);
+
         document.getElementById('answers').innerHTML = Object.entries(FIELD_LABELS)
           .filter(([key]) => o.fields && o.fields[key])
           .map(([key, label]) => `<div class="admin-row"><strong>${label}</strong><span>${esc(o.fields[key])}</span></div>`)
@@ -137,6 +144,55 @@
           document.getElementById('approve-msg').textContent =
             o.status === 'proof_ready' ? 'Proof has been sent — waiting on the customer.' : 'This order is past the review stage.';
         }
+      }
+
+      // "What fulfillment receives" — the frame, size, colors, and finish the
+      // Luma order will carry, resolved server-side by the same code that
+      // places the order.
+      function swatch(hex) {
+        if (!/^#[0-9a-fA-F]{3,8}$/.test(String(hex))) return '';
+        return `<span style="display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid #ccc;vertical-align:middle;background:${hex}"></span> `;
+      }
+
+      function frow(label, valueHtml) {
+        return `<div class="admin-row"><strong>${label}</strong><span>${valueHtml}</span></div>`;
+      }
+
+      function renderFulfillment(f) {
+        const card = document.getElementById('fulfillment-card');
+        if (!f) { card.style.display = 'none'; return; }
+        card.style.display = '';
+
+        if (f.type === 'digital') {
+          document.getElementById('fulfillment').innerHTML =
+            `<p style="margin:0;color:#6b6359;font-size:0.95rem;">${esc(f.summary)}</p>`;
+          return;
+        }
+
+        const rows = [];
+        if (f.width && f.height) {
+          rows.push(frow('Print size', `${esc(f.width)}&times;${esc(f.height)}&Prime; &middot; ${esc(f.orientation)}`));
+        }
+        if (f.type === 'framed') {
+          rows.push(frow('Frame', `${esc(f.frameLabel || f.frameId || '—')}${f.frameDefaulted && f.frameId ? ' <em>(not offered — fell back to default)</em>' : ''}`));
+        } else {
+          rows.push(frow('Product', esc(f.summary || 'Unframed print')));
+        }
+        if (f.colors && f.colors.mat) {
+          let c = `${swatch(f.colors.mat)}${esc(f.colors.mat)}`;
+          if (f.colors.bevel) c += ` &middot; bevel ${swatch(f.colors.bevel)}${esc(f.colors.bevel)}`;
+          rows.push(frow('Printed mat', c));
+        }
+        if (Array.isArray(f.options) && f.options.length) {
+          rows.push(frow('Finish', f.options.map(esc).join('<br>')));
+        }
+        rows.push(frow('Gift note printout', f.giftNote ? 'Yes — printed and enclosed in the box' : 'None'));
+        if (f.shipping) {
+          const s = f.shipping;
+          rows.push(frow('Ships to', [s.name, s.address1, s.address2, [s.city, s.state, s.zip].filter(Boolean).join(', ')].filter(Boolean).map(esc).join('<br>')));
+        }
+        rows.push(frow('Sent to Luma', 'Only after the customer approves their proof'));
+        document.getElementById('fulfillment').innerHTML = rows.join('');
       }
 
       async function post(url, body) {

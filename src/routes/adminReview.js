@@ -55,6 +55,99 @@ function findOrderByAdminToken(db, token) {
   return db.get('SELECT * FROM orders WHERE admin_token = ?', [token]);
 }
 
+// Human labels for the Luma order-item options placeOrder() sends on every
+// framed order (LUMA_CONFIG.sharedOptions). Keyed by Luma option id so a
+// config change surfaces as "Luma option <id>" instead of a silently wrong
+// label.
+const LUMA_OPTION_LABELS = {
+  64: 'No mat from Luma — the mat is printed into the artwork (full bleed)',
+  74: 'Archival Matte Fine Art Paper',
+  146: 'Acrylic glass glazing',
+  83: 'Hanging wire installed',
+  95: 'Kraft paper backing',
+  148: 'Dry mounted to foam core',
+  36: '0.25in bleed',
+};
+
+/**
+ * What fulfillment will actually receive for this order — resolved with the
+ * SAME code paths lumaOrderApi.placeOrder() uses (frame subcategory, print
+ * orientation), so the review page shows the truth, not a guess.
+ */
+function buildFulfillmentPreview(order, fields) {
+  const sku = order.product_sku || '';
+  let shipping = null;
+  try { shipping = order.shipping_json ? JSON.parse(order.shipping_json) : null; } catch (e) { /* ignore */ }
+
+  if (isDigitalOrder(order)) {
+    return {
+      type: 'digital',
+      summary: 'Digital Keepsake — nothing goes to a print vendor. Approving delivers the download link.',
+    };
+  }
+
+  const lumaApi = require('../services/lumaOrderApi');
+  const { isLandscapeLayout } = require('../services/tributeRenderer');
+
+  // Print dimensions exactly as placeOrder() will send them.
+  const m = sku.match(/(\d+)x(\d+)/);
+  const landscape = isLandscapeLayout((fields && fields.layout) || 'side-by-side');
+  let width = null, height = null;
+  if (m) {
+    const short = Math.min(Number(m[1]), Number(m[2]));
+    const long = Math.max(Number(m[1]), Number(m[2]));
+    width = landscape ? long : short;
+    height = landscape ? short : long;
+  }
+
+  const base = {
+    orientation: landscape ? 'Landscape' : 'Portrait',
+    width,
+    height,
+    colors: (fields && fields.colors) || null,
+    giftNote: !!(fields && fields.giftNote),
+    shipping,
+    printFileReady: !!order.print_file_url,
+  };
+
+  if (sku.startsWith('print-')) {
+    return {
+      ...base,
+      type: 'print-only',
+      summary: 'Unframed print — same archival matte paper, shipped bare for their own frame.',
+      lumaSubcategoryId: lumaApi.LUMA_CONFIG.printOnly.subcategoryId,
+      options: lumaApi.LUMA_CONFIG.printOnly.options.map(id => LUMA_OPTION_LABELS[id] || `Luma option ${id}`),
+    };
+  }
+
+  // Framed: the frame the customer chose (falls back to the template default,
+  // exactly like placeOrder). Frame color/profile is baked into the Luma
+  // subcategory.
+  const frameId = (fields && (fields.frameChoice || fields.frame)) || null;
+  let frameLabel = null;
+  let frameDefaulted = false;
+  const tmpl = loadTemplate(order.template_id);
+  const fo = tmpl && tmpl.frameOptions;
+  if (fo && Array.isArray(fo.groups)) {
+    const all = fo.groups.reduce((acc, g) => acc.concat(g.choices || []), []);
+    const chosen = all.find(c => c.id === frameId);
+    const fallback = all.find(c => c.id === fo.default) || all[0];
+    frameDefaulted = !chosen;
+    const effective = chosen || fallback;
+    if (effective) frameLabel = effective.label || effective.id;
+  }
+
+  return {
+    ...base,
+    type: 'framed',
+    frameId,
+    frameLabel,
+    frameDefaulted,
+    lumaSubcategoryId: lumaApi.resolveFrameSubcategory(order.template_id, frameId),
+    options: lumaApi.LUMA_CONFIG.sharedOptions.map(id => LUMA_OPTION_LABELS[id] || `Luma option ${id}`),
+  };
+}
+
 /**
  * GET /api/admin/review/:token/data
  */
@@ -66,6 +159,14 @@ router.get('/review/:token/data', (req, res) => {
   }
 
   const fields = order.fields_json ? JSON.parse(order.fields_json) : {};
+
+  let fulfillment = null;
+  try {
+    fulfillment = buildFulfillmentPreview(order, fields);
+  } catch (err) {
+    // The preview is informational — a resolution error must never block review.
+    console.error(`Fulfillment preview failed for order ${order.id}:`, err.message);
+  }
 
   res.json({
     orderId: order.id,
@@ -79,6 +180,7 @@ router.get('/review/:token/data', (req, res) => {
     poemText: order.poem_text || '',
     proofUrl: order.proof_url,
     fields,
+    fulfillment,
     changeRequestNotes: order.change_request_notes || null,
     reviewedAt: order.reviewed_at || null,
     createdAt: order.created_at,

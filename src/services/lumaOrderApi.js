@@ -417,5 +417,6 @@ module.exports = {
   subscribeWebhook,
   buildImageUrl,
   placeOrder,
+  resolveFrameSubcategory,
   LUMA_CONFIG,
 };
