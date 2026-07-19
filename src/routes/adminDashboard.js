@@ -132,6 +132,12 @@ router.get('/api/orders/:id', requireAdmin, (req, res) => {
     'SELECT event_type, data_json, created_at FROM order_events WHERE order_id = ? ORDER BY id ASC',
     [o.id]
   );
+  // Fulfillment audit trail: the exact payload sent to Luma and their response,
+  // one row per submission attempt (written by lumaOrderApi.placeOrder).
+  const lumaOrders = db.all(
+    'SELECT luma_order_number, status, error_message, request_json, response_json, created_at FROM luma_orders WHERE order_id = ? ORDER BY id ASC',
+    [o.id]
+  );
   const { customerName, petName } = summarize(o);
   let shipping = null;
   try { shipping = o.shipping_json ? JSON.parse(o.shipping_json) : null; } catch (e) { /* ignore */ }
@@ -160,6 +166,14 @@ router.get('/api/orders/:id', requireAdmin, (req, res) => {
       updatedAt: o.updated_at,
     },
     events: events.map(e => ({ type: e.event_type, data: e.data_json, at: e.created_at })),
+    lumaOrders: lumaOrders.map(l => ({
+      lumaOrderNumber: l.luma_order_number,
+      status: l.status,
+      errorMessage: l.error_message,
+      request: l.request_json,
+      response: l.response_json,
+      at: l.created_at,
+    })),
   });
 });
 

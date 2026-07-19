@@ -104,7 +104,8 @@
     document.querySelectorAll('.row').forEach(r => r.classList.toggle('sel', r.dataset.id === id));
     const r = await fetch('/admin/api/orders/' + encodeURIComponent(id));
     if (r.status === 401) { location.href = '/admin/login'; return; }
-    const { order: o, events } = await r.json();
+    const { order: o, events, lumaOrders = [] } = await r.json();
+    const pretty = (j) => { try { return JSON.stringify(JSON.parse(j), null, 2); } catch (e) { return j || ''; } };
     const ship = o.shipping;
     const shipStr = ship ? [ship.name, ship.address1, ship.address2, [ship.city, ship.state, ship.zip].filter(Boolean).join(', ')].filter(Boolean).join('<br>') : '<span class="muted">— (digital or not yet paid)</span>';
     const links = [];
@@ -137,6 +138,19 @@
         <span id="syncResult" class="muted" style="margin-left:8px"></span>
       </div>
       <div class="section"><h3>Poem</h3><div style="white-space:pre-wrap;font-size:.88rem">${esc(o.poemText||'—')}</div></div>
+      ${lumaOrders.length ? `
+      <div class="section"><h3>Luma submissions (${lumaOrders.length})</h3>
+        ${lumaOrders.map(l => `
+          <div style="margin-bottom:10px">
+            <div style="font-size:.85rem;margin-bottom:4px">
+              ${esc(l.at)} · <strong>${esc(l.status)}</strong>${l.lumaOrderNumber ? ` · Luma #${esc(l.lumaOrderNumber)}` : ''}${l.errorMessage ? ` · <span style="color:#e5a3a3">${esc(l.errorMessage)}</span>` : ''}
+            </div>
+            <details><summary style="cursor:pointer;font-size:.8rem">Payload sent to Luma</summary>
+              <pre style="font-size:.72rem;overflow-x:auto;background:#1a1714;padding:8px;border-radius:6px">${esc(pretty(l.request))}</pre></details>
+            ${l.response ? `<details><summary style="cursor:pointer;font-size:.8rem">Luma response</summary>
+              <pre style="font-size:.72rem;overflow-x:auto;background:#1a1714;padding:8px;border-radius:6px">${esc(pretty(l.response))}</pre></details>` : ''}
+          </div>`).join('')}
+      </div>` : ''}
       <div class="section"><h3>Full timeline (${events.length})</h3>
         <ul class="timeline">${events.map(e => `<li><span class="t">${esc(e.at)}</span><span class="ev">${esc(e.type.replace(/_/g,' '))}</span></li>`).join('')}</ul>
       </div>`;

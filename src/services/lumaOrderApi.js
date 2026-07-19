@@ -368,8 +368,48 @@ async function placeOrder(orderId, db) {
     [orderId, JSON.stringify(payload)]
   );
 
-  // Submit to Luma
-  const result = await createOrder(payload);
+  // Full audit copy to the admin inbox — the exact payload Luma received and
+  // what they returned, on success AND every failure mode. The same record
+  // lives in luma_orders.request_json / response_json; the email is the
+  // off-site copy. Best-effort: an email hiccup must never fail (or
+  // duplicate) a submission.
+  const shortId = orderId.substring(0, 8).toUpperCase();
+  const emailAudit = async (subject, headline, response) => {
+    try {
+      const emailService = require('./emailService');
+      await emailService.sendAdminAlert(
+        subject,
+        `${headline}\n\n` +
+        `Order ID: ${orderId}\n\n` +
+        `=== Payload sent to Luma (POST /api/v1/orders) ===\n` +
+        `${JSON.stringify(payload, null, 2)}\n\n` +
+        `=== Luma response ===\n` +
+        `${JSON.stringify(response, null, 2)}`
+      );
+    } catch (e) {
+      console.error(`Luma audit email failed for order ${orderId}:`, e.message);
+    }
+  };
+
+  // Submit to Luma. A transport-level failure (network, 4xx/5xx) still gets
+  // the audit email — the payload is what David needs to retry by hand.
+  let result;
+  try {
+    result = await createOrder(payload);
+  } catch (err) {
+    db.run(
+      `UPDATE luma_orders SET status = 'error', error_message = ?,
+       response_json = ?, updated_at = datetime('now')
+       WHERE order_id = ? AND status = 'pending'`,
+      [err.message, JSON.stringify(err.body || null), orderId]
+    );
+    await emailAudit(
+      `Luma order FAILED — ${shortId}`,
+      `The Luma API call failed: ${err.message}`,
+      err.body || { error: err.message }
+    );
+    throw err;
+  }
   const orderNumber = result.orderNumber || result.OrderNumber;
 
   if (!orderNumber) {
@@ -380,8 +420,19 @@ async function placeOrder(orderId, db) {
        WHERE order_id = ? AND status = 'pending'`,
       [errMsg, JSON.stringify(result), orderId]
     );
+    await emailAudit(
+      `Luma order FAILED — ${shortId}`,
+      `Luma rejected the order submission: ${errMsg}`,
+      result
+    );
     throw new Error(`Luma order creation failed: ${errMsg}`);
   }
+
+  await emailAudit(
+    `Luma order placed — ${shortId} (Luma #${orderNumber})`,
+    `Order ${shortId} was submitted to Luma Prints as order #${orderNumber}.`,
+    result
+  );
 
   // Update tracking with Luma's order number
   db.run(
