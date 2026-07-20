@@ -287,6 +287,9 @@ async function start() {
   app.get('/pet-memorial-gifts', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'pet-memorial-gifts.html'));
   });
+  app.get('/the-writing', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'the-writing.html'));
+  });
   app.get('/sympathy-gifts', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'sympathy-gifts.html'));
   });

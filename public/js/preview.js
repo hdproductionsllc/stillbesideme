@@ -1024,6 +1024,21 @@
         }
       }
 
+      if (fitted) {
+        // Grow a short poem (up to ~1.3x base) to fill the space so it doesn't
+        // sit small and adrift in a large or short-and-wide panel. Mirrors the
+        // print/proof renderer (tributeRenderer buildTributeSvg) so the preview
+        // shows the same comfortable size the customer will actually receive.
+        // fill to 90% of the available zone keeps a comfortable margin.
+        var growMax = poemBaseSize * 1.3;
+        var growAvail = h - margin * 2 - headerH - pad * 2 - footerH;
+        for (var gs = Math.round(poemBaseSize) + 1; gs <= growMax; gs += 1) {
+          var gm = measurePoem(gs);
+          if (gm.totalH > growAvail * 0.9) break;
+          poem = gm;
+        }
+      }
+
       if (!fitted) {
         var last = tiers[tiers.length - 1];
         margin = h * last.marginPct;
