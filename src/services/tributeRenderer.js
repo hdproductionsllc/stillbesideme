@@ -238,13 +238,32 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
     // (nickname/family). At ~0.009·w the full tribute always fits; landscape
     // panels are tall so they never reach this floor and keep their larger size.
     const floorFont = Math.max(8, Math.round(width * 0.009));
+    // Cap how large the poem may grow, for aesthetic hierarchy — it stays well
+    // below the name (0.065·w). Without an upward pass a short poem floats small
+    // and adrift in a large panel, most noticeable on the smaller print sizes
+    // (the 8×10 the customer flagged), where the width-relative base is
+    // physically tiny. fillH leaves a comfortable margin above the footer.
+    const maxFont = Math.max(poemFontSize, Math.round(width * 0.042));
+    const fillH = poemAvailH * 0.9;
     let fit = measurePoem(poemFontSize);
     let poemSize = poemFontSize;
-    for (let fs = poemFontSize; fs >= floorFont; fs -= 1) {
-      const m = measurePoem(fs);
-      fit = m;
-      poemSize = fs;
-      if (m.total <= poemAvailH) break;
+    if (fit.total <= poemAvailH) {
+      // Fits at the base size — grow it (up to the cap, or until it fills the
+      // space) so short poems read at a comfortable, deliberate size.
+      for (let fs = poemFontSize + 1; fs <= maxFont; fs += 1) {
+        const m = measurePoem(fs);
+        if (m.total > fillH) break;
+        fit = m;
+        poemSize = fs;
+      }
+    } else {
+      // Too long for the base size — shrink to fit (never clipped) to a legible floor.
+      for (let fs = poemFontSize - 1; fs >= floorFont; fs -= 1) {
+        const m = measurePoem(fs);
+        fit = m;
+        poemSize = fs;
+        if (m.total <= poemAvailH) break;
+      }
     }
 
     for (const line of fit.lines) {
