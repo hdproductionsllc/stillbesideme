@@ -476,8 +476,19 @@ async function start() {
   // content-change dates. Resolved once at boot and cached; if git isn't
   // available in the container we omit lastmod entirely rather than emit a
   // date we know is wrong (the element is optional).
+  // Prefer the committed manifest (src/data/lastmod.json, written by
+  // `npm run lastmod`) because git is not installed in the Railway runtime
+  // image. Fall back to a live git call so local dev stays accurate without
+  // running the build step, and omit the element entirely if neither works.
+  let lastmodManifest = {};
+  try {
+    lastmodManifest = require('./src/data/lastmod.json');
+  } catch (e) {
+    console.warn('Sitemap: src/data/lastmod.json missing — run `npm run lastmod`. Falling back to git.');
+  }
   const gitLastmodCache = new Map();
   const lastmodFor = (relPath) => {
+    if (lastmodManifest[relPath]) return lastmodManifest[relPath];
     if (gitLastmodCache.has(relPath)) return gitLastmodCache.get(relPath);
     let value = null;
     try {

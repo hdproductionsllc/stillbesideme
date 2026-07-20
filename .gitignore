@@ -17,8 +17,10 @@ still-beside-me-claude-code-spec.md
 tasks/
 cache/
 
-# Local runtime data (DB, backups, session files) — contains customer PII; repo is public
-data/
+# Local runtime data (DB, backups, session files) — contains customer PII; repo is public.
+# Root-anchored: a bare "data/" also matched src/data/, which holds committed
+# app data (templates, sitemap lastmod manifest).
+/data/
 
 # Local QA harness
 run_qa.js
