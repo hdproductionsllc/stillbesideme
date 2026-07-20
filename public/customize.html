@@ -40,6 +40,12 @@
   <!-- Customizer -->
   <main class="customizer">
 
+    <!-- The page had no H1 at all. It's noindex, so this is an accessibility
+         fix rather than an SEO one: screen readers and the browser's heading
+         outline had nothing naming the step the visitor is on. Visually hidden
+         because the design deliberately leads with the frame preview. -->
+    <h1 class="sr-only">Create your pet's memorial tribute</h1>
+
     <!-- Preview Pane (60% desktop, sticky top mobile) -->
     <div class="preview-pane">
       <!-- Stage = the part that stays pinned on mobile (frame + zoom/swap).

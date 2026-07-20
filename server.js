@@ -100,12 +100,23 @@ async function start() {
     crossOriginEmbedderPolicy: false,
   }));
 
-  // Rate limiting — general
+  // Rate limiting — general.
+  //
+  // Skips GET/HEAD requests for public pages and static assets. This limiter is
+  // abuse protection for the write/expensive paths; applying it to reads meant a
+  // single visitor loading ~15 subresources per page — or Googlebot crawling
+  // from one IP — could burn 200 requests in minutes and start receiving 429s.
+  // Google reads sustained 429s as a server-health signal and throttles crawl
+  // rate, so this was quietly capping how much of the site could get indexed.
+  // Non-GET requests and everything under /api are still fully limited, and the
+  // per-route limiters below (poems, uploads, checkout) are the real defense.
   const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 200,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) =>
+      (req.method === 'GET' || req.method === 'HEAD') && !req.path.startsWith('/api/'),
   });
   app.use(generalLimiter);
 
@@ -258,6 +269,37 @@ async function start() {
   });
   // ── end discontinued LFH block ────────────────────────────────────────
 
+  // Every page is reachable at BOTH /page and /page.html, because express.static
+  // serves files by their raw filename. Self-referencing canonicals already tell
+  // Google which one counts, but a canonical is a hint and a 301 is a directive —
+  // this collapses the duplicate outright. Registered before express.static so
+  // the redirect wins over the file. Explicit list rather than a blanket
+  // ".html -> strip extension" rule: /404.html and the token-served admin pages
+  // have no clean-URL equivalent and would redirect into a 404.
+  const CLEAN_URL_PAGES = [
+    'index', 'the-writing', 'pet-memorial-gifts', 'sympathy-gifts', 'memorial-gifts',
+    'dog-memorial-gifts', 'cat-memorial-gifts', 'sympathy-message-helper',
+    'pet-memorial-poem-generator', 'rainbow-bridge-poem-for-dogs',
+    'privacy-policy', 'terms', 'refund-policy', 'shipping-policy', 'contact', 'about',
+  ];
+  for (const page of CLEAN_URL_PAGES) {
+    app.get(`/${page}.html`, (req, res) =>
+      res.redirect(301, page === 'index' ? '/' : `/${page}`));
+  }
+  const CLEAN_URL_BLOG = [
+    'how-to-write-sympathy-card', 'first-year-after-losing-pet',
+    'personalized-memorial-gifts-vs-flowers', 'what-to-get-someone-who-lost-a-dog',
+    'pet-memorial-poems', 'what-to-send-instead-of-flowers', 'best-memorial-gifts-that-last',
+  ];
+  app.get('/blog/index.html', (req, res) => res.redirect(301, '/blog'));
+  // Requesting the error page directly used to answer 200 — a soft 404, which
+  // Google flags. Serve the same page with the status it describes.
+  app.get('/404.html', (req, res) =>
+    res.status(404).sendFile(path.join(__dirname, 'public', '404.html')));
+  for (const post of CLEAN_URL_BLOG) {
+    app.get(`/blog/${post}.html`, (req, res) => res.redirect(301, `/blog/${post}`));
+  }
+
   // Client-side analytics config — /js/env.js exposes ONLY the public ad/pixel
   // IDs that are actually set. Registered before express.static so it always
   // wins over any static file of the same name. Always valid JS, even when
@@ -272,8 +314,31 @@ async function start() {
     res.send(`window.SBM_ENV=${JSON.stringify(env)};`);
   });
 
-  // Static files
-  app.use(express.static(path.join(__dirname, 'public')));
+  // Static files.
+  //
+  // Cache-Control by type: images/fonts/favicons are effectively immutable and
+  // get a long TTL; CSS and JS get a short one because they ship unhashed
+  // filenames (a long TTL would strand users on stale styles after a deploy);
+  // HTML is always revalidated so copy fixes go live immediately. Before this,
+  // everything was max-age=0 — every asset cost a revalidation round-trip on
+  // every page view, which is a direct hit to repeat-visit load time.
+  app.use(express.static(path.join(__dirname, 'public'), {
+    // Don't 301 /blog -> /blog/. express.static's directory redirect fired
+    // before the explicit app.get('/blog') route below, so the canonical URL
+    // (/blog, which is what the page's own canonical tag and the sitemap both
+    // declare) answered with a redirect instead of the page. Falling through
+    // to the route serves it directly at 200.
+    redirect: false,
+    setHeaders: (res, filePath) => {
+      if (/\.(jpg|jpeg|png|webp|avif|gif|svg|ico|woff2?|ttf)$/i.test(filePath)) {
+        res.setHeader('Cache-Control', 'public, max-age=2592000'); // 30 days
+      } else if (/\.(css|js)$/i.test(filePath)) {
+        res.setHeader('Cache-Control', 'public, max-age=3600');    // 1 hour
+      } else if (/\.html?$/i.test(filePath)) {
+        res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+      }
+    },
+  }));
 
   // Restrict /uploads — only authenticated sessions can access uploaded photos
   app.use('/uploads', (req, res, next) => {
@@ -360,6 +425,10 @@ async function start() {
     res.sendFile(path.join(__dirname, 'public', 'contact.html'));
   });
 
+  app.get('/about', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'about.html'));
+  });
+
   // Contact form submission
   app.post('/api/contact', rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -371,24 +440,17 @@ async function start() {
       return res.status(400).json({ error: 'Name, email, and message are required.' });
     }
     try {
-      const nodemailer = require('nodemailer');
-      const adminEmail = process.env.ADMIN_EMAIL || 'hello@stillbesideme.com';
-      if (process.env.SMTP_HOST) {
-        const transporter = nodemailer.createTransport({
-          host: process.env.SMTP_HOST,
-          port: parseInt(process.env.SMTP_PORT) || 587,
-          auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-        });
-        await transporter.sendMail({
-          from: process.env.EMAIL_FROM || `Still Beside Me <${adminEmail}>`,
-          to: adminEmail,
-          replyTo: email,
-          subject: `Contact Form: ${name}${orderNumber ? ` (Order #${orderNumber})` : ''}`,
-          text: `Name: ${name}\nEmail: ${email}\nOrder: ${orderNumber || 'N/A'}\n\nMessage:\n${message}`,
-        });
-      } else {
-        console.log('[Contact Form]', { name, email, orderNumber, message });
-      }
+      // Goes through emailService, NOT a raw nodemailer transport. Railway's
+      // network drops outbound SMTP, so the direct-transport version of this
+      // handler was timing out and every contact-form message was being lost.
+      // emailService routes Resend over its HTTPS API and falls back to logging
+      // when no transport is configured.
+      const emailService = require('./src/services/emailService');
+      await emailService.sendAdminAlert(
+        `Contact form: ${name}${orderNumber ? ` (Order #${orderNumber})` : ''}`,
+        `Name: ${name}\nEmail: ${email}\nOrder: ${orderNumber || 'N/A'}\n\nMessage:\n${message}\n\n` +
+        `Reply directly to ${email}.`
+      );
       res.json({ success: true });
     } catch (err) {
       console.error('Contact form error:', err);
@@ -405,155 +467,160 @@ async function start() {
   });
 
   // XML Sitemap
+  //
+  // lastmod comes from the file's last GIT COMMIT date, not its mtime. On
+  // Railway every deploy re-checks-out the repo, so mtime is the deploy
+  // timestamp — which made all 23 URLs report the same lastmod, changing on
+  // every deploy whether or not any content changed. That is precisely the
+  // pattern Google learns to distrust and then ignores. Git dates are the real
+  // content-change dates. Resolved once at boot and cached; if git isn't
+  // available in the container we omit lastmod entirely rather than emit a
+  // date we know is wrong (the element is optional).
+  const gitLastmodCache = new Map();
+  const lastmodFor = (relPath) => {
+    if (gitLastmodCache.has(relPath)) return gitLastmodCache.get(relPath);
+    let value = null;
+    try {
+      const out = require('child_process')
+        .execFileSync('git', ['log', '-1', '--format=%cs', '--', `public/${relPath}`], {
+          cwd: __dirname, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000,
+        })
+        .trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(out)) value = out;
+    } catch (e) {
+      value = null; // git unavailable (or file untracked) — omit the element
+    }
+    gitLastmodCache.set(relPath, value);
+    return value;
+  };
+
   app.get('/sitemap.xml', (req, res) => {
     const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
-    // lastmod = real file modification date; fixed launch date for anything without a file
-    const SITEMAP_FALLBACK_DATE = '2026-06-01';
     const lastmod = (relPath) => {
-      try {
-        return fs.statSync(path.join(__dirname, 'public', relPath)).mtime.toISOString().split('T')[0];
-      } catch (e) {
-        return SITEMAP_FALLBACK_DATE;
-      }
+      const d = lastmodFor(relPath);
+      return d ? `
+    <lastmod>${d}</lastmod>` : '';
     };
     res.set('Content-Type', 'application/xml');
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>${baseUrl}/</loc>
-    <lastmod>${lastmod('index.html')}</lastmod>
+    <loc>${baseUrl}/</loc>${lastmod('index.html')}
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>${baseUrl}/the-writing</loc>
-    <lastmod>${lastmod('the-writing.html')}</lastmod>
+    <loc>${baseUrl}/the-writing</loc>${lastmod('the-writing.html')}
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>${baseUrl}/pet-memorial-gifts</loc>
-    <lastmod>${lastmod('pet-memorial-gifts.html')}</lastmod>
+    <loc>${baseUrl}/pet-memorial-gifts</loc>${lastmod('pet-memorial-gifts.html')}
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>${baseUrl}/sympathy-gifts</loc>
-    <lastmod>${lastmod('sympathy-gifts.html')}</lastmod>
+    <loc>${baseUrl}/sympathy-gifts</loc>${lastmod('sympathy-gifts.html')}
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>${baseUrl}/memorial-gifts</loc>
-    <lastmod>${lastmod('memorial-gifts.html')}</lastmod>
+    <loc>${baseUrl}/memorial-gifts</loc>${lastmod('memorial-gifts.html')}
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>${baseUrl}/dog-memorial-gifts</loc>
-    <lastmod>${lastmod('dog-memorial-gifts.html')}</lastmod>
+    <loc>${baseUrl}/dog-memorial-gifts</loc>${lastmod('dog-memorial-gifts.html')}
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>${baseUrl}/cat-memorial-gifts</loc>
-    <lastmod>${lastmod('cat-memorial-gifts.html')}</lastmod>
+    <loc>${baseUrl}/cat-memorial-gifts</loc>${lastmod('cat-memorial-gifts.html')}
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>${baseUrl}/privacy-policy</loc>
-    <lastmod>${lastmod('privacy-policy.html')}</lastmod>
+    <loc>${baseUrl}/privacy-policy</loc>${lastmod('privacy-policy.html')}
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>${baseUrl}/terms</loc>
-    <lastmod>${lastmod('terms.html')}</lastmod>
+    <loc>${baseUrl}/terms</loc>${lastmod('terms.html')}
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>${baseUrl}/refund-policy</loc>
-    <lastmod>${lastmod('refund-policy.html')}</lastmod>
+    <loc>${baseUrl}/refund-policy</loc>${lastmod('refund-policy.html')}
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>${baseUrl}/shipping-policy</loc>
-    <lastmod>${lastmod('shipping-policy.html')}</lastmod>
+    <loc>${baseUrl}/shipping-policy</loc>${lastmod('shipping-policy.html')}
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>${baseUrl}/contact</loc>
-    <lastmod>${lastmod('contact.html')}</lastmod>
+    <loc>${baseUrl}/about</loc>${lastmod('about.html')}
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/contact</loc>${lastmod('contact.html')}
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>${baseUrl}/blog</loc>
-    <lastmod>${lastmod('blog/index.html')}</lastmod>
+    <loc>${baseUrl}/blog</loc>${lastmod('blog/index.html')}
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>${baseUrl}/blog/how-to-write-sympathy-card</loc>
-    <lastmod>${lastmod('blog/how-to-write-sympathy-card.html')}</lastmod>
+    <loc>${baseUrl}/blog/how-to-write-sympathy-card</loc>${lastmod('blog/how-to-write-sympathy-card.html')}
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>${baseUrl}/blog/first-year-after-losing-pet</loc>
-    <lastmod>${lastmod('blog/first-year-after-losing-pet.html')}</lastmod>
+    <loc>${baseUrl}/blog/first-year-after-losing-pet</loc>${lastmod('blog/first-year-after-losing-pet.html')}
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>${baseUrl}/blog/personalized-memorial-gifts-vs-flowers</loc>
-    <lastmod>${lastmod('blog/personalized-memorial-gifts-vs-flowers.html')}</lastmod>
+    <loc>${baseUrl}/blog/personalized-memorial-gifts-vs-flowers</loc>${lastmod('blog/personalized-memorial-gifts-vs-flowers.html')}
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>${baseUrl}/blog/what-to-get-someone-who-lost-a-dog</loc>
-    <lastmod>${lastmod('blog/what-to-get-someone-who-lost-a-dog.html')}</lastmod>
+    <loc>${baseUrl}/blog/what-to-get-someone-who-lost-a-dog</loc>${lastmod('blog/what-to-get-someone-who-lost-a-dog.html')}
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>${baseUrl}/blog/pet-memorial-poems</loc>
-    <lastmod>${lastmod('blog/pet-memorial-poems.html')}</lastmod>
+    <loc>${baseUrl}/blog/pet-memorial-poems</loc>${lastmod('blog/pet-memorial-poems.html')}
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>${baseUrl}/blog/what-to-send-instead-of-flowers</loc>
-    <lastmod>${lastmod('blog/what-to-send-instead-of-flowers.html')}</lastmod>
+    <loc>${baseUrl}/blog/what-to-send-instead-of-flowers</loc>${lastmod('blog/what-to-send-instead-of-flowers.html')}
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>${baseUrl}/blog/best-memorial-gifts-that-last</loc>
-    <lastmod>${lastmod('blog/best-memorial-gifts-that-last.html')}</lastmod>
+    <loc>${baseUrl}/blog/best-memorial-gifts-that-last</loc>${lastmod('blog/best-memorial-gifts-that-last.html')}
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>${baseUrl}/sympathy-message-helper</loc>
-    <lastmod>${lastmod('sympathy-message-helper.html')}</lastmod>
+    <loc>${baseUrl}/sympathy-message-helper</loc>${lastmod('sympathy-message-helper.html')}
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>${baseUrl}/pet-memorial-poem-generator</loc>
-    <lastmod>${lastmod('pet-memorial-poem-generator.html')}</lastmod>
+    <loc>${baseUrl}/pet-memorial-poem-generator</loc>${lastmod('pet-memorial-poem-generator.html')}
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>${baseUrl}/rainbow-bridge-poem-for-dogs</loc>
-    <lastmod>${lastmod('rainbow-bridge-poem-for-dogs.html')}</lastmod>
+    <loc>${baseUrl}/rainbow-bridge-poem-for-dogs</loc>${lastmod('rainbow-bridge-poem-for-dogs.html')}
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -689,8 +756,19 @@ async function start() {
     res.sendFile(path.join(__dirname, 'public', 'story.html'));
   });
 
-  // Serve proof images from output directory
-  app.use('/output', express.static(OUTPUT_DIR));
+  // Serve proof images, print files, and note cards from the output directory.
+  //
+  // This mount is deliberately UNAUTHENTICATED: Luma's servers fetch the print
+  // file and the enclosed note card anonymously when placing an order, so a
+  // login gate here would break fulfillment. The correct control is therefore
+  // "don't index", not "don't serve" — X-Robots-Tag keeps a customer's tribute
+  // artwork (and the sender's private gift note) out of search results even if
+  // a URL leaks, and robots.txt Disallows /output/ so it is never crawled.
+  app.use('/output', express.static(OUTPUT_DIR, {
+    setHeaders: (res) => {
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow, noimageindex');
+    },
+  }));
 
   // Email signup — captured into our own DB first (the source of truth, on the
   // /data volume, so no signup is ever lost), then the admin is notified, then

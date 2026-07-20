@@ -1,6 +1,25 @@
 User-agent: *
 Allow: /
+
+# Internal APIs and customer uploads
 Disallow: /api/
 Disallow: /uploads/
+
+# Rendered customer artwork. /output must stay publicly fetchable — Luma's
+# servers fetch print files and note cards anonymously — so it is excluded
+# from crawling here and served with X-Robots-Tag: noindex, not locked down.
+Disallow: /output/
+
+# Admin surfaces
+Disallow: /admin
+Disallow: /admin/
+
+# Tokenized, per-customer pages. These carry noindex too; disallowing them
+# keeps crawlers from fetching links that get texted and printed on cards.
+Disallow: /order/
+Disallow: /proof/
+Disallow: /tribute/
+Disallow: /story/
+Disallow: /download/
 
 Sitemap: https://www.stillbesideme.com/sitemap.xml
