@@ -426,6 +426,12 @@ async function start() {
     <priority>1.0</priority>
   </url>
   <url>
+    <loc>${baseUrl}/the-writing</loc>
+    <lastmod>${lastmod('the-writing.html')}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
     <loc>${baseUrl}/pet-memorial-gifts</loc>
     <lastmod>${lastmod('pet-memorial-gifts.html')}</lastmod>
     <changefreq>weekly</changefreq>
