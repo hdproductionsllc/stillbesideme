@@ -1632,6 +1632,64 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
   letter-spacing: 0.02em;
 }
 
+/* Secondary gift/sympathy entry path — deliberately quieter than the primary
+   self-purchase CTA above it. */
+.hero-secondary {
+  margin-top: var(--space-md);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  color: #9B9590;
+}
+
+.hero-secondary a {
+  color: var(--color-warm);
+  border-bottom: 1px solid rgba(196, 168, 130, 0.4);
+  padding-bottom: 1px;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.hero-secondary a:hover {
+  color: #d8bd93;
+  border-bottom-color: #d8bd93;
+}
+
+/* Honest counter-signal near the "Our promise" CTA — we build trust by NOT
+   faking reviews. Reuses the muted, centered subline treatment. */
+.honesty-note {
+  max-width: 640px;
+  margin: var(--space-2xl) auto 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--color-muted);
+}
+
+.honesty-note a {
+  color: var(--color-warm);
+  border-bottom: 1px solid rgba(196, 168, 130, 0.4);
+  padding-bottom: 1px;
+  white-space: nowrap;
+}
+
+.honesty-note a:hover {
+  color: #b89a74;
+  border-bottom-color: #b89a74;
+}
+
+/* Reversal trust strip under the final CTA — same trust-item treatment as the
+   hero, centered on the dark band. */
+.trust-bar-center {
+  justify-content: center;
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.final-cta .trust-bar {
+  margin-top: var(--space-2xl);
+}
+
 /* ============================================================
    BLOG – Index page and article pages
    ============================================================ */

@@ -40,7 +40,7 @@ router.post('/', async (req, res) => {
 
       case 'checkout.session.expired': {
         const session = event.data.object;
-        handleCheckoutExpired(session, db);
+        await handleCheckoutExpired(session, db);
         break;
       }
 
@@ -277,8 +277,13 @@ async function handleCheckoutCompleted(session, db) {
 
 /**
  * Handle expired checkout session (customer abandoned).
+ *
+ * Besides cancelling the order, this sends ONE gentle recovery email inviting
+ * the customer to finish their tribute — when an email is available. Email is
+ * captured at Stripe (guest checkout), so on expiry it exists only if the
+ * customer got far enough to enter it; without one, we no-op gracefully.
  */
-function handleCheckoutExpired(session, db) {
+async function handleCheckoutExpired(session, db) {
   const orderId = session.metadata?.orderId;
   if (!orderId) return;
 
@@ -296,6 +301,69 @@ function handleCheckoutExpired(session, db) {
   );
 
   console.log(`Order ${orderId} cancelled (checkout expired)`);
+
+  // Gentle abandoned-checkout recovery. This person is grieving — one warm,
+  // no-pressure invitation to finish, never a nudge.
+  //
+  // Email comes from the Stripe session (entered at checkout), falling back to
+  // any email already stored on the order. No email → nothing to send.
+  const email = session.customer_details?.email || order.email || '';
+  if (!email) {
+    console.log(`Order ${orderId}: no customer email on expiry — recovery email skipped`);
+    return;
+  }
+
+  // Idempotency: never send this twice for the same order. The status flip to
+  // 'cancelled' above already gates re-entry (a duplicate expired event finds
+  // the order no longer 'pending_payment' and returns early), but guard on an
+  // explicit 'recovery_email_sent' marker too so a manual replay or any future
+  // caller of this function can never double-send.
+  const alreadySent = db.get(
+    `SELECT 1 FROM order_events WHERE order_id = ? AND event_type = 'recovery_email_sent' LIMIT 1`,
+    [orderId]
+  );
+  if (alreadySent) {
+    console.log(`Order ${orderId}: recovery email already sent — skipping`);
+    return;
+  }
+
+  // The webhook must NEVER throw because of email — wrap the send and log
+  // failures as an order_event so a delivery problem stays visible without
+  // breaking the pipeline.
+  try {
+    const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
+    // Honest resume path: there is no persisted per-order resume token, so we
+    // link back to the customizer for this order's template (the same URL
+    // Stripe uses as its cancel_url). The customizer restores an in-progress
+    // design from the browser session when the customer returns, so this is a
+    // genuine "pick it back up" — not a saved-cart promise we can't keep.
+    const resumeUrl = `${baseUrl}/customize/${order.template_id}`;
+
+    // Pet name is best-effort warmth only — a malformed fields_json must never
+    // stop the email from going out.
+    let petName = '';
+    try {
+      const fields = order.fields_json ? JSON.parse(order.fields_json) : {};
+      petName = fields.petName || '';
+    } catch (e) {
+      // Non-fatal — send without a name.
+    }
+
+    const emailService = require('../services/emailService');
+    await emailService.sendAbandonedCheckoutRecovery(email, { petName }, resumeUrl);
+
+    db.run(
+      `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+      [orderId, 'recovery_email_sent', JSON.stringify({ email })]
+    );
+    console.log(`Order ${orderId}: abandoned-checkout recovery email sent to ${email}`);
+  } catch (err) {
+    console.error(`Failed to send recovery email for order ${orderId}:`, err.message);
+    db.run(
+      `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+      [orderId, 'recovery_email_failed', JSON.stringify({ error: err.message })]
+    );
+  }
 }
 
 /**

@@ -211,6 +211,77 @@ async function sendOrderConfirmation(to, orderData, statusPageUrl, giftUrl = nul
 }
 
 /**
+ * Gentle recovery email for an abandoned Stripe Checkout.
+ *
+ * Sent at most once, from handleCheckoutExpired, when a customer got far enough
+ * to leave an email at Stripe but didn't complete payment. This person is
+ * grieving, so the copy is an open door, never a nudge: no urgency, no
+ * countdown, no discount code, no "you left something in your cart." Just the
+ * real promises and a warm link back to finish whenever they feel ready.
+ *
+ * @param {string} to
+ * @param {object} orderData — { petName }
+ * @param {string} resumeUrl — absolute link back to the customizer for this
+ *        order's template (the customizer restores an in-progress design from
+ *        the browser session, so it's an honest "pick it back up").
+ */
+async function sendAbandonedCheckoutRecovery(to, orderData, resumeUrl) {
+  const esc = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  const petName = orderData && orderData.petName ? String(orderData.petName).trim() : '';
+  const safePet = esc(petName);
+
+  const heading = safePet
+    ? `${safePet}'s tribute is here whenever you're ready`
+    : `Your tribute is here whenever you're ready`;
+
+  const opening = safePet
+    ? `You started a tribute for ${safePet}, and it's still here for you. There's no rush at all &mdash; take all the time you need.`
+    : `You started a tribute, and it's still here for you. There's no rush at all &mdash; take all the time you need.`;
+
+  const html = wrapHtml(`
+    <div style="background:#fff;border-radius:12px;padding:32px;margin-bottom:24px;">
+      <h1 style="font-family:Georgia,serif;font-size:1.6rem;font-weight:400;color:#2C2C2C;text-align:center;margin:0 0 24px;">
+        ${heading}
+      </h1>
+
+      <p style="color:#2C2C2C;line-height:1.6;margin-bottom:16px;">
+        ${opening}
+      </p>
+
+      <p style="color:#2C2C2C;line-height:1.6;margin-bottom:24px;">
+        Whenever you feel ready, you can pick your tribute back up right where you left off.
+      </p>
+
+      <div style="text-align:center;margin-bottom:24px;">
+        <a href="${resumeUrl}"
+           style="display:inline-block;background:#8B9D83;color:#fff;text-decoration:none;padding:14px 40px;border-radius:8px;font-weight:600;font-size:1rem;">
+          Finish your tribute
+        </a>
+      </div>
+
+      <div style="background:#FAF7F2;border:1px solid #E8E4DF;border-radius:8px;padding:20px;">
+        <p style="color:#2C2C2C;line-height:1.6;margin:0 0 8px;font-weight:600;">
+          A few things to set your mind at ease:
+        </p>
+        <ul style="color:#2C2C2C;line-height:1.7;margin:0;padding-left:20px;">
+          <li>You'll see a free design proof within 24 hours, and nothing is printed until you've approved every word.</li>
+          <li>You can ask for a full refund any time before you approve your proof &mdash; no questions asked.</li>
+          <li>Shipping within the US is always free.</li>
+        </ul>
+      </div>
+    </div>
+  `);
+
+  const subject = petName
+    ? `${petName}'s tribute is here whenever you're ready`
+    : `Your tribute is here whenever you're ready`;
+
+  return send(to, subject, html);
+}
+
+/**
  * Send proof email to customer with proof image and approval link.
  */
 async function sendProofEmail(to, orderData, proofImageUrl, approvalPageUrl, statusPageUrl) {
@@ -606,6 +677,7 @@ module.exports = {
   send,
   sendAdminAlert,
   sendOrderConfirmation,
+  sendAbandonedCheckoutRecovery,
   sendProofEmail,
   sendReviewRequest,
   sendChangeRequestNotification,
