@@ -390,11 +390,14 @@
     cartSection.id = 'cart-section';
     cartSection.innerHTML = `
       <button class="btn btn-warm btn-lg" id="purchase-btn">
-        Purchase
+        Continue to Checkout
       </button>
-      <p style="text-align:center;margin-top:0.5rem;font-size:0.85rem;color:var(--color-muted)">
-        Free shipping. Museum-quality framed print.
-      </p>
+      <ul class="checkout-reassurance">
+        <li>You approve every word before anything is printed</li>
+        <li>Full refund any time before you approve &mdash; no questions asked</li>
+        <li>Free replacement if it ever arrives damaged</li>
+      </ul>
+      <p class="checkout-securely">Secure checkout &middot; Free US shipping &middot; Made to order in the USA</p>
     `;
     formPane.appendChild(cartSection);
 
@@ -2088,7 +2091,7 @@
       // charges 0 for print-only/digital, so the button must agree.
       const upcharge = isFramedSku(product.sku) ? frameUpchargeCents() : 0;
       const total = product.price + upcharge;
-      btn.textContent = `Purchase \u2013 $${(total / 100).toFixed(2)}`;
+      btn.textContent = `Continue to Checkout \u2013 $${(total / 100).toFixed(2)}`;
     }
   }
 

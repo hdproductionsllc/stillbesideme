@@ -251,8 +251,8 @@ router.post('/checkout', async (req, res) => {
           fixed_amount: { amount: 0, currency: 'usd' },
           display_name: 'Free shipping',
           delivery_estimate: {
-            minimum: { unit: 'business_day', value: 5 },
-            maximum: { unit: 'business_day', value: 10 },
+            minimum: { unit: 'business_day', value: 8 },
+            maximum: { unit: 'business_day', value: 12 },
           },
         },
       }];

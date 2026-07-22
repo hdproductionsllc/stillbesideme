@@ -1514,6 +1514,42 @@
   width: 100%;
 }
 
+/* Reassurance at the moment of payment — the strongest risk-reversal messages
+   ride right alongside the button, where checkout anxiety peaks. */
+.checkout-reassurance {
+  list-style: none;
+  margin: var(--space-md) 0 var(--space-sm);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.checkout-reassurance li {
+  position: relative;
+  padding-left: 1.6rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--color-primary);
+}
+
+.checkout-reassurance li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--color-success);
+  font-weight: 700;
+}
+
+.checkout-securely {
+  text-align: center;
+  margin-top: var(--space-sm);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  color: var(--color-muted);
+}
+
 /* ============================================================
    MOBILE: Stacked layout with sticky preview
    ============================================================ */
