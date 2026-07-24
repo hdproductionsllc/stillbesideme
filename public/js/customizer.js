@@ -96,6 +96,22 @@
     return (template && template.poemLabel) || 'Poem';
   }
 
+  /**
+   * Gift deep-link: /customize/pet-tribute?gift=1 opens the flow already set to
+   * "Someone else's pet". Condolence senders arrive from a different place than
+   * owners, and landing on the wrong toggle costs them the first thing they see.
+   * A saved choice always wins — restoreState() runs after this and puts back
+   * whatever the customer last picked.
+   */
+  function isGiftDeepLink() {
+    try {
+      const v = new URLSearchParams(window.location.search).get('gift');
+      return v === '1' || v === 'true';
+    } catch (e) {
+      return false;
+    }
+  }
+
   /** Whether this template offers any 3-panel layouts (second photo) */
   function hasThreePanelLayouts() {
     if (!template || !template.layouts) return false;
@@ -119,6 +135,39 @@
   /** Generations used by the active format. */
   function fmtRegenCount() {
     return regenCounts[fmtKey()] || 0;
+  }
+
+  // ── Afterglow (the quiet line under a generated tribute) ──
+  //
+  // The reveal is the emotional peak; the afterglow is what it leaves behind.
+  // One understated line naming where the words came from turns "the AI wrote
+  // this" into "this was written from what I remembered". Shown only for
+  // tributes we generated — never for a poem chosen from the library.
+
+  let afterglowTimer = null;
+
+  function afterglowLine() {
+    const fields = PreviewRenderer.getFields();
+    const name = (fields[nameFieldId()] || '').trim();
+    return name
+      ? `Written from your memories of ${name}.`
+      : 'Written from the memories you shared.';
+  }
+
+  function showAfterglow() {
+    clearTimeout(afterglowTimer);
+    afterglowTimer = null;
+    const el = document.getElementById('poem-afterglow');
+    if (!el) return;
+    el.textContent = afterglowLine();
+    el.style.display = '';
+  }
+
+  function hideAfterglow() {
+    clearTimeout(afterglowTimer);
+    afterglowTimer = null;
+    const el = document.getElementById('poem-afterglow');
+    if (el) el.style.display = 'none';
   }
 
   function updateVersionTabs() {
@@ -148,6 +197,8 @@
     const rt = document.getElementById('poem-result-text');
     if (rt) rt.textContent = history[index];
     PreviewRenderer.setField('poemText', history[index]);
+    // Every version in the history is one we wrote from their memories.
+    showAfterglow();
     updateVersionTabs();
     saveState();
   }
@@ -187,12 +238,14 @@
       activeIndices[fmtKey()] = idx;
       resultText.textContent = history[idx];
       PreviewRenderer.setField('poemText', history[idx]);
+      showAfterglow();
       resultDiv.style.display = '';
       generateBtn.style.display = 'none';
     } else {
       // Nothing generated in this format yet — the generate button IS the way
       // in, so it must always come back here. (The preview keeps showing the
       // other format's text until this one is generated.)
+      hideAfterglow();
       resultDiv.style.display = 'none';
       generateBtn.style.display = '';
       generateBtn.disabled = false;
@@ -234,8 +287,20 @@
       // Wire up photo crop interaction for main photo panel
       initPhotoCropInteraction('photo');
 
+      // ?gift=1 pre-selects "Someone else's pet" before the form is built, so
+      // the toggle, the gift-only fields and the gift hint all render in their
+      // gift state rather than flipping a beat later. restoreState() below
+      // still overrides this with an explicit saved choice.
+      if (template.giftLabels && isGiftDeepLink()) {
+        orderType = 'gift';
+      }
+
       // Build the guided form
       buildGuidedForm();
+
+      // The build only paints gift VISIBILITY; the gift wording comes from
+      // template.giftLabels, so apply it when we arrived pre-set to gift.
+      if (orderType === 'gift') updateFormForOrderType();
 
       // Build layout & style selectors (dynamic)
       rebuildLayoutSelector();
@@ -1294,6 +1359,7 @@
       <div id="poem-result" class="poem-result" style="display:none">
         <div class="poem-version-tabs" id="poem-version-tabs" style="display:none"></div>
         <div class="poem-result-text" id="poem-result-text"></div>
+        <p class="poem-afterglow" id="poem-afterglow" style="display:none"></p>
         <div class="poem-actions">
           <button class="poem-regenerate-btn" id="poem-regenerate-btn">Try another version</button>
           <button class="poem-edit-btn" id="poem-edit-btn">Edit ${label.toLowerCase()}</button>
@@ -1373,47 +1439,125 @@
     }
 
     let loadingEl = null;
+    let statusTimer = null;
+    let statusFadeTimer = null;
+
+    const STATUS_ROTATE_MS = 2800;   // time each waiting line holds
+    const STATUS_FADE_MS = 400;      // cross-fade between them
+
+    /**
+     * Honest waiting copy. Each line describes something that is actually
+     * happening, in order, and the sequence STOPS on the last one rather than
+     * looping \u2014 no invented progress, no countdown, nothing to disbelieve.
+     */
+    function loadingLines(name) {
+      return [
+        'Reading your memories\u2026',
+        name ? `Finding the right words for ${name}\u2026` : 'Finding the right words\u2026',
+        `Writing ${name ? name + "'s" : 'their'} ${poemLabel().toLowerCase()}\u2026`
+      ];
+    }
 
     function showPoemLoading(name) {
+      const lines = loadingLines(name);
+
       if (!loadingEl) {
         loadingEl = document.createElement('div');
         loadingEl.className = 'poem-generating';
         loadingEl.innerHTML = `
-          <div class="poem-generating-text">Writing ${name ? name + "'s" : 'their'} ${poemLabel().toLowerCase()}...</div>
+          <div class="poem-generating-text"></div>
           <div class="poem-generating-dots"><span></span><span></span><span></span></div>
         `;
-      } else {
-        loadingEl.querySelector('.poem-generating-text').textContent =
-          `Writing ${name ? name + "'s" : 'their'} ${poemLabel().toLowerCase()}...`;
       }
+      const textEl = loadingEl.querySelector('.poem-generating-text');
+      clearInterval(statusTimer);
+      clearTimeout(statusFadeTimer);
+      textEl.classList.remove('fading');
+      textEl.textContent = lines[0];
+
       generateBtn.style.display = 'none';
       resultDiv.style.display = 'none';
       editArea.style.display = 'none';
       const section = document.getElementById('poem-section');
       const existing = section.querySelector('.poem-generating');
       if (!existing) section.insertBefore(loadingEl, resultDiv);
+
+      let i = 0;
+      statusTimer = setInterval(() => {
+        if (i >= lines.length - 1) {
+          clearInterval(statusTimer);
+          statusTimer = null;
+          return;
+        }
+        i += 1;
+        textEl.classList.add('fading');
+        statusFadeTimer = setTimeout(() => {
+          textEl.textContent = lines[i];
+          textEl.classList.remove('fading');
+        }, STATUS_FADE_MS);
+      }, STATUS_ROTATE_MS);
     }
 
     function hidePoemLoading() {
-      if (loadingEl && loadingEl.parentNode) {
-        loadingEl.parentNode.removeChild(loadingEl);
+      clearInterval(statusTimer);
+      clearTimeout(statusFadeTimer);
+      statusTimer = null;
+      statusFadeTimer = null;
+      if (loadingEl) {
+        const textEl = loadingEl.querySelector('.poem-generating-text');
+        if (textEl) textEl.classList.remove('fading');
+        if (loadingEl.parentNode) loadingEl.parentNode.removeChild(loadingEl);
       }
+    }
+
+    // \u2500\u2500 Reveal pacing \u2500\u2500
+    // A beat of stillness before the first line lets the loading state clear
+    // and gives the moment room to land; each line then fades up gently instead
+    // of popping in. Worst realistic case \u2014 a 12-line poem with two stanza
+    // breaks \u2014 settles a little under 6s, so it reads as written, never waited.
+    const REVEAL_FIRST_BEAT = 420;     // ms before line one
+    const REVEAL_LINE_DELAY = 340;     // ms between lines
+    const REVEAL_LINE_DURATION = 1000; // must match .poem-line animation in CSS
+
+    function prefersReducedMotion() {
+      return !!(window.matchMedia
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     }
 
     function revealPoem(poemText) {
       resultText.innerHTML = '';
+      hideAfterglow();
       const lines = poemText.split('\n');
-      const LINE_DELAY = 250;
 
       lines.forEach((line, i) => {
         const span = document.createElement('span');
         span.className = 'poem-line';
         span.textContent = line || '\u00A0';
-        span.style.animationDelay = `${i * LINE_DELAY}ms`;
+        span.style.animationDelay = `${REVEAL_FIRST_BEAT + i * REVEAL_LINE_DELAY}ms`;
         resultText.appendChild(span);
       });
 
       PreviewRenderer.setField('poemText', poemText);
+
+      // The afterglow arrives as the last line settles \u2014 never before it, or it
+      // explains the moment while the moment is still happening.
+      const settleAt = prefersReducedMotion()
+        ? 0
+        : REVEAL_FIRST_BEAT + (lines.length - 1) * REVEAL_LINE_DELAY + REVEAL_LINE_DURATION;
+      afterglowTimer = setTimeout(showAfterglow, settleAt);
+    }
+
+    /**
+     * The tribute exactly as it reads on screen. During the reveal the text is
+     * one <span> per line, whose combined textContent runs the lines together \u2014
+     * so rebuild from the spans and put the line breaks back.
+     */
+    function currentPoemText() {
+      const lineEls = resultText.querySelectorAll('.poem-line');
+      if (!lineEls.length) return resultText.textContent;
+      return Array.from(lineEls)
+        .map(el => (el.textContent === '\u00A0' ? '' : el.textContent))
+        .join('\n');
     }
 
     /**
@@ -1539,7 +1683,7 @@
     });
 
     editBtn.addEventListener('click', () => {
-      editTextarea.value = resultText.textContent;
+      editTextarea.value = currentPoemText();
       resultDiv.style.display = 'none';
       editArea.style.display = '';
     });
@@ -1591,6 +1735,8 @@
         libraryPreview.textContent = poem.text;
 
         resultText.textContent = poem.text;
+        // A library poem wasn't written from their memories — never claim it was.
+        hideAfterglow();
         resultDiv.style.display = '';
         editArea.style.display = 'none';
         generateBtn.style.display = 'none';

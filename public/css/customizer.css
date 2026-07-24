@@ -1374,12 +1374,17 @@
   padding: var(--space-2xl) var(--space-xl);
 }
 
+/* The waiting line cross-fades between honest status messages (customizer.js
+   toggles .fading around the swap) instead of snapping to new copy. */
 .poem-generating-text {
   font-family: var(--font-display);
   font-size: 1.1rem;
   color: var(--color-muted);
   margin-bottom: var(--space-lg);
+  transition: opacity 0.4s ease;
 }
+
+.poem-generating-text.fading { opacity: 0; }
 
 .poem-generating-dots {
   display: inline-flex;
@@ -1402,15 +1407,50 @@
   40% { opacity: 1; transform: scale(1); }
 }
 
+/* Each line rises and settles rather than popping in. The long ease-out tail
+   is the point: the line arrives quickly, then comes to rest slowly, which
+   reads as writing rather than loading. Duration is mirrored by
+   REVEAL_LINE_DURATION in customizer.js — change both together. */
 .poem-result-text .poem-line {
   display: block;
   opacity: 0;
-  transform: translateY(8px);
-  animation: poemLineReveal 0.6s ease forwards;
+  transform: translateY(10px);
+  animation: poemLineReveal 1s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
 }
 
 @keyframes poemLineReveal {
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* The afterglow — one quiet line under the finished tribute naming where the
+   words came from. Deliberately smaller and softer than the poem: it should
+   be noticed a second after the poem is read, not alongside it. */
+.poem-afterglow {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--color-muted);
+  text-align: center;
+  margin: calc(-1 * var(--space-sm)) 0 var(--space-lg);
+  animation: poemAfterglowIn 1.1s ease forwards;
+}
+
+@keyframes poemAfterglowIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Someone who has asked their OS for less motion is often asking for a reason.
+   The poem still arrives — it just arrives whole, without drift or pulse. */
+@media (prefers-reduced-motion: reduce) {
+  .poem-result-text .poem-line {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+  .poem-afterglow { animation: none; }
+  .poem-generating-dots span { animation: none; opacity: 0.55; }
 }
 
 /* ============================================================
