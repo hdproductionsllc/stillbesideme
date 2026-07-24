@@ -326,6 +326,91 @@ async function sendProofEmail(to, orderData, proofImageUrl, approvalPageUrl, sta
 }
 
 /**
+ * Gentle nudge for a proof that is still waiting on the customer's eyes.
+ * Sent by the proof-reminder engine (src/services/followupEngine.js) at 3 and
+ * 7 days after the proof email, and never more than twice.
+ *
+ * Deliberately pressure-free: no deadline, no countdown, no offer, nothing
+ * that reads as a sales chase. The order is already paid — the only thing this
+ * email is allowed to do is quietly reopen the door.
+ *
+ * @param {string} to — customer email
+ * @param {object} orderData — { orderId, petName, templateName, totalCents }
+ * @param {string|null} proofImageUrl — absolute URL to the proof image, or null
+ * @param {string} approvalPageUrl — the customer's existing /proof/:token page
+ * @param {number} reminderNumber — 1 or 2. #2 adds that we're holding their
+ *        piece and that a plain reply reaches us.
+ */
+async function sendProofReminder(to, orderData, proofImageUrl, approvalPageUrl, reminderNumber = 1) {
+  const esc = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  const { orderId, totalCents } = orderData;
+  const shortId = orderId ? String(orderId).substring(0, 8).toUpperCase() : '';
+  const pet = orderData && orderData.petName ? String(orderData.petName).trim() : '';
+  const safePet = esc(pet);
+  const isSecond = reminderNumber === 2;
+
+  const possessive = safePet ? `${safePet}'s` : 'your';
+
+  const heading = safePet
+    ? `${safePet}'s tribute is ready for your eyes`
+    : `Your tribute is ready for your eyes`;
+
+  const opening = isSecond
+    ? `${possessive.charAt(0).toUpperCase() + possessive.slice(1)} design proof is still here whenever you'd like to see it. We're holding your piece safely &mdash; it isn't going anywhere, and neither are we.`
+    : `We sent ${possessive} design proof a little while ago, and it's still waiting quietly for you. There's no rush at all &mdash; some days are heavier than others, and this will keep.`;
+
+  const html = wrapHtml(`
+    <div style="background:#fff;border-radius:12px;padding:32px;margin-bottom:24px;">
+      <h1 style="font-family:Georgia,serif;font-size:1.6rem;font-weight:400;color:#2C2C2C;text-align:center;margin:0 0 8px;">
+        ${heading}
+      </h1>
+      ${shortId ? `
+      <p style="text-align:center;color:#9B9590;margin:0 0 24px;">
+        Order ${shortId}${totalCents ? ` &middot; ${formatPrice(totalCents)}` : ''}
+      </p>` : '<div style="height:16px;"></div>'}
+
+      ${proofImageUrl ? `
+      <div style="text-align:center;margin-bottom:24px;">
+        <img src="${proofImageUrl}" alt="Your tribute proof" style="max-width:100%;border-radius:8px;border:1px solid #E8E4DF;" />
+      </div>` : ''}
+
+      <p style="color:#2C2C2C;line-height:1.6;margin-bottom:16px;">
+        ${opening}
+      </p>
+
+      <p style="color:#2C2C2C;line-height:1.6;margin-bottom:24px;">
+        Nothing is printed until you've seen it and told us it's right. Whenever you're ready,
+        you can look it over and either approve it or ask for changes.
+      </p>
+
+      <div style="text-align:center;margin-bottom:24px;">
+        <a href="${approvalPageUrl}"
+           style="display:inline-block;background:#8B9D83;color:#fff;text-decoration:none;padding:14px 40px;border-radius:8px;font-weight:600;font-size:1rem;">
+          See your proof
+        </a>
+      </div>
+
+      <div style="background:#FAF7F2;border:1px solid #E8E4DF;border-radius:8px;padding:20px;">
+        <p style="color:#2C2C2C;line-height:1.7;margin:0;">
+          Take all the time you need. Your proof stays at that link, and nothing goes to print
+          without your approval.${isSecond ? ` If something isn't right &mdash; a word, the photo, or simply the timing &mdash; you can reply straight to this email and we'll help.` : ''}
+        </p>
+      </div>
+    </div>
+  `);
+
+  const subject = isSecond
+    ? (pet ? `${pet}'s tribute is still here, whenever you're ready`
+           : `Your tribute is still here, whenever you're ready`)
+    : (pet ? `${pet}'s tribute is ready for your eyes`
+           : `Your tribute is ready for your eyes`);
+
+  return send(to, subject, html);
+}
+
+/**
  * Ask David/Rebecca to review a freshly generated proof before it goes to
  * the customer. This is the review gate: the ONLY path to the customer
  * proof email runs through the /admin/review page this email links to.
@@ -679,6 +764,7 @@ module.exports = {
   sendOrderConfirmation,
   sendAbandonedCheckoutRecovery,
   sendProofEmail,
+  sendProofReminder,
   sendReviewRequest,
   sendChangeRequestNotification,
   sendApprovalConfirmation,

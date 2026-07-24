@@ -221,6 +221,22 @@ async function start() {
     setInterval(runDateEngine, 24 * 60 * 60 * 1000).unref();
   }
 
+  // Proof-approval reminders → nudges customers whose paid order is stuck in
+  // proof_ready waiting on their approval. Same daily-timer shape as the two
+  // above, but gated ON by default: this is transactional, not marketing. The
+  // money is already taken and the order cannot move without the customer, so
+  // silence here means a family paid and got nothing. Set
+  // PROOF_REMINDERS_ENABLED=false to switch it off. At most two reminders per
+  // order ever (3 days, then 7), enforced by proof_reminder_sent order_events.
+  if (process.env.PROOF_REMINDERS_ENABLED !== 'false') {
+    const { checkAndSend } = require('./src/services/followupEngine');
+    const runProofReminders = () => {
+      checkAndSend().catch((err) => console.error('Proof reminder engine failed:', err.message));
+    };
+    runProofReminders();
+    setInterval(runProofReminders, 24 * 60 * 60 * 1000).unref();
+  }
+
   // ── Letter From Heaven is discontinued ────────────────────────────────
   // LFH and its human-loss landing pages are permanently off sale, so they
   // return 410 Gone (not a 302). 410 tells Google to DROP these URLs and stop
