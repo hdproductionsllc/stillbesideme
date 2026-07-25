@@ -86,7 +86,15 @@ async function start() {
         ],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:", "https://www.google-analytics.com", "https://www.facebook.com", "https://www.googletagmanager.com"],
+        // blob: is required for the customizer's instant photo preview. When a
+        // customer picks their pet's photo we render it from a local
+        // URL.createObjectURL(file) blob immediately, then swap in the server
+        // thumbnail once the upload returns. Without blob: the CSP blocked that
+        // first render, so the preview stayed empty until a 3-5MB upload
+        // finished — on mobile, seconds of nothing at the exact moment the
+        // photo is supposed to appear — and the upload-failure fallback
+        // ("using local preview") had no preview to fall back to.
+        imgSrc: ["'self'", "data:", "blob:", "https://www.google-analytics.com", "https://www.facebook.com", "https://www.googletagmanager.com"],
         connectSrc: [
           "'self'",
           "https://www.google-analytics.com",
