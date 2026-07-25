@@ -1,0 +1,41 @@
+{
+  "_note": "Canonical record of real customer reviews, supplied by the business owner. Pages quote from this file verbatim. Rules: never edit a reviewer's words beyond typography, never invent an attribution, and never attach a star rating — no customer was asked to rate their grief, so no rating data exists and none may be manufactured. Because there are no ratings, pages publish Review schema WITHOUT reviewRating and MUST NOT publish AggregateRating.",
+  "themes": {
+    "likeness": "It sounds like our actual pet — the poem captured who they were",
+    "gift": "Sent to someone else who was grieving",
+    "process": "Proof, revisions, photo quality, framing",
+    "home": "Living with it / chosen over alternatives"
+  },
+  "reviews": [
+    { "author": "Keith L.", "theme": "likeness", "body": "I knew it would be beautiful, but I was not prepared for how much it would feel like him. The part about waiting by the kitchen made me laugh and cry at the same time. It really captured who he was." },
+    { "author": "Danica G.", "theme": "likeness", "body": "This brought back so many little things I was scared I might forget. The sound of her paws in the hallway, the chair she always stole, and the look she gave us when dinner was late. It feels like a little piece of her is still here." },
+    { "author": "Harper's Mom and Dad", "theme": "likeness", "body": "The poem honestly felt like it was written by someone who knew our dog. It was not generic at all. Every part of it sounded like him." },
+    { "author": "Chloe L.", "theme": "likeness", "body": "I have read it more times than I can count. At first I cried every time. Now it makes me smile too because it reminds me how funny and full of personality she was." },
+    { "author": "Alisha W.", "theme": "likeness", "body": "I loved that the poem was not only about losing him. It was about his life, his habits, and all the silly things he did that made our house feel like home." },
+    { "author": "Maddie L.", "theme": "likeness", "body": "The line about her spot by the window got me immediately. It was such a small detail, but that is what made it feel so personal. Anyone who knew her would know exactly who the poem was about." },
+    { "author": "Mika", "theme": "gift", "body": "I sent this to my sister after she lost her dog of fourteen years. She called me as soon as she opened it and could barely get the words out. She said it was the first gift that made her feel like someone truly understood." },
+    { "author": "Cameron", "theme": "gift", "body": "I was nervous about ordering this for a friend because I did not know every detail about her cat. I shared what I knew, and the finished poem still felt incredibly personal. She hung it beside the window where he used to sleep." },
+    { "author": "Radhika S.", "theme": "gift", "body": "This meant more than flowers ever could. Months later, it is still hanging on their wall, and my friend says she stops to read it all the time." },
+    { "author": "Ronnie H.", "theme": "gift", "body": "I wanted to give them something that remembered who their dog really was. The poem included his nickname and the funny habit everyone loved about him. It felt thoughtful in a way a regular sympathy gift never could." },
+    { "author": "Tori B.", "theme": "gift", "body": "They had already received flowers and cards, but this was the gift everyone gathered around to read. It got the whole family talking and sharing stories about her." },
+    { "author": "Bobbie S.", "theme": "process", "body": "I really appreciated getting to review the poem before it was printed. I asked for one small change, and it was handled right away. The final version felt exactly right." },
+    { "author": "Felicia T.", "theme": "process", "body": "The whole process was easy and thoughtful. I uploaded a photo, shared a few memories, and received a proof to review. I never felt rushed." },
+    { "author": "Jenna R.", "theme": "process", "body": "I was worried my phone photo would not look good when printed, but it turned out beautifully. The frame is also much nicer than I expected." },
+    { "author": "Priya N.", "theme": "process", "body": "Seeing the full design before it was printed gave me peace of mind. What arrived looked just like the proof, only even better in person." },
+    { "author": "Megan C.", "theme": "process", "body": "The poem was personal, the print looked beautiful, and the frame arrived ready to hang. You can tell someone took real care with it." },
+    { "author": "Luke and Sarah P.", "theme": "likeness", "body": "It did not sound like a poem for any dog. It sounded like a poem for our dog." },
+    { "author": "Brianna K.", "theme": "likeness", "body": "The beginning made us laugh. The ending made us cry. That was exactly who she was." },
+    { "author": "Elena M.", "theme": "likeness", "body": "The photo showed what he looked like. The poem brought back what it felt like to have him here." },
+    { "author": "Nate D.", "theme": "likeness", "body": "They included the tiny details that meant the most to us." },
+    { "author": "Monica V.", "theme": "home", "body": "This is the first memorial gift we have received that feels like it truly belongs in our home." },
+    { "author": "Derek A.", "theme": "home", "body": "The house is still quieter without her, but seeing this every day makes her feel a little closer." },
+    { "author": "Cara P.", "theme": "likeness", "body": "Everyone who reads it says the same thing. That is exactly him." },
+    { "author": "Stephanie J.", "theme": "likeness", "body": "It made us cry, but it also reminded us of the version of him that made us laugh every day." },
+    { "author": "Tyler W.", "theme": "likeness", "body": "I was not sure a few memories would be enough to create something meaningful, but they were. My family recognized every little moment behind the words." },
+    { "author": "Melissa R.", "theme": "home", "body": "I almost ordered a regular photo canvas instead. I am so glad I chose this. The poem is what makes it feel like more than just a picture." },
+    { "author": "Gwen A.", "theme": "home", "body": "The finished piece looks beautiful in our home. It does not feel mass produced or generic. It feels like it was made only for our family." },
+    { "author": "Nicole F.", "theme": "likeness", "body": "I had looked at so many memorial gifts, but most of them felt too general. This one remembered the muddy paws, the stolen socks, and the exact place he waited for us by the door." },
+    { "author": "Trevor J.", "theme": "home", "body": "I worried that making this would be too painful, but answering the questions actually brought back a lot of happy memories. When it arrived, it felt like a celebration of his life." },
+    { "author": "Amanda S.", "theme": "likeness", "body": "The smallest things are often what you miss the most. This tribute understood that." }
+  ]
+}
