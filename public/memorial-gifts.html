@@ -122,6 +122,55 @@
   }
   </script>
 
+  <!-- Schema: Reviews (verbatim customer reviews from /src/data/reviews.json).
+       Intentionally no reviewRating and no aggregateRating: no rating data exists. -->
+  <script type="application/ld+json">
+  [
+    {
+      "@context": "https://schema.org",
+      "@type": "Review",
+      "itemReviewed": {
+        "@type": "Product",
+        "name": "Personalized Pet Memorial Gift",
+        "url": "https://www.stillbesideme.com/customize/pet-tribute"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Monica V."
+      },
+      "reviewBody": "This is the first memorial gift we have received that feels like it truly belongs in our home."
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Review",
+      "itemReviewed": {
+        "@type": "Product",
+        "name": "Personalized Pet Memorial Gift",
+        "url": "https://www.stillbesideme.com/customize/pet-tribute"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Brianna K."
+      },
+      "reviewBody": "The beginning made us laugh. The ending made us cry. That was exactly who she was."
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Review",
+      "itemReviewed": {
+        "@type": "Product",
+        "name": "Personalized Pet Memorial Gift",
+        "url": "https://www.stillbesideme.com/customize/pet-tribute"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Gwen A."
+      },
+      "reviewBody": "The finished piece looks beautiful in our home. It does not feel mass produced or generic. It feels like it was made only for our family."
+    }
+  ]
+  </script>
+
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=2">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=2">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
@@ -393,6 +442,37 @@
           <h3>Can I order this as a gift for someone else?</h3>
           <p>Yes. Many of our orders are gifts for someone who's grieving. Share what you know &ndash; even just a name and photo &ndash; and we'll create something meaningful. We can ship it directly to the recipient.</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       6B. IN THEIR OWN WORDS &ndash; real customer reviews
+       Source of truth: /src/data/reviews.json. Quoted verbatim.
+       No ratings anywhere: no customer was asked to score their grief,
+       so no rating data exists and none may be manufactured.
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="social-proof" id="reviews">
+    <div class="container">
+      <h2 class="proof-count">What families tell us</h2>
+      <p class="proof-subline">Published as they were written, without edits.</p>
+      <div class="testimonials">
+
+        <div class="testimonial fade-in">
+          <blockquote style="overflow-wrap:break-word;">This is the first memorial gift we have received that feels like it truly belongs in our home.</blockquote>
+          <cite>Monica V.</cite>
+        </div>
+
+        <div class="testimonial fade-in">
+          <blockquote style="overflow-wrap:break-word;">The beginning made us laugh. The ending made us cry. That was exactly who she was.</blockquote>
+          <cite>Brianna K.</cite>
+        </div>
+
+        <div class="testimonial fade-in">
+          <blockquote style="overflow-wrap:break-word;">The finished piece looks beautiful in our home. It does not feel mass produced or generic. It feels like it was made only for our family.</blockquote>
+          <cite>Gwen A.</cite>
+        </div>
+
       </div>
     </div>
   </section>

@@ -131,6 +131,55 @@
   }
   </script>
 
+  <!-- Schema: Reviews (verbatim customer reviews from /src/data/reviews.json).
+       Intentionally no reviewRating and no aggregateRating: no rating data exists. -->
+  <script type="application/ld+json">
+  [
+    {
+      "@context": "https://schema.org",
+      "@type": "Review",
+      "itemReviewed": {
+        "@type": "Product",
+        "name": "Personalized Dog Memorial Gift",
+        "url": "https://www.stillbesideme.com/dog-memorial-gifts"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Harper's Mom and Dad"
+      },
+      "reviewBody": "The poem honestly felt like it was written by someone who knew our dog. It was not generic at all. Every part of it sounded like him."
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Review",
+      "itemReviewed": {
+        "@type": "Product",
+        "name": "Personalized Dog Memorial Gift",
+        "url": "https://www.stillbesideme.com/dog-memorial-gifts"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Luke and Sarah P."
+      },
+      "reviewBody": "It did not sound like a poem for any dog. It sounded like a poem for our dog."
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Review",
+      "itemReviewed": {
+        "@type": "Product",
+        "name": "Personalized Dog Memorial Gift",
+        "url": "https://www.stillbesideme.com/dog-memorial-gifts"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Nicole F."
+      },
+      "reviewBody": "I had looked at so many memorial gifts, but most of them felt too general. This one remembered the muddy paws, the stolen socks, and the exact place he waited for us by the door."
+    }
+  ]
+  </script>
+
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=2">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=2">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
@@ -408,6 +457,37 @@
           <h3>What happens to the memories I share about my dog?</h3>
           <p>They stay safe with us. Along with the framed print, every order includes a private page holding your dog&rsquo;s photo, their poem, and every memory you shared &ndash; there whenever you want to visit it.</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       6B. IN THEIR OWN WORDS &ndash; real customer reviews
+       Source of truth: /src/data/reviews.json. Quoted verbatim.
+       No ratings anywhere: no customer was asked to score their grief,
+       so no rating data exists and none may be manufactured.
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="social-proof" id="reviews">
+    <div class="container">
+      <h2 class="proof-count">From other dog families</h2>
+      <p class="proof-subline">Their words, published exactly as they were written.</p>
+      <div class="testimonials">
+
+        <div class="testimonial fade-in">
+          <blockquote style="overflow-wrap:break-word;">The poem honestly felt like it was written by someone who knew our dog. It was not generic at all. Every part of it sounded like him.</blockquote>
+          <cite>Harper's Mom and Dad</cite>
+        </div>
+
+        <div class="testimonial fade-in">
+          <blockquote style="overflow-wrap:break-word;">It did not sound like a poem for any dog. It sounded like a poem for our dog.</blockquote>
+          <cite>Luke and Sarah P.</cite>
+        </div>
+
+        <div class="testimonial fade-in">
+          <blockquote style="overflow-wrap:break-word;">I had looked at so many memorial gifts, but most of them felt too general. This one remembered the muddy paws, the stolen socks, and the exact place he waited for us by the door.</blockquote>
+          <cite>Nicole F.</cite>
+        </div>
+
       </div>
     </div>
   </section>

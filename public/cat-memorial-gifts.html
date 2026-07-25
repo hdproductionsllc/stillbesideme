@@ -131,6 +131,55 @@
   }
   </script>
 
+  <!-- Schema: Reviews (verbatim customer reviews from /src/data/reviews.json).
+       Intentionally no reviewRating and no aggregateRating: no rating data exists. -->
+  <script type="application/ld+json">
+  [
+    {
+      "@context": "https://schema.org",
+      "@type": "Review",
+      "itemReviewed": {
+        "@type": "Product",
+        "name": "Personalized Cat Memorial Gift",
+        "url": "https://www.stillbesideme.com/cat-memorial-gifts"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Cameron"
+      },
+      "reviewBody": "I was nervous about ordering this for a friend because I did not know every detail about her cat. I shared what I knew, and the finished poem still felt incredibly personal. She hung it beside the window where he used to sleep."
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Review",
+      "itemReviewed": {
+        "@type": "Product",
+        "name": "Personalized Cat Memorial Gift",
+        "url": "https://www.stillbesideme.com/cat-memorial-gifts"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Danica G."
+      },
+      "reviewBody": "This brought back so many little things I was scared I might forget. The sound of her paws in the hallway, the chair she always stole, and the look she gave us when dinner was late. It feels like a little piece of her is still here."
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Review",
+      "itemReviewed": {
+        "@type": "Product",
+        "name": "Personalized Cat Memorial Gift",
+        "url": "https://www.stillbesideme.com/cat-memorial-gifts"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Maddie L."
+      },
+      "reviewBody": "The line about her spot by the window got me immediately. It was such a small detail, but that is what made it feel so personal. Anyone who knew her would know exactly who the poem was about."
+    }
+  ]
+  </script>
+
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=2">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=2">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
@@ -409,6 +458,37 @@
           <h3>What happens to the memories I share about my cat?</h3>
           <p>They&rsquo;re kept, not discarded. Every order includes a private page with your cat&rsquo;s photo, their poem, and the memories you wrote &ndash; a quiet place to return to whenever you miss them.</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       6B. IN THEIR OWN WORDS &ndash; real customer reviews
+       Source of truth: /src/data/reviews.json. Quoted verbatim.
+       No ratings anywhere: no customer was asked to score their grief,
+       so no rating data exists and none may be manufactured.
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="social-proof" id="reviews">
+    <div class="container">
+      <h2 class="proof-count">From other cat families</h2>
+      <p class="proof-subline">Words from people who have their cat&rsquo;s tribute on the wall.</p>
+      <div class="testimonials">
+
+        <div class="testimonial fade-in">
+          <blockquote style="overflow-wrap:break-word;">I was nervous about ordering this for a friend because I did not know every detail about her cat. I shared what I knew, and the finished poem still felt incredibly personal. She hung it beside the window where he used to sleep.</blockquote>
+          <cite>Cameron</cite>
+        </div>
+
+        <div class="testimonial fade-in">
+          <blockquote style="overflow-wrap:break-word;">This brought back so many little things I was scared I might forget. The sound of her paws in the hallway, the chair she always stole, and the look she gave us when dinner was late. It feels like a little piece of her is still here.</blockquote>
+          <cite>Danica G.</cite>
+        </div>
+
+        <div class="testimonial fade-in">
+          <blockquote style="overflow-wrap:break-word;">The line about her spot by the window got me immediately. It was such a small detail, but that is what made it feel so personal. Anyone who knew her would know exactly who the poem was about.</blockquote>
+          <cite>Maddie L.</cite>
+        </div>
+
       </div>
     </div>
   </section>

@@ -34,6 +34,7 @@
   {
     "@context": "https://schema.org",
     "@type": "Product",
+    "@id": "https://www.stillbesideme.com/sympathy-gifts#product",
     "image": "https://www.stillbesideme.com/images/og/sympathy-gifts.jpg",
     "name": "Personalized Pet Loss Gift – Framed Poem & Photo Tribute",
     "description": "A pet sympathy gift for someone grieving a dog, cat, or beloved companion: a personalized poem written from their memories, printed beside their pet's photo, with their name and the years you shared, in an elegant frame. Archival, museum-quality print in four sizes, made to order in the USA with free US shipping, and it arrives ready to hang. They approve every word before it prints.",
@@ -140,6 +141,64 @@
       }
     ]
   }
+  </script>
+
+  <!-- Schema: Review (real customer reviews shown in the "In their own words"
+       section). Source of truth: /src/data/reviews.json, quoted verbatim.
+       Deliberately NO reviewRating and NO aggregateRating anywhere on this
+       page: no customer was ever asked to rate their grief, so no rating data
+       exists and none may be manufactured. Do not add one. -->
+  <script type="application/ld+json">
+  [
+    {
+      "@context": "https://schema.org",
+      "@type": "Review",
+      "itemReviewed": { "@type": "Product", "@id": "https://www.stillbesideme.com/sympathy-gifts#product", "name": "Personalized Pet Loss Gift – Framed Poem & Photo Tribute" },
+      "author": { "@type": "Person", "name": "Mika" },
+      "inLanguage": "en",
+      "reviewBody": "I sent this to my sister after she lost her dog of fourteen years. She called me as soon as she opened it and could barely get the words out. She said it was the first gift that made her feel like someone truly understood."
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Review",
+      "itemReviewed": { "@type": "Product", "@id": "https://www.stillbesideme.com/sympathy-gifts#product", "name": "Personalized Pet Loss Gift – Framed Poem & Photo Tribute" },
+      "author": { "@type": "Person", "name": "Cameron" },
+      "inLanguage": "en",
+      "reviewBody": "I was nervous about ordering this for a friend because I did not know every detail about her cat. I shared what I knew, and the finished poem still felt incredibly personal. She hung it beside the window where he used to sleep."
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Review",
+      "itemReviewed": { "@type": "Product", "@id": "https://www.stillbesideme.com/sympathy-gifts#product", "name": "Personalized Pet Loss Gift – Framed Poem & Photo Tribute" },
+      "author": { "@type": "Person", "name": "Radhika S." },
+      "inLanguage": "en",
+      "reviewBody": "This meant more than flowers ever could. Months later, it is still hanging on their wall, and my friend says she stops to read it all the time."
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Review",
+      "itemReviewed": { "@type": "Product", "@id": "https://www.stillbesideme.com/sympathy-gifts#product", "name": "Personalized Pet Loss Gift – Framed Poem & Photo Tribute" },
+      "author": { "@type": "Person", "name": "Ronnie H." },
+      "inLanguage": "en",
+      "reviewBody": "I wanted to give them something that remembered who their dog really was. The poem included his nickname and the funny habit everyone loved about him. It felt thoughtful in a way a regular sympathy gift never could."
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Review",
+      "itemReviewed": { "@type": "Product", "@id": "https://www.stillbesideme.com/sympathy-gifts#product", "name": "Personalized Pet Loss Gift – Framed Poem & Photo Tribute" },
+      "author": { "@type": "Person", "name": "Tori B." },
+      "inLanguage": "en",
+      "reviewBody": "They had already received flowers and cards, but this was the gift everyone gathered around to read. It got the whole family talking and sharing stories about her."
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Review",
+      "itemReviewed": { "@type": "Product", "@id": "https://www.stillbesideme.com/sympathy-gifts#product", "name": "Personalized Pet Loss Gift – Framed Poem & Photo Tribute" },
+      "author": { "@type": "Person", "name": "Bobbie S." },
+      "inLanguage": "en",
+      "reviewBody": "I really appreciated getting to review the poem before it was printed. I asked for one small change, and it was handled right away. The final version felt exactly right."
+    }
+  ]
   </script>
 
   <!-- Schema: BreadcrumbList -->
@@ -376,7 +435,8 @@
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════
-       5. OUR PROMISE &ndash; honest trust block (no fabricated reviews)
+       5. OUR PROMISE &ndash; honest trust block (our promises, in our own
+          voice). Real customer reviews live in section 6B below.
        ═══════════════════════════════════════════════════════════ -->
   <section class="social-proof">
     <div class="container">
@@ -446,6 +506,52 @@
           <h3>How long after a pet dies is it okay to send a gift?</h3>
           <p>There is no window that closes. Sending something two or three weeks after the loss is often more meaningful than sending it in the first few days, because that is when the messages stop and the house is quietest. Flowers and cards arrive in the first 48 hours and are gone by the end of the week. Arriving later, on purpose, is a feature rather than a delay. Months or even a year later is also welcome, especially around the anniversary or the pet's birthday.</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       6B. IN THEIR OWN WORDS &ndash; real customer reviews
+       Source of truth: /src/data/reviews.json. Quoted verbatim.
+       No ratings anywhere: no customer was asked to score their grief,
+       so no rating data exists and none may be manufactured.
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="social-proof" id="reviews">
+    <div class="container">
+      <h2 class="proof-count">In their own words</h2>
+      <p class="proof-subline">Real words from people who sent this to someone who was grieving, published as they were written.</p>
+      <div class="testimonials">
+
+        <div class="testimonial fade-in">
+          <blockquote>I sent this to my sister after she lost her dog of fourteen years. She called me as soon as she opened it and could barely get the words out. She said it was the first gift that made her feel like someone truly understood.</blockquote>
+          <cite>Mika</cite>
+        </div>
+
+        <div class="testimonial fade-in">
+          <blockquote>I was nervous about ordering this for a friend because I did not know every detail about her cat. I shared what I knew, and the finished poem still felt incredibly personal. She hung it beside the window where he used to sleep.</blockquote>
+          <cite>Cameron</cite>
+        </div>
+
+        <div class="testimonial fade-in">
+          <blockquote>This meant more than flowers ever could. Months later, it is still hanging on their wall, and my friend says she stops to read it all the time.</blockquote>
+          <cite>Radhika S.</cite>
+        </div>
+
+        <div class="testimonial fade-in">
+          <blockquote>I wanted to give them something that remembered who their dog really was. The poem included his nickname and the funny habit everyone loved about him. It felt thoughtful in a way a regular sympathy gift never could.</blockquote>
+          <cite>Ronnie H.</cite>
+        </div>
+
+        <div class="testimonial fade-in">
+          <blockquote>They had already received flowers and cards, but this was the gift everyone gathered around to read. It got the whole family talking and sharing stories about her.</blockquote>
+          <cite>Tori B.</cite>
+        </div>
+
+        <div class="testimonial fade-in">
+          <blockquote>I really appreciated getting to review the poem before it was printed. I asked for one small change, and it was handled right away. The final version felt exactly right.</blockquote>
+          <cite>Bobbie S.</cite>
+        </div>
+
       </div>
     </div>
   </section>
