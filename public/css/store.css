@@ -2287,6 +2287,21 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
   text-wrap: pretty;
 }
 
+/* States the rating, then immediately subordinates it to the quotes. The
+   number is what earns the click in search results; the words are what
+   actually sell. Deliberately quiet — a large star badge would be the one
+   tonally wrong note on a memorial page, and it is the least differentiated
+   thing we could show. */
+.reviews-rating {
+  margin: var(--space-md) auto 0;
+  max-width: 46ch;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--color-muted);
+  text-wrap: pretty;
+}
+
 /* Multi-column wall rather than a grid: quotes are wildly different
    lengths, and columns pack them without leaving dead rows. Matches the
    .tw-gallery pattern already used in "The Writing". */
