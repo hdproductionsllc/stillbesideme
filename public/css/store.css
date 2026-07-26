@@ -2422,3 +2422,330 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
   color: var(--color-warm);
   overflow-wrap: break-word;
 }
+
+/* ============================================================
+   TRIBUTE LIGHTBOX (.tl-*)
+   Clicking a framed tribute opens it larger, with the poem set
+   again as real text — a 1100px JPEG is never readable on a
+   phone, and the poem is the thing people came to read.
+   Namespaced .tl-* so it cannot collide with .tw-* or the
+   email popup. Paired with /js/tribute-lightbox.js.
+   ============================================================ */
+
+/* --- The trigger images ------------------------------------ */
+.tl-trigger {
+  cursor: zoom-in;
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+.tw-piece .tl-trigger:hover,
+.tw-piece .tl-trigger:focus-visible {
+  transform: scale(1.012);
+}
+.tl-trigger:focus-visible {
+  outline: 2px solid var(--color-warm);
+  outline-offset: 4px;
+}
+.tw-attrib .tl-trigger:hover,
+.tw-attrib .tl-trigger:focus-visible {
+  filter: brightness(1.06);
+}
+
+/* The JS also sets these inline (and restores the previous values on close);
+   the class keeps the lock declarative and is a hook for anything else that
+   needs to know a modal is up. */
+body.tl-open { overflow: hidden; }
+
+/* --- Backdrop ---------------------------------------------- */
+.tl-root {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(10px, 2.4vw, 40px);
+  /* A softly-lit gallery, not a black box: the light falls where the
+     tribute hangs. */
+  background:
+    radial-gradient(120% 90% at 50% 32%, rgba(66, 56, 44, 0.55) 0%, rgba(15, 13, 11, 0.94) 62%),
+    rgba(15, 13, 11, 0.96);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  overscroll-behavior: contain;
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+.tl-root.is-open { opacity: 1; }
+.tl-root[hidden] { display: none; }
+
+/* --- Dialog shell ------------------------------------------ */
+.tl-dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 1140px;
+  max-height: 100%;
+  outline: none;
+  transform: translateY(14px) scale(0.985);
+  transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.tl-root.is-open .tl-dialog { transform: none; }
+.tl-dialog:focus { outline: none; }
+.tl-dialog:focus-visible {
+  outline: 2px solid rgba(196, 168, 130, 0.6);
+  outline-offset: 6px;
+  border-radius: var(--radius);
+}
+
+/* --- Close ------------------------------------------------- */
+.tl-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 3;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 17, 14, 0.7);
+  border: 1px solid rgba(196, 168, 130, 0.32);
+  border-radius: 50%;
+  color: #EDE7DF;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.tl-close:hover {
+  background: rgba(196, 168, 130, 0.18);
+  border-color: rgba(196, 168, 130, 0.65);
+  color: #fff;
+}
+.tl-close:focus-visible {
+  outline: 2px solid var(--color-warm);
+  outline-offset: 3px;
+}
+.tl-close .tl-x {
+  font-family: var(--font-body);
+  font-size: 1.6rem;
+  line-height: 1;
+  margin-top: -2px;
+}
+
+/* --- Content area ------------------------------------------ */
+/* One stretched row, so the image and the poem column both get a definite
+   height to constrain themselves against: the image scales down to fit and
+   the poem scrolls on its own rather than pushing the dialog off-screen. */
+.tl-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: clamp(24px, 3.6vw, 56px);
+  align-items: stretch;
+  overflow: hidden;
+  padding: var(--space-sm) 0;
+}
+
+.tl-media {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.tl-img {
+  width: auto;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 3px;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55);
+}
+
+.tl-body {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Clear of the close button, which sits in the dialog's top-right. */
+  padding-right: 56px;
+}
+
+.tl-eyebrow {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-warm);
+  margin: 0;
+}
+.tl-name {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2rem, 4.4vw, 3rem);
+  line-height: 1.1;
+  letter-spacing: 0.005em;
+  color: #F4EFE8;
+  margin: 0.28em 0 0;
+}
+.tl-years {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin: 10px 0 0;
+}
+.tl-years[hidden], .tl-family[hidden] { display: none; }
+
+/* The poem is set like the tribute itself: display serif, generous
+   leading, measure kept short enough to read in one breath. */
+.tl-poem {
+  margin-top: clamp(20px, 2.6vw, 30px);
+  padding-top: clamp(20px, 2.6vw, 30px);
+  border-top: 1px solid rgba(196, 168, 130, 0.28);
+}
+.tl-stanza {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.14rem, 1.5vw, 1.42rem);
+  line-height: 1.75;
+  color: #EDE7DF;
+  max-width: 38ch;
+  margin: 0 0 1.15em;
+  text-wrap: pretty;
+  overflow-wrap: break-word;
+}
+.tl-stanza:last-child { margin-bottom: 0; }
+
+.tl-family {
+  margin: clamp(22px, 2.6vw, 30px) 0 0;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-warm);
+}
+
+/* --- Prev / next bar --------------------------------------- */
+.tl-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid rgba(196, 168, 130, 0.22);
+}
+/* A page with a single tribute has nothing to page through. display:none
+   (not visibility:hidden) so the arrows leave the tab order too. */
+.tl-bar-solo { display: none; }
+
+.tl-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  background: transparent;
+  border: 1px solid rgba(196, 168, 130, 0.38);
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #E4DCD1;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.tl-nav:hover {
+  background: rgba(196, 168, 130, 0.16);
+  border-color: rgba(196, 168, 130, 0.72);
+  color: #fff;
+}
+.tl-nav:focus-visible {
+  outline: 2px solid var(--color-warm);
+  outline-offset: 3px;
+}
+.tl-nav .tl-arrow { font-size: 1rem; line-height: 1; }
+
+.tl-count {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+/* Screen-reader-only announcement when navigating between tributes. */
+.tl-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* --- Stacked layout: phones and short windows --------------- */
+@media (max-width: 860px), (max-height: 560px) {
+  .tl-scroll {
+    display: block;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 var(--space-xs);
+  }
+  .tl-media {
+    display: block;
+    margin: 0 auto;
+    max-width: 420px;
+  }
+  .tl-img {
+    width: 100%;
+    max-height: none;
+  }
+  .tl-body {
+    overflow: visible;
+    max-height: none;
+    margin-top: clamp(22px, 5vw, 34px);
+    padding-right: 0;
+  }
+  /* Full-width column now, but a poem still needs a measure. */
+  .tl-stanza { max-width: 42ch; }
+  .tl-nav { padding: 9px 14px; }
+}
+
+/* Very narrow phones: keep the poem the priority, trim the chrome. */
+@media (max-width: 430px) {
+  .tl-media { max-width: 300px; }
+  .tl-close { top: -2px; right: -2px; width: 40px; height: 40px; }
+  .tl-nav .tl-navtext { display: none; }
+  .tl-nav { padding: 10px 16px; }
+  .tl-stanza { font-size: 1.14rem; line-height: 1.72; }
+}
+
+/* --- Reduced motion: appear, don't animate ------------------ */
+@media (prefers-reduced-motion: reduce) {
+  .tl-root,
+  .tl-dialog,
+  .tl-trigger,
+  .tl-nav,
+  .tl-close {
+    transition: none !important;
+  }
+  .tl-root { opacity: 1; }
+  .tl-dialog { transform: none !important; }
+  .tw-piece .tl-trigger:hover,
+  .tw-piece .tl-trigger:focus-visible { transform: none; }
+}
