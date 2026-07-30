@@ -153,20 +153,38 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
   const padding = Math.round(width * 0.1);
   const innerW = width - padding * 2;
 
-  // Font sizes relative to panel width
-  const nameFontSize = Math.round(width * 0.065);
-  const nicknameFontSize = Math.round(width * 0.03);
-  const datesFontSize = Math.round(width * 0.028);
+  // The tribute panel's proportions differ sharply by layout: landscape leaves
+  // a tall, narrow panel (~1.28 as tall as wide), portrait a wide, short one
+  // (~0.63). Sizing every element off width alone meant that in the portrait
+  // panel the name, dates, nickname, family line and the gaps between them were
+  // all scaled from a large width while the space they had to fit into was
+  // governed by a small height. The furniture ate ~60% of the panel and the
+  // poem — the thing the customer is actually buying — shrank toward its floor
+  // to compensate, landing at ~17% of the name's size against the ~50% the
+  // on-screen preview promises. Capping the chrome by height lets a short panel
+  // scale its furniture down and hand the room back to the poem. Landscape
+  // panels are taller than they are wide, so this never binds there and that
+  // layout renders exactly as before.
+  const chromeScale = Math.min(width, Math.round(height * 1.15));
+
+  // Font sizes: chrome scales with the panel's tighter dimension, the poem
+  // stays width-relative (it is fit to the remaining height below anyway, so a
+  // wide panel should still be allowed to set it large when the room exists).
+  const nameFontSize = Math.round(chromeScale * 0.065);
+  const nicknameFontSize = Math.round(chromeScale * 0.03);
+  const datesFontSize = Math.round(chromeScale * 0.028);
   const poemFontSize = Math.round(width * 0.032);
-  const familyFontSize = Math.round(width * 0.026);
+  const familyFontSize = Math.round(chromeScale * 0.026);
   const lineHeight = 1.55;
 
-  // Footer rhythm — proportional to width so the proof (small) and the 300 DPI
-  // print render the SAME relative spacing. Fixed-pixel gaps here made the
-  // nickname crowd the poem at print scale and diverge between the two sizes.
+  // Footer rhythm — proportional so the proof (small) and the 300 DPI print
+  // render the SAME relative spacing. Fixed-pixel gaps here made the nickname
+  // crowd the poem at print scale and diverge between the two sizes. On
+  // chromeScale for the same reason as the fonts above: a width-derived gap in
+  // a short portrait panel spent height the poem needed.
   // These are used in BOTH the reserve calc and the draw, so they can't drift.
-  const poemToFooterGap = Math.round(width * 0.05);   // poem's last line → footer divider
-  const footerLineGap = Math.round(width * 0.024);    // divider → first footer line
+  const poemToFooterGap = Math.round(chromeScale * 0.05);   // poem's last line → footer divider
+  const footerLineGap = Math.round(chromeScale * 0.024);    // divider → first footer line
   const dividerStroke = Math.max(1, Math.round(width * 0.0016));
 
   // Content is built from y=0 and vertically centered afterwards via a
@@ -235,15 +253,32 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
     // The floor must be low enough that the poem can ALWAYS shrink to fit — in
     // portrait the tribute panel is wide-but-short, and a floor of ~0.017·w was
     // too high, so a medium+ poem overflowed and the frame clipped the footer
-    // (nickname/family). At ~0.009·w the full tribute always fits; landscape
-    // panels are tall so they never reach this floor and keep their larger size.
-    const floorFont = Math.max(8, Math.round(width * 0.009));
+    // (nickname/family). Landscape panels are tall so they never approach this
+    // and keep their larger size.
+    //
+    // 0.009·w was still not low enough for the longest letters: the shrink loop
+    // below stops when it reaches the floor whether or not the text fits, so an
+    // unusually long tribute in a portrait panel ran past the bottom and was
+    // clipped — exactly what this renderer promises never to do. The floor is
+    // now low enough that the loop can always reach a fitting size. Nothing
+    // that already fits is affected: the loop breaks at the LARGEST size that
+    // fits, so a lower floor only ever rescues a tribute that would otherwise
+    // have been cut off.
+    const floorFont = Math.max(8, Math.round(width * 0.005));
     // Cap how large the poem may grow, for aesthetic hierarchy — it stays well
     // below the name (0.065·w). Without an upward pass a short poem floats small
     // and adrift in a large panel, most noticeable on the smaller print sizes
     // (the 8×10 the customer flagged), where the width-relative base is
     // physically tiny. fillH leaves a comfortable margin above the footer.
-    const maxFont = Math.max(poemFontSize, Math.round(width * 0.042));
+    // Also cap the poem against the NAME, not width alone. Now that the name
+    // scales down in a short portrait panel, a width-derived cap alone let a
+    // short poem grow to ~83% of the name and flatten the hierarchy. 0.65 is
+    // the ratio the width-based cap already produced in landscape
+    // (0.042 / 0.065), so that layout keeps its exact previous size.
+    const maxFont = Math.max(
+      poemFontSize,
+      Math.min(Math.round(width * 0.042), Math.round(nameFontSize * 0.65)),
+    );
     const fillH = poemAvailH * 0.9;
     let fit = measurePoem(poemFontSize);
     let poemSize = poemFontSize;
