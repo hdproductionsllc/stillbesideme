@@ -1941,13 +1941,30 @@
         : { w: innerW, h: (innerH - gutter) / 2 };
     }
 
-    const panelEl = document.getElementById('panel-tribute');
-    const host = PreviewRenderer.getContainer && PreviewRenderer.getContainer();
-    if (!panelEl || !host || !host.clientWidth || !host.clientHeight) return null;
-    return {
-      w: printW * (panelEl.clientWidth / host.clientWidth),
-      h: printH * (panelEl.clientHeight / host.clientHeight),
-    };
+    // Full-bleed orders split the print between the panels. For the layout the
+    // customer is actually looking at, read the share off the rendered grid so
+    // a dragged divider is respected. For any OTHER layout — which is how the
+    // orientation suggestion asks "would turning this help?" — the DOM cannot
+    // answer, because it only ever holds the current arrangement; measuring it
+    // would hand back the geometry we already have and the suggestion could
+    // never find a gain. Fall back to the layout's own even split, which is
+    // what calculateLayout uses when no divider ratios are supplied.
+    if (layoutKey === currentLayout) {
+      const panelEl = document.getElementById('panel-tribute');
+      const host = PreviewRenderer.getContainer && PreviewRenderer.getContainer();
+      if (panelEl && host && host.clientWidth && host.clientHeight) {
+        return {
+          w: printW * (panelEl.clientWidth / host.clientWidth),
+          h: printH * (panelEl.clientHeight / host.clientHeight),
+        };
+      }
+    }
+
+    const def = (template.layouts || {})[layoutKey];
+    if (!def) return null;
+    return landscape
+      ? { w: printW / 2, h: printH }
+      : { w: printW, h: printH / 2 };
   }
 
   /**
@@ -1979,6 +1996,40 @@
    * at a comfortable size. Null when no size we sell would actually fix it; we
    * only ever name a size the computation confirms.
    */
+  /**
+   * The other orientation, when simply turning the piece gives the poem room.
+   *
+   * This is offered BEFORE any larger size, because it is free and it is
+   * usually the better fix. The two layouts hand the tribute opposite-shaped
+   * panels: landscape sets it beside the photo (tall and narrow), portrait
+   * stacks it beneath (wide and short). A poem is limited by how many lines
+   * fit, so vertical room is what decides its size — and past about a dozen
+   * lines landscape prints it up to twice as large. On an 11x14 a 24-line
+   * poem is 8.4pt stacked and 16.1pt side-by-side, which beats what the next
+   * size up would give for $50 more. Recommending the paid fix when the free
+   * one works better is not a trade we make.
+   *
+   * Returns null when the current orientation is already the roomier one.
+   */
+  function roomierOrientationFor(sku, layoutKey, poemText) {
+    const layouts = (template && template.layouts) || {};
+    const keys = Object.keys(layouts);
+    if (keys.length < 2) return null;
+
+    const here = predictedPoemPoints(sku, layoutKey, poemText);
+    let best = null;
+    for (const key of keys) {
+      if (key === layoutKey) continue;
+      const points = predictedPoemPoints(sku, key, poemText);
+      if (points === null || points < POEM_COMFORT_PT) continue;
+      // Only worth raising if it is genuinely roomier than where they are.
+      if (here !== null && points <= here) continue;
+      if (best && points <= best.points) continue;
+      best = { key, points, label: (layouts[key] && layouts[key].label) || key };
+    }
+    return best;
+  }
+
   function roomierSizeFor(currentSku, layoutKey, poemText) {
     const products = (template && template.printProducts) || [];
     const family = String(currentSku).split('-')[0];
@@ -2060,14 +2111,31 @@
     const points = predictedPoemPoints(product.sku, currentLayout, poemText);
     if (points === null || points >= POEM_COMFORT_PT) return hide();
 
-    const rescue = roomierSizeFor(product.sku, currentLayout, poemText);
+    // Prefer the free fix. Turning the piece costs the customer nothing and
+    // past about a dozen lines it usually beats the next size up outright, so
+    // it is offered first and a larger size is only named when orientation
+    // cannot rescue the poem on its own.
+    const turn = roomierOrientationFor(product.sku, currentLayout, poemText);
+    const rescue = turn ? null : roomierSizeFor(product.sku, currentLayout, poemText);
     const here = skuSizeLabel(product.sku);
     const there = rescue ? skuSizeLabel(rescue.product.sku) : '';
+    const turnTo = turn ? String(turn.label).toLowerCase() : '';
     const subject = poemSubject();
     const tight = points < POEM_TIGHT_PT;
 
     let copy;
-    if (tight && rescue) {
+    if (turn) {
+      // Same piece, same price — the poem simply gets a taller column to sit in.
+      copy = tight
+        ? `${subject} runs long, and stacked under the photo it prints small `
+          + `enough to be hard to read from a step back. Turned ${turnTo}, beside `
+          + `the photo, the same words have room to print at a comfortable size — `
+          + `same size piece, same price. Either way, you'll see a proof before `
+          + `anything is made.`
+        : `${subject} has a lot of lines, so in this arrangement it prints small — `
+          + `every word is there, just quiet. Turned ${turnTo} the same words have `
+          + `room to breathe, at the same size and price.`;
+    } else if (tight && rescue) {
       copy = `${subject} runs long. On the ${here} every word still prints, but `
         + `small enough to be hard to read from a step back. On the ${there} the `
         + `same words print at a comfortable size. Either way, you'll see a proof `
@@ -2098,7 +2166,20 @@
     text.textContent = copy;
     host.appendChild(text);
 
-    if (rescue) {
+    if (turn) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'poem-fit-note-action';
+      button.textContent = `Turn it ${turnTo}`;
+      // Straight through the layout option's own handler, exactly as if the
+      // customer had chosen it — preview, selectors and saved state all follow.
+      button.addEventListener('click', () => {
+        const option = document.querySelector(
+          `.layout-option[data-layout="${turn.key}"]`);
+        if (option) option.click();
+      });
+      host.appendChild(button);
+    } else if (rescue) {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'poem-fit-note-action';
