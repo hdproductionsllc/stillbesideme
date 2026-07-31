@@ -199,6 +199,16 @@
   let fontsLoaded = false;
   let renderQueued = false;
 
+  // ── Poem fit probe (see measurePoemFit) ────────────────────
+  // The tribute panel fits the poem to the space it has — extra lines come out
+  // of the font size, never out of the text. The customizer needs that fitted
+  // size to tell the customer how large their poem will actually print, so the
+  // tribute renderer records it on every render, and measurePoemFit can run
+  // that same renderer over a hypothetical panel. Nothing re-implements the
+  // fitting, so the note and the artwork can never disagree.
+  let lastPoemFit = null;    // { fontSize, blockH, availH, panelW } from the last render
+  let fitProbeText = null;   // when set, the renderer measures this text instead
+
   // Elegant single-color engraved symbols (inherit the accent color)
   const FRAME_ICONS = {
     none: '',
@@ -227,6 +237,7 @@
     setLayout,
     setFrameSize,
     getFields: () => ({ ...fields }),
+    measurePoemFit,
     render,
     getCurrentFrValues,
     setCustomRatios,
@@ -951,6 +962,13 @@
       poemText = previewPoemText;
       poemIsSample = true;
     }
+    // Fit probe: measure a candidate poem (e.g. one still being typed in the
+    // customizer) instead of the saved one. Only ever set by measurePoemFit,
+    // which draws to its own offscreen canvas — never during a visible render.
+    if (fitProbeText !== null) {
+      poemText = fitProbeText;
+      poemIsSample = false;
+    }
     const birthDate = fields[birthField] || '';
     const passDate = fields[passField] || '';
     let dateStr = '';
@@ -986,7 +1004,13 @@
     // ── Measure poem at a given font size ──
 
     function measurePoem(fontSize) {
-      var lh = fontSize * 1.55;
+      // Must match `lineHeight` in tributeRenderer.buildTributeSvg. The preview
+      // is the customer's only view of the piece before the proof, so a looser
+      // measure here does not just look different — it fits the poem to a
+      // different height and lands on a different size than the print will,
+      // and it skews the printed-size prediction that drives the readability
+      // note. Change this and the renderer together.
+      var lh = fontSize * 1.40;
       var blankH = lh * 0.5;
       ctx.font = '500 ' + Math.round(fontSize) + 'px "Cormorant Garamond", serif';
       var lines = wrapText(ctx, poemText, maxTextWidth * 0.92);
@@ -1007,6 +1031,7 @@
     ];
 
     var margin, pad, poem;
+    var poemAvailH = 0;   // the height the poem had to fit into (for measurePoemFit)
 
     if (poemText) {
       var fullPoem = measurePoem(poemBaseSize);
@@ -1032,6 +1057,7 @@
         // fill to 90% of the available zone keeps a comfortable margin.
         var growMax = poemBaseSize * 1.3;
         var growAvail = h - margin * 2 - headerH - pad * 2 - footerH;
+        poemAvailH = growAvail;
         for (var gs = Math.round(poemBaseSize) + 1; gs <= growMax; gs += 1) {
           var gm = measurePoem(gs);
           if (gm.totalH > growAvail * 0.9) break;
@@ -1044,6 +1070,7 @@
         margin = h * last.marginPct;
         pad = last.pad;
         var available = h - margin * 2 - headerH - pad * 2 - footerH;
+        poemAvailH = available;
 
         // Shrink the poem until it fits the panel. The poem is the product, so
         // we hold its size as long as we can, but a tribute must NEVER be
@@ -1063,6 +1090,10 @@
       pad = tiers[0].pad;
       poem = { lines: [], lineH: 0, blankH: 0, totalH: 0, fontSize: poemBaseSize };
     }
+
+    // The size the poem settled at, for measurePoemFit. blockH vs availH says
+    // whether it still overflows (the panel shrinks it only to a legible floor).
+    lastPoemFit = { fontSize: poem.fontSize, blockH: poem.totalH, availH: poemAvailH, panelW: w };
 
     // ── Draw ──
 
@@ -1133,6 +1164,41 @@
     if (hasFooter) {
       drawDivider(ctx, cx, fy, 28 * scale, colors.divider, scale);
     }
+  }
+
+  /**
+   * How large does the poem end up in a tribute panel of these proportions?
+   *
+   * Runs the REAL tribute renderer over an offscreen canvas — there is no
+   * second copy of the fitting rules anywhere — and reports the size the poem
+   * settled at. The customizer turns that into the printed point size for its
+   * readability note (fontSize / panelW is the same fraction at any scale, so
+   * fraction × the panel's printed width in inches × 72 = printed points).
+   *
+   * @param {number} w — panel width in px (only the w:h proportion matters)
+   * @param {number} h — panel height in px
+   * @param {string} [poemTextOverride] — measure this text instead of the saved poem
+   * @returns {{fontSize:number, blockH:number, availH:number, panelW:number}|null}
+   */
+  function measurePoemFit(w, h, poemTextOverride) {
+    if (!(w > 0) || !(h > 0)) return null;
+    var canvas = document.createElement('canvas');
+    canvas.width = Math.round(w);
+    canvas.height = Math.round(h);
+    var ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    var previous = lastPoemFit;
+    lastPoemFit = null;
+    fitProbeText = typeof poemTextOverride === 'string' ? poemTextOverride : null;
+    try {
+      renderTributePanel(ctx, canvas);
+    } finally {
+      fitProbeText = null;
+    }
+    var result = lastPoemFit;
+    lastPoemFit = previous;   // the visible panel's own fit stays the recorded one
+    return result;
   }
 
   // ── Text Panel (3rd panel custom message) ──────────────────

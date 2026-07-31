@@ -331,6 +331,9 @@
         updateFrameSectionVisibility(initialProduct.dataset.sku);
       }
 
+      // A restored session can arrive with a long poem already in place.
+      schedulePoemFitNote();
+
       // Attach divider handles after initial layout
       requestAnimationFrame(() => {
         attachDividerHandles();
@@ -1688,6 +1691,10 @@
       editArea.style.display = '';
     });
 
+    // Pasting a long poem is exactly the moment this matters, so the note
+    // follows the editor live (debounced) rather than waiting for a save.
+    editTextarea.addEventListener('input', () => schedulePoemFitNote());
+
     saveEditBtn.addEventListener('click', () => {
       const edited = editTextarea.value.trim();
       if (edited) {
@@ -1707,6 +1714,7 @@
     cancelEditBtn.addEventListener('click', () => {
       editArea.style.display = 'none';
       resultDiv.style.display = '';
+      schedulePoemFitNote();   // back to the saved poem
     });
 
     libraryToggle.addEventListener('click', () => {
@@ -1824,6 +1832,287 @@
 
     section.appendChild(grid);
     return section;
+  }
+
+  // ── Poem Readability Note ────────────────────────────────────
+  //
+  // A long poem is never truncated: the tribute renderer fits it to the panel,
+  // so every extra line comes out of the font size instead. Until now the
+  // customer only discovered that when the proof arrived. This tells them here,
+  // gently, while they can still do something about it — and the something is
+  // usually just a larger size, which is honest guidance, not a nudge to spend.
+  //
+  // Same promise as the photo-quality message: say what we can see, never
+  // block, never scold. A long poem on a small print is a perfectly good order.
+  //
+  // How the printed size is derived:
+  //   • PreviewRenderer.measurePoemFit runs the REAL tribute renderer over an
+  //     offscreen panel and reports the size the poem settled at. Nothing here
+  //     re-implements the fitting, so this note can never drift from the art.
+  //   • fittedFontSize / panelWidthPx is the same fraction at any scale, so
+  //         printed points = fraction x panelWidthInches x 72.
+  //   • The panel's printed width in inches comes from the print renderer's own
+  //     geometry (see tributePanelInches).
+
+  // Thresholds are real printed point sizes: the preview now sets verse on the
+  // same 1.40 leading as the print renderer, so what this file computes tracks
+  // what comes off the press to within about 5% and needs no bias correction.
+  //
+  // Why 8.5 and not a rounder 10: the note must always mean "your words are
+  // being squeezed", never "you picked a small print". Inside its mat an 8x10
+  // gives the tribute a 3x5 inch panel, which tops out at ~9.1pt even for a
+  // four-line poem — so a 10pt tier would fire on every 8x10 order no matter
+  // what the customer wrote, and the suggestion to size up would read as a
+  // shakedown. 8.5 sits just under that ceiling, so a short poem is silent at
+  // every size and the note only appears once length is genuinely the cause.
+  //
+  // Measured against the real renderer: an 8-12 line poem or a 10-14 line
+  // letter never trips either tier at the default 11x14 in either layout.
+  const POEM_COMFORT_PT = 8.5;   // below this: a gentle note
+  const POEM_TIGHT_PT = 6.5;     // below this: a firmer (still warm) one
+  const FIT_PROBE_W = 900;       // px — only the panel's proportions matter
+  const FIT_DEBOUNCE_MS = 250;
+
+  let poemFitTimer = null;
+  let poemFitSignature = null;
+
+  /** True when a layout prints wider than tall (mirrors the preview's own test). */
+  function isLandscapeLayout(layoutKey) {
+    const def = (PreviewRenderer.getLayouts() || {})[layoutKey];
+    const parts = String((def && def.aspectRatio) || '1/1').split('/');
+    return parseFloat(parts[0]) > parseFloat(parts[1]);
+  }
+
+  /** Physical area of a SKU in square inches, for ordering sizes. */
+  function skuArea(sku) {
+    const m = String(sku || '').match(/(\d+)x(\d+)/);
+    return m ? Number(m[1]) * Number(m[2]) : 0;
+  }
+
+  /** "framed-11x14" → "11×14" — how a size reads inside a sentence. */
+  function skuSizeLabel(sku) {
+    const m = String(sku || '').match(/(\d+)x(\d+)/);
+    return m ? `${m[1]}×${m[2]}` : '';
+  }
+
+  /**
+   * The tribute panel's PRINTED size in inches, for a SKU and the current layout.
+   *
+   * SKU parsing matches printRenderer.calculatePrintDimensions exactly — the
+   * convention lists the SMALLER dimension first, so a landscape layout prints
+   * wider than tall (14x11 for an 11x14) and a portrait one taller than wide.
+   *
+   * The panel inside that print comes from tributeRenderer:
+   *   • Printed-mat templates (colorMode 'auto' + printSpec) inset every
+   *     opening inside the mat border and split what is left across a gutter
+   *     (calculateMatLayout). Portrait: the tribute spans the full opening
+   *     width and half its height; landscape: half the width, full height.
+   *     That path ignores divider ratios, exactly as the print renderer does.
+   *   • Everything else fills the print edge to edge (calculateLayout), split
+   *     by the customer's dividers — and the preview grid IS that split, so we
+   *     read the share off the laid-out panel rather than restating the maths.
+   */
+  function tributePanelInches(sku, layoutKey) {
+    const m = String(sku || '').match(/(\d+)x(\d+)/);
+    if (!m) return null;
+    const landscape = isLandscapeLayout(layoutKey);
+    const printW = landscape ? Number(m[2]) : Number(m[1]);
+    const printH = landscape ? Number(m[1]) : Number(m[2]);
+
+    // Whether this ORDER prints a mat is decided per order, not per template:
+    // tributeRenderer.resolveOrderData sets hasPrintedMat from
+    // `fields.colors && isHex(fields.colors.mat)`, and checkout posts
+    // `colors: currentColors`, which stays null until a photo yields
+    // auto-matched colors or the customer taps a swatch. Keying off the
+    // template alone predicted the small matted panel for full-bleed orders
+    // too — on an 8x10 portrait that is a 5x3" panel instead of the real
+    // 8x5", under-reporting the printed size by ~40% and warning about a poem
+    // that prints perfectly well. Mirror the renderer's own condition instead.
+    const spec = template.printSpec;
+    const printsMat = !!(currentColors && /^#[0-9a-fA-F]{6}$/.test(String(currentColors.mat || '')));
+    if (printsMat && spec) {
+      const border = Number(spec.matBorderIn) || 0;
+      const gutter = Number(spec.gutterIn) || 0;
+      const innerW = printW - border * 2;
+      const innerH = printH - border * 2;
+      if (innerW <= 0 || innerH <= 0) return null;
+      return landscape
+        ? { w: (innerW - gutter) / 2, h: innerH }
+        : { w: innerW, h: (innerH - gutter) / 2 };
+    }
+
+    const panelEl = document.getElementById('panel-tribute');
+    const host = PreviewRenderer.getContainer && PreviewRenderer.getContainer();
+    if (!panelEl || !host || !host.clientWidth || !host.clientHeight) return null;
+    return {
+      w: printW * (panelEl.clientWidth / host.clientWidth),
+      h: printH * (panelEl.clientHeight / host.clientHeight),
+    };
+  }
+
+  /**
+   * Predicted printed size of the poem, in points, at a given SKU.
+   * Returns null when it cannot be computed — we never guess.
+   */
+  function predictedPoemPoints(sku, layoutKey, poemText) {
+    if (!poemText || !PreviewRenderer.measurePoemFit) return null;
+    const panel = tributePanelInches(sku, layoutKey);
+    if (!panel || !(panel.w > 0) || !(panel.h > 0)) return null;
+
+    const fit = PreviewRenderer.measurePoemFit(
+      FIT_PROBE_W, FIT_PROBE_W * panel.h / panel.w, poemText);
+    if (!fit || !(fit.fontSize > 0) || !(fit.panelW > 0)) return null;
+
+    // The preview stops shrinking at its own legible floor; the print keeps
+    // going, because a tribute is never clipped. When the block still overflows
+    // the space it has, the size that truly fits is smaller in that proportion.
+    const squeeze = (fit.blockH > 0 && fit.availH > 0)
+      ? Math.min(1, fit.availH / fit.blockH)
+      : 1;
+
+    return (fit.fontSize / fit.panelW) * squeeze * panel.w * 72;
+  }
+
+  /**
+   * The smallest larger size — in the same product family, so a framed order is
+   * never answered with "buy the unframed one" — where these same words print
+   * at a comfortable size. Null when no size we sell would actually fix it; we
+   * only ever name a size the computation confirms.
+   */
+  function roomierSizeFor(currentSku, layoutKey, poemText) {
+    const products = (template && template.printProducts) || [];
+    const family = String(currentSku).split('-')[0];
+    const currentArea = skuArea(currentSku);
+    if (!currentArea) return null;
+
+    let best = null;
+    for (const product of products) {
+      if (String(product.sku).split('-')[0] !== family) continue;
+      const area = skuArea(product.sku);
+      if (!area || area <= currentArea) continue;
+      if (best && area >= best.area) continue;
+      const points = predictedPoemPoints(product.sku, layoutKey, poemText);
+      if (points === null || points < POEM_COMFORT_PT) continue;
+      best = { product, area, points };
+    }
+    return best;
+  }
+
+  /** The poem as it stands — including one still being typed in the editor. */
+  function poemTextForFit() {
+    const editArea = document.getElementById('poem-edit-area');
+    const textarea = document.getElementById('poem-edit-textarea');
+    if (editArea && editArea.style.display !== 'none' && textarea) {
+      return textarea.value.trim();
+    }
+    const fields = PreviewRenderer.getFields();
+    return fields && fields.poemText ? String(fields.poemText).trim() : '';
+  }
+
+  /** The note lives with the size chooser — where the fix is one click away. */
+  function poemFitNoteHost() {
+    let host = document.getElementById('poem-fit-note');
+    if (host) return host;
+    const anchor = document.querySelector('.product-grid')
+      || document.querySelector('.single-product-line');
+    if (!anchor || !anchor.parentNode) return null;
+    host = document.createElement('div');
+    host.id = 'poem-fit-note';
+    host.className = 'poem-fit-note';
+    // Politely announced, never interrupting — it arrives while they are
+    // reading the sizes, not as an alert.
+    host.setAttribute('role', 'status');
+    host.hidden = true;
+    anchor.parentNode.insertBefore(host, anchor.nextSibling);
+    return host;
+  }
+
+  /** "Bailey's poem" when we know the name, "their poem" when we don't. */
+  function poemSubject() {
+    const fields = PreviewRenderer.getFields();
+    const name = ((fields && fields[nameFieldId()]) || '').trim();
+    const label = poemLabel().toLowerCase();
+    return name ? `${name}'s ${label}` : `Their ${label}`;
+  }
+
+  function schedulePoemFitNote(delayMs) {
+    clearTimeout(poemFitTimer);
+    poemFitTimer = setTimeout(updatePoemFitNote,
+      typeof delayMs === 'number' ? delayMs : FIT_DEBOUNCE_MS);
+  }
+
+  function updatePoemFitNote() {
+    const host = poemFitNoteHost();
+    if (!host) return;
+
+    const product = getSelectedProduct();
+    const poemText = poemTextForFit();
+    const ratios = PreviewRenderer.getCurrentFrValues
+      ? JSON.stringify(PreviewRenderer.getCurrentFrValues())
+      : '';
+    const signature = [product && product.sku, currentLayout, ratios, poemText].join('|');
+    if (signature === poemFitSignature) return;
+    poemFitSignature = signature;
+
+    const hide = () => { host.hidden = true; host.innerHTML = ''; };
+    if (!product || !poemText) return hide();
+
+    const points = predictedPoemPoints(product.sku, currentLayout, poemText);
+    if (points === null || points >= POEM_COMFORT_PT) return hide();
+
+    const rescue = roomierSizeFor(product.sku, currentLayout, poemText);
+    const here = skuSizeLabel(product.sku);
+    const there = rescue ? skuSizeLabel(rescue.product.sku) : '';
+    const subject = poemSubject();
+    const tight = points < POEM_TIGHT_PT;
+
+    let copy;
+    if (tight && rescue) {
+      copy = `${subject} runs long. On the ${here} every word still prints, but `
+        + `small enough to be hard to read from a step back. On the ${there} the `
+        + `same words print at a comfortable size. Either way, you'll see a proof `
+        + `before anything is made.`;
+    } else if (tight) {
+      copy = `${subject} runs long. At this size every word still prints, but `
+        + `small enough to be hard to read from a step back. Trimming a few lines `
+        + `would give the rest more room. Either way, you'll see a proof before `
+        + `anything is made.`;
+    } else if (rescue) {
+      copy = `${subject} has a lot of lines, so on the ${here} it prints small — `
+        + `every word is there, just quiet. On the ${there} the same words have `
+        + `room to breathe.`;
+    } else {
+      copy = `${subject} has a lot of lines, so at this size it prints small — `
+        + `every word is there, just quiet. You'll see a proof before anything `
+        + `is made.`;
+    }
+
+    host.innerHTML = '';
+    host.hidden = false;
+    host.classList.toggle('is-firm', tight);
+    // Kept off the page, for support: what we actually computed.
+    host.dataset.predictedPt = points.toFixed(1);
+
+    const text = document.createElement('p');
+    text.className = 'poem-fit-note-text';
+    text.textContent = copy;
+    host.appendChild(text);
+
+    if (rescue) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'poem-fit-note-action';
+      button.textContent = `Use the ${there}`;
+      // One click, through the size option's own handler, so the preview,
+      // price, frame chooser and saved state all follow exactly as if the
+      // customer had picked it themselves. We never change it for them.
+      button.addEventListener('click', () => {
+        const option = document.querySelector(
+          `.product-option[data-sku="${rescue.product.sku}"]`);
+        if (option) option.click();
+      });
+      host.appendChild(button);
+    }
   }
 
   // ── Order Type Form Updates ──────────────────────────────────
@@ -2368,6 +2657,11 @@
     } catch (e) {
       // sessionStorage may not be available
     }
+
+    // Every meaningful change lands here — poem, size, layout, dividers — so
+    // this is the one place the readability note needs to listen. It debounces
+    // and skips the work entirely when nothing it depends on actually moved.
+    schedulePoemFitNote();
   }
 
   function restoreState() {
