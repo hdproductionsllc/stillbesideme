@@ -165,7 +165,7 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
   // scale its furniture down and hand the room back to the poem. Landscape
   // panels are taller than they are wide, so this never binds there and that
   // layout renders exactly as before.
-  const chromeScale = Math.min(width, Math.round(height * 1.15));
+  const chromeScale = Math.min(width, Math.round(height * 1.0));
 
   // Font sizes: chrome scales with the panel's tighter dimension, the poem
   // stays width-relative (it is fit to the remaining height below anyway, so a
@@ -175,7 +175,12 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
   const datesFontSize = Math.round(chromeScale * 0.028);
   const poemFontSize = Math.round(width * 0.032);
   const familyFontSize = Math.round(chromeScale * 0.026);
-  const lineHeight = 1.55;
+  // Leading for the poem only (see measurePoem). 1.55 is generous for centred
+  // verse and it was costing real size: every 0.01 of leading is spent 13-odd
+  // times over on a typical tribute, and in a short portrait panel that came
+  // straight out of the font size. 1.40 still reads as verse rather than prose
+  // and buys roughly a 10% larger face.
+  const lineHeight = 1.40;
 
   // Footer rhythm — proportional so the proof (small) and the 300 DPI print
   // render the SAME relative spacing. Fixed-pixel gaps here made the nickname
@@ -191,7 +196,11 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
   // single <g> translate — keeps short poems from leaving dead space below.
   let y = 0;
   const elements = [];
-  const maxContentH = height - Math.round(height * 0.12);
+  // Vertical breathing room at the panel edges. Held at 10% rather than pushed
+  // lower: the last footer line sits near the bottom of the printed piece, and
+  // on framed orders the mat overlaps the panel edge, so the final 2% is worth
+  // more as margin than as font size.
+  const maxContentH = height - Math.round(height * 0.10);
 
   // Header mirrors the preview: name, dates, divider. The nickname lives in
   // the footer (with the family line), exactly where the preview draws it.
