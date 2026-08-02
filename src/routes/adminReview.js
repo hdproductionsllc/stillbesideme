@@ -1,17 +1,30 @@
 /**
- * Admin Review Routes — the human gate between payment and the customer
- * proof email.
+ * Admin Review Routes — the human gate between payment and the printer.
  *
- * BRAND RULE: every proof passes David/Rebecca's review before the customer
- * sees it. The approve action below is the ONLY caller of sendProofEmail.
- * Never add an automatic path around this page.
+ * BRAND RULE: every tribute passes David/Rebecca's review before it goes to
+ * production. Never add an automatic path around this page.
+ *
+ * What this page is NO LONGER is a gate in front of a customer proof email.
+ * The customer now approves their real, watermarked proof inline, before they
+ * pay (src/routes/checkout.js), so by the time an order lands here the
+ * approval is already on record — orders.proof_approved_at plus the exact
+ * orders.proof_approved_url they saw. Approving therefore releases the order
+ * STRAIGHT to production. The customer is never asked to approve anything a
+ * second time, and never receives a proof email.
+ *
+ * One exception, and it is temporary: an order that was already paid before
+ * inline approval shipped has no approval on record and has never seen its
+ * proof. Approving one of those keeps the old behaviour and emails them the
+ * proof, because the alternative is printing artwork a grieving customer was
+ * never shown. That branch retires itself once no such orders remain.
  *
  * Uses the same tokenized model as adminOrder.js (admin_token, generated at
  * payment, deliberately separate from the customer-facing proof_token).
  *
  * GET  /api/admin/review/:token/data     — Order + answers + poem + proof
  * POST /api/admin/review/:token/poem     — Save edited poem, regenerate proof
- * POST /api/admin/review/:token/approve  — Send the proof email to the customer
+ * POST /api/admin/review/:token/approve  — Release to production (or, for a
+ *                                          legacy order, send the proof email)
  *
  * Handles both fresh orders (awaiting_review) and customer change requests
  * (change_requested) — same page, same actions.

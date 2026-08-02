@@ -460,6 +460,7 @@
       <button class="btn btn-warm btn-lg" id="purchase-btn">
         Continue to Checkout
       </button>
+      <p class="proof-note" id="proof-note" role="status" aria-live="polite" hidden></p>
       <ul class="checkout-reassurance">
         <li>You approve every word before anything is printed</li>
         <li>Full refund any time before you approve &mdash; no questions asked</li>
@@ -2611,8 +2612,75 @@
     }
   }
 
+  /**
+   * The one description of the order the server needs. Both the proof request
+   * and the checkout request post exactly this — the proof the customer
+   * approves is rendered from the same description that goes on to print.
+   */
+  function buildOrderBody(product, fields, poemText) {
+    return {
+      templateId: TEMPLATE_ID,
+      sku: product.sku,
+      fields,
+      poemText: poemText.trim(),
+      style: currentStyle,
+      layout: currentLayout,
+      orderType,
+      colors: currentColors,
+      frameIcon,
+      frameChoice: currentFrame,
+      poemFirst,
+      // What the customer framed on screen must be what prints: the
+      // divider-drag panel ratios and each photo's zoom/pan. The server
+      // sanitizes both and its renderers reproduce them exactly.
+      customRatios: PreviewRenderer.getCurrentFrValues(),
+      photoCrops: {
+        photo: PreviewRenderer.getPhotoCrop('photo'),
+        panel2: PreviewRenderer.getPhotoCrop('panel2'),
+      },
+    };
+  }
+
+  /**
+   * Real checkout intent — GA4 + Meta with the true order value. Fired when
+   * the customer approves their proof and heads for payment, not when they
+   * ask to see the proof. (The marketing pages' CTA-click event is
+   * top-of-funnel only; this is the one that carries the amount they pay.)
+   */
+  function fireCheckoutAnalytics(product) {
+    try {
+      const upcharge = isFramedSku(product.sku) ? frameUpchargeCents() : 0;
+      const value = (product.price + upcharge) / 100;
+      if (typeof gtag === 'function') {
+        gtag('event', 'begin_checkout', { currency: 'USD', value });
+      }
+      if (typeof fbq === 'function' && window.SBM_ENV && window.SBM_ENV.metaPixelId) {
+        fbq('track', 'InitiateCheckout', { currency: 'USD', value });
+      }
+    } catch (e) { /* analytics must never block checkout */ }
+  }
+
+  /** POST JSON with a hard timeout, so nothing can hang silently forever. */
+  async function postJson(url, body, timeoutMs) {
+    const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    let timer = null;
+    if (ctrl && timeoutMs) timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: ctrl ? ctrl.signal : undefined,
+      });
+      let data = {};
+      try { data = await res.json(); } catch (e) { data = {}; }
+      return { ok: res.ok, data: data || {} };
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
   async function handlePurchase() {
-    const btn = document.getElementById('purchase-btn');
     const product = getSelectedProduct();
 
     if (!product) {
@@ -2638,68 +2706,439 @@
       return;
     }
 
-    // Real checkout intent — fire GA4 + Meta with the true order value.
-    // (The marketing pages' CTA-click event is top-of-funnel only; this is
-    // the one that carries the amount the customer is about to pay.)
-    try {
-      const upcharge = isFramedSku(product.sku) ? frameUpchargeCents() : 0;
-      const value = (product.price + upcharge) / 100;
-      if (typeof gtag === 'function') {
-        gtag('event', 'begin_checkout', { currency: 'USD', value });
-      }
-      if (typeof fbq === 'function' && window.SBM_ENV && window.SBM_ENV.metaPixelId) {
-        fbq('track', 'InitiateCheckout', { currency: 'USD', value });
-      }
-    } catch (e) { /* analytics must never block checkout */ }
+    if (proofBusy || proofOpen) return;   // one proof at a time
 
-    // Disable button and show loading
-    btn.disabled = true;
-    btn.textContent = 'Preparing checkout...';
+    // Ask for the real, watermarked proof of this exact piece. Compositing it
+    // takes a few seconds, so the button says so rather than sitting dead.
+    proofBusy = true;
+    setPurchaseButtonBusy(true);
+    setProofNote('Setting your words into the frame. This takes a few seconds.', 'wait');
 
     try {
-      const res = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          templateId: TEMPLATE_ID,
-          sku: product.sku,
-          fields,
-          poemText: poemText.trim(),
-          style: currentStyle,
-          layout: currentLayout,
-          orderType,
-          colors: currentColors,
-          frameIcon,
-          frameChoice: currentFrame,
-          poemFirst,
-          // What the customer framed on screen must be what prints: the
-          // divider-drag panel ratios and each photo's zoom/pan. The server
-          // sanitizes both and its renderers reproduce them exactly.
-          customRatios: PreviewRenderer.getCurrentFrValues(),
-          photoCrops: {
-            photo: PreviewRenderer.getPhotoCrop('photo'),
-            panel2: PreviewRenderer.getPhotoCrop('panel2'),
-          },
-        }),
-      });
+      const { ok, data } = await postJson('/api/checkout/proof',
+        buildOrderBody(product, fields, poemText), PROOF_TIMEOUT_MS);
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.error || 'Something went wrong. Please try again.');
-        btn.disabled = false;
-        updatePurchaseButton();
+      if (!ok || !data.orderId || !data.proofUrl) {
+        setProofNote(data.error ||
+          'We couldn’t finish your proof just now. Nothing has been charged, and everything you’ve made is exactly as you left it — please try again in a moment.',
+          'error');
         return;
       }
 
-      // Redirect to Stripe Checkout
+      clearProofNote();
+      proofOrder = {
+        orderId: data.orderId,
+        proofUrl: data.proofUrl,
+        body: buildOrderBody(product, fields, poemText),
+        product,
+        petName: (fields[nameFieldId()] || '').trim(),
+        analyticsFired: false,
+      };
+      openProofDialog();
+    } catch (err) {
+      console.error('Proof error:', err);
+      const aborted = err && (err.name === 'AbortError' || err.code === 20);
+      setProofNote(aborted
+        ? 'That took longer than it should have. Nothing has been charged and your piece is exactly as you left it — please try again.'
+        : 'We couldn’t reach us just now. Nothing has been charged — check your connection and try again.',
+        'error');
+    } finally {
+      proofBusy = false;
+      setPurchaseButtonBusy(false);
+    }
+  }
+
+  // ── Proof approval ─────────────────────────────────────────
+  // The last thing before payment: the customer's real, watermarked proof,
+  // shown large enough to read, with one tick that sends it to print. There is
+  // no email round-trip — what they approve here is what is made.
+
+  const PROOF_TIMEOUT_MS = 60000;      // proof compositing runs server-side
+  const CHECKOUT_TIMEOUT_MS = 30000;
+
+  const PROOF_FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), ' +
+    'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+  const proofReduceMotion = window.matchMedia
+    ? window.matchMedia('(prefers-reduced-motion: reduce)')
+    : { matches: false };
+
+  let proofEls = null;          // dialog nodes, built on first use
+  let proofOrder = null;        // { orderId, proofUrl, body, product, petName }
+  let proofOpen = false;
+  let proofBusy = false;        // proof request in flight
+  let proofSubmitting = false;  // checkout request in flight (dialog is locked)
+  let proofLastFocus = null;
+  let proofPrevOverflow = '';
+  let proofPrevPadRight = '';
+  let proofCloseTimer = null;
+
+  /** The purchase button never looks dead: it says what it is doing. */
+  function setPurchaseButtonBusy(on) {
+    const btn = document.getElementById('purchase-btn');
+    if (!btn) return;
+    if (on) {
+      btn.disabled = true;
+      btn.setAttribute('aria-busy', 'true');
+      btn.classList.add('is-preparing');
+      btn.textContent = 'Preparing your proof…';
+    } else {
+      btn.disabled = false;
+      btn.removeAttribute('aria-busy');
+      btn.classList.remove('is-preparing');
+      btn.textContent = 'Continue to Checkout';
+      updatePurchaseButton();
+    }
+  }
+
+  function setProofNote(message, kind) {
+    const note = document.getElementById('proof-note');
+    if (!note) return;
+    note.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    note.classList.toggle('is-error', kind === 'error');
+    note.classList.toggle('is-wait', kind === 'wait');
+    note.textContent = message;
+    note.hidden = false;
+  }
+
+  function clearProofNote() {
+    const note = document.getElementById('proof-note');
+    if (!note) return;
+    note.textContent = '';
+    note.hidden = true;
+    note.classList.remove('is-error', 'is-wait');
+  }
+
+  function setProofStatus(message, kind) {
+    if (!proofEls) return;
+    proofEls.status.classList.toggle('is-error', kind === 'error');
+    proofEls.status.textContent = message || '';
+  }
+
+  function buildProofDialog() {
+    const root = document.createElement('div');
+    root.className = 'pf-root';
+    root.id = 'proof-approval';
+    root.hidden = true;
+
+    const dialog = document.createElement('div');
+    dialog.className = 'pf-dialog';
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.setAttribute('aria-labelledby', 'pf-title');
+    dialog.setAttribute('tabindex', '-1');
+
+    // Static skeleton only — every piece of customer text (their pet's name)
+    // is written with textContent below, never through innerHTML.
+    dialog.innerHTML = `
+      <button type="button" class="pf-close" id="pf-close" aria-label="Close and keep editing">
+        <span class="pf-x" aria-hidden="true">&times;</span>
+      </button>
+      <div class="pf-scroll" id="pf-scroll">
+        <div class="pf-head">
+          <p class="pf-eyebrow">Your proof</p>
+          <h2 class="pf-title" id="pf-title"></h2>
+          <p class="pf-lede" id="pf-lede"></p>
+        </div>
+        <div class="pf-frame" id="pf-frame">
+          <p class="pf-loading" id="pf-loading">
+            <span class="pf-spinner" aria-hidden="true"></span>
+            <span>Bringing your proof in…</span>
+          </p>
+          <img class="pf-img" id="pf-img" alt="" decoding="async">
+        </div>
+        <div class="pf-tools">
+          <button type="button" class="pf-zoom" id="pf-zoom" aria-pressed="false">Zoom in to read</button>
+        </div>
+      </div>
+      <div class="pf-foot">
+        <div class="pf-approve">
+          <label class="pf-check" for="pf-agree">
+            <input type="checkbox" id="pf-agree">
+            <span class="pf-check-text" id="pf-agree-text"></span>
+          </label>
+          <p class="pf-final" id="pf-final">This is the final version. Once you tick the box and continue, it goes to print exactly as you see it here — the words, the photo and the layout stay as they are. If anything isn’t right, keep editing and we’ll make you a new proof.</p>
+        </div>
+        <div class="pf-actions">
+          <button type="button" class="pf-confirm" id="pf-confirm" aria-describedby="pf-final" disabled></button>
+          <button type="button" class="pf-back" id="pf-back">Keep editing</button>
+          <p class="pf-nudge" id="pf-nudge">Tick the box above when you’re ready.</p>
+        </div>
+      </div>
+      <p class="pf-status" id="pf-status" role="status" aria-live="polite"></p>
+    `;
+
+    root.appendChild(dialog);
+    document.body.appendChild(root);
+
+    const els = {
+      root,
+      dialog,
+      close: dialog.querySelector('#pf-close'),
+      scroll: dialog.querySelector('#pf-scroll'),
+      title: dialog.querySelector('#pf-title'),
+      lede: dialog.querySelector('#pf-lede'),
+      frame: dialog.querySelector('#pf-frame'),
+      loading: dialog.querySelector('#pf-loading'),
+      img: dialog.querySelector('#pf-img'),
+      zoom: dialog.querySelector('#pf-zoom'),
+      agree: dialog.querySelector('#pf-agree'),
+      agreeText: dialog.querySelector('#pf-agree-text'),
+      confirm: dialog.querySelector('#pf-confirm'),
+      back: dialog.querySelector('#pf-back'),
+      nudge: dialog.querySelector('#pf-nudge'),
+      status: dialog.querySelector('#pf-status'),
+    };
+
+    els.close.addEventListener('click', () => closeProofDialog());
+    els.back.addEventListener('click', () => closeProofDialog());
+    els.confirm.addEventListener('click', confirmProof);
+    els.zoom.addEventListener('click', () => toggleProofZoom());
+    els.img.addEventListener('click', () => toggleProofZoom());
+
+    els.agree.addEventListener('change', () => {
+      // Nothing is approved until this is ticked, so nothing can be paid for.
+      els.confirm.disabled = !els.agree.checked || els.agree.disabled;
+      els.nudge.hidden = els.agree.checked;
+      if (els.agree.checked) setProofStatus('');
+    });
+
+    els.img.addEventListener('load', () => {
+      els.loading.hidden = true;
+      els.agree.disabled = false;
+      setProofStatus('Your proof is ready to read.');
+    });
+    els.img.addEventListener('error', () => {
+      els.loading.hidden = true;
+      els.agree.disabled = true;
+      els.confirm.disabled = true;
+      setProofStatus('Your proof didn’t come through. Keep editing and tap Continue to Checkout again — nothing has been charged.', 'error');
+    });
+
+    // Backdrop click closes, but only when the press starts AND ends on the
+    // backdrop — so a drag out of the proof image never dismisses it.
+    let pressedBackdrop = false;
+    root.addEventListener('mousedown', (e) => { pressedBackdrop = (e.target === root); });
+    root.addEventListener('click', (e) => {
+      if (e.target === root && pressedBackdrop) closeProofDialog();
+      pressedBackdrop = false;
+    });
+
+    // Keys are handled here and stopped here. store.js listens for Escape on
+    // document to dismiss its exit-intent popup, and the preview zoom above
+    // does the same — letting our Escape bubble would fire both.
+    dialog.addEventListener('keydown', onProofKeydown);
+
+    return els;
+  }
+
+  function onProofKeydown(e) {
+    if (!proofOpen) return;
+    if (e.key === 'Escape' || e.key === 'Esc') {
+      e.preventDefault();
+      e.stopPropagation();
+      closeProofDialog();
+    } else if (e.key === 'Tab') {
+      trapProofTab(e);
+    }
+  }
+
+  function trapProofTab(e) {
+    const items = [];
+    const nodes = proofEls.dialog.querySelectorAll(PROOF_FOCUSABLE);
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (!n.hasAttribute('hidden') && n.offsetParent !== null) items.push(n);
+    }
+    if (!items.length) {
+      e.preventDefault();
+      proofEls.dialog.focus();
+      return;
+    }
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey) {
+      if (active === first || active === proofEls.dialog || !proofEls.dialog.contains(active)) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (active === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+  // Focus can still escape via a find-bar or an errant script; pull it back.
+  function onProofFocusIn(e) {
+    if (proofOpen && proofEls && !proofEls.dialog.contains(e.target)) {
+      e.stopPropagation();
+      proofEls.dialog.focus();
+    }
+  }
+
+  function toggleProofZoom(force) {
+    if (!proofEls) return;
+    const on = typeof force === 'boolean' ? force : !proofEls.frame.classList.contains('is-zoomed');
+    proofEls.frame.classList.toggle('is-zoomed', on);
+    proofEls.zoom.setAttribute('aria-pressed', on ? 'true' : 'false');
+    proofEls.zoom.textContent = on ? 'Fit the whole piece on screen' : 'Zoom in to read';
+    if (!on) { proofEls.frame.scrollTop = 0; proofEls.frame.scrollLeft = 0; }
+  }
+
+  function openProofDialog() {
+    if (!proofOrder) return;
+    if (!proofEls) proofEls = buildProofDialog();
+    const els = proofEls;
+    const name = proofOrder.petName;
+    const product = proofOrder.product;
+    const upcharge = isFramedSku(product.sku) ? frameUpchargeCents() : 0;
+    const total = (product.price + upcharge) / 100;
+
+    els.title.textContent = name
+      ? name + '’s tribute, exactly as it will print'
+      : 'Your tribute, exactly as it will print';
+    els.lede.textContent = 'Take your time with it. Read it the way you’d read a letter — every word, the dates, the spelling of their name. The pale watermark is only on this proof; it never appears on the piece that comes to you.';
+    els.agreeText.textContent = name
+      ? 'I’ve read every word of ' + name + '’s tribute. Print it exactly as it is here.'
+      : 'I’ve read every word. Print it exactly as it is here.';
+    els.confirm.textContent = 'Approve & continue – $' + total.toFixed(2);
+    els.img.alt = name
+      ? 'Watermarked proof of ' + name + '’s tribute'
+      : 'Watermarked proof of your tribute';
+
+    // Every opening starts from unticked and unread.
+    els.agree.checked = false;
+    els.agree.disabled = true;
+    els.confirm.disabled = true;
+    els.confirm.removeAttribute('aria-busy');
+    els.confirm.classList.remove('is-busy');
+    els.back.disabled = false;
+    els.close.disabled = false;
+    els.nudge.hidden = false;
+    els.loading.hidden = false;
+    toggleProofZoom(false);
+    setProofStatus('');
+    els.img.removeAttribute('src');
+    els.img.src = proofOrder.proofUrl;
+
+    if (proofCloseTimer) { clearTimeout(proofCloseTimer); proofCloseTimer = null; }
+    proofLastFocus = document.activeElement;
+    proofOpen = true;
+    proofSubmitting = false;
+
+    // Lock the page behind the dialog, compensating for the scrollbar so the
+    // layout underneath does not jump sideways.
+    const sbw = window.innerWidth - document.documentElement.clientWidth;
+    proofPrevOverflow = document.body.style.overflow;
+    proofPrevPadRight = document.body.style.paddingRight;
+    document.body.style.overflow = 'hidden';
+    if (sbw > 0) {
+      const basePad = parseFloat(window.getComputedStyle(document.body).paddingRight) || 0;
+      document.body.style.paddingRight = (basePad + sbw) + 'px';
+    }
+    document.body.classList.add('pf-open');
+
+    els.root.hidden = false;
+    document.addEventListener('focusin', onProofFocusIn, true);
+
+    void els.root.offsetWidth;    // force reflow so the fade actually runs
+    els.root.classList.add('is-open');
+
+    els.scroll.scrollTop = 0;
+    els.dialog.focus();
+  }
+
+  /**
+   * Backing out costs nothing: the customizer is untouched underneath, the
+   * purchase button goes back to normal, and the next attempt renders a fresh
+   * proof of whatever they changed in the meantime.
+   */
+  function closeProofDialog() {
+    if (!proofOpen || proofSubmitting) return;
+    const els = proofEls;
+    proofOpen = false;
+
+    document.removeEventListener('focusin', onProofFocusIn, true);
+    els.root.classList.remove('is-open');
+    document.body.classList.remove('pf-open');
+    document.body.style.overflow = proofPrevOverflow;
+    document.body.style.paddingRight = proofPrevPadRight;
+
+    const finish = () => {
+      proofCloseTimer = null;
+      if (proofOpen) return;                 // reopened during the fade-out
+      els.root.hidden = true;
+      els.img.removeAttribute('src');        // release the proof JPEG
+    };
+    if (proofReduceMotion.matches) finish();
+    else proofCloseTimer = setTimeout(finish, 220);
+
+    proofOrder = null;               // a new proof for every new attempt
+    setPurchaseButtonBusy(false);    // never leave them stuck on a dead button
+    clearProofNote();
+
+    if (proofLastFocus && document.contains(proofLastFocus)) {
+      try { proofLastFocus.focus(); } catch (err) { /* element went away */ }
+    } else {
+      const btn = document.getElementById('purchase-btn');
+      if (btn) btn.focus();
+    }
+    proofLastFocus = null;
+  }
+
+  async function confirmProof() {
+    const els = proofEls;
+    if (!els || !proofOrder || proofSubmitting) return;
+    if (!els.agree.checked) return;
+
+    if (!proofOrder.analyticsFired) {
+      fireCheckoutAnalytics(proofOrder.product);
+      proofOrder.analyticsFired = true;
+    }
+
+    const label = els.confirm.textContent;
+    proofSubmitting = true;
+    els.confirm.disabled = true;
+    els.confirm.setAttribute('aria-busy', 'true');
+    els.confirm.classList.add('is-busy');
+    els.confirm.textContent = 'Taking you to secure payment…';
+    els.back.disabled = true;
+    els.close.disabled = true;
+    setProofStatus('Approved. Opening secure payment…');
+
+    try {
+      const body = Object.assign({}, proofOrder.body, {
+        orderId: proofOrder.orderId,
+        approved: true,
+      });
+      const { ok, data } = await postJson('/api/checkout', body, CHECKOUT_TIMEOUT_MS);
+
+      if (!ok || !data.checkoutUrl) {
+        restoreProofConfirm(label);
+        setProofStatus(data.error ||
+          'We couldn’t reach secure payment just now. Nothing has been charged and your approval is still here — please try again.',
+          'error');
+        return;
+      }
+
       window.location.href = data.checkoutUrl;
     } catch (err) {
       console.error('Checkout error:', err);
-      alert('Could not connect to checkout. Please try again.');
-      btn.disabled = false;
-      updatePurchaseButton();
+      restoreProofConfirm(label);
+      setProofStatus('We couldn’t reach secure payment just now. Nothing has been charged and your approval is still here — please try again.', 'error');
     }
+  }
+
+  function restoreProofConfirm(label) {
+    const els = proofEls;
+    proofSubmitting = false;
+    els.confirm.textContent = label;
+    els.confirm.classList.remove('is-busy');
+    els.confirm.removeAttribute('aria-busy');
+    els.confirm.disabled = !els.agree.checked;
+    els.back.disabled = false;
+    els.close.disabled = false;
   }
 
   // ── State Persistence ──────────────────────────────────────
