@@ -62,6 +62,67 @@ function downloadFilename(order) {
   return `${safeName}-tribute-${size}.jpg`;
 }
 
+/**
+ * Boot-time readiness report.
+ *
+ * Most of what this store needs to actually take an order is configuration,
+ * not code, and nearly every way it can be missing fails QUIETLY: without SMTP
+ * every email is logged instead of sent, so a customer pays and hears nothing;
+ * without ADMIN_EMAIL nobody is told a paid order is waiting to be reviewed;
+ * without a mounted volume the database and the customer's photos live on
+ * container disk and are wiped by the next deploy. None of that raises an
+ * error — the site looks perfectly healthy while orders quietly go nowhere.
+ *
+ * So we say it out loud at boot, where Railway's own log will show it without
+ * needing the admin dashboard (which itself needs configuration). Presence
+ * only: no secret is ever printed.
+ */
+function logReadiness() {
+  const has = (name) => {
+    const v = process.env[name];
+    return !!(v && String(v).trim() && !/^(your-|sk-ant-placeholder|change-me|pk_test_placeholder|sk_test_placeholder|whsec_placeholder)/.test(String(v).trim()));
+  };
+  const line = (ok, label, detail) =>
+    `  ${ok ? '[ok]  ' : '[MISS]'} ${label.padEnd(22)} ${ok ? '' : detail}`;
+
+  // Storage that survives a redeploy. Default is a directory inside the app,
+  // which on Railway is ephemeral — the classic silent data-loss setup.
+  const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
+  const persistent = !!process.env.DATA_DIR && !dataDir.startsWith(__dirname);
+
+  const emailOk = has('SMTP_HOST') || has('RESEND_API_KEY');
+  const blocking = [
+    [has('STRIPE_SECRET_KEY') && has('STRIPE_WEBHOOK_SECRET'), 'Payments',
+      'STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET — checkout cannot complete'],
+    [emailOk, 'Email delivery',
+      'SMTP_HOST (or RESEND_API_KEY) — every email is only logged, so customers hear NOTHING'],
+    [has('ADMIN_EMAIL'), 'Review alerts',
+      'ADMIN_EMAIL — nobody is told when a paid order is waiting for review'],
+    [has('ADMIN_PASSWORD'), 'Admin dashboard',
+      'ADMIN_PASSWORD — /admin is disabled, and proofs can only be sent from there'],
+    [persistent, 'Persistent storage',
+      'DATA_DIR is inside the app — orders, photos and proofs are LOST on every deploy'],
+  ];
+  const degraded = [
+    [has('ANTHROPIC_API_KEY'), 'AI poems', 'ANTHROPIC_API_KEY — falls back to a template poem'],
+    [has('LUMA_API_KEY') && has('LUMA_API_SECRET'), 'Fulfilment',
+      'LUMA_API_KEY / LUMA_API_SECRET — approved orders cannot be sent to the printer'],
+    [has('LUMA_STORE_ID'), 'Luma store id', 'LUMA_STORE_ID — run GET /api/luma/setup once'],
+  ];
+
+  const failed = blocking.filter(([ok]) => !ok);
+  console.log('  ── Readiness ' + '─'.repeat(46));
+  blocking.forEach(([ok, l, d]) => console.log(line(ok, l, d)));
+  degraded.forEach(([ok, l, d]) => console.log(line(ok, l, d)));
+  console.log('  ' + '─'.repeat(58));
+  if (failed.length) {
+    console.warn(`  ${failed.length} setting(s) above will stop real orders from completing.`);
+    console.warn('  The site will still serve pages and take payments — it just cannot finish the job.\n');
+  } else {
+    console.log('  Ready to take and fulfil orders.\n');
+  }
+}
+
 // Initialize database (creates tables via migrations)
 async function start() {
   const db = await require('./src/db/database').init();
@@ -902,6 +963,7 @@ async function start() {
     console.log(`\n  Still Beside Me – Memorial Art Store`);
     console.log(`  http://localhost:${PORT}`);
     console.log(`  http://localhost:${PORT}/customize\n`);
+    logReadiness();
   });
 
   // Railway sends SIGTERM when a redeploy replaces this container. Exit 0 so
