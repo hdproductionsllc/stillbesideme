@@ -1876,3 +1876,389 @@ body.preview-zoom-open { overflow: hidden; }
 /* ── Preview controls row (zoom + poem flip) ──────────────────── */
 .preview-controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .preview-zoom-btn.active { border-color: var(--color-accent, #C4A882); background: rgba(196,168,130,0.14); }
+
+/* ============================================================
+   PROOF APPROVAL — the last look before payment
+   ============================================================
+   The customer's real, watermarked proof, shown large enough to actually
+   read, with one tick that sends it to print. Visual language follows the
+   tribute lightbox in store.css (.tl-*): a softly lit gallery, warm gold
+   accents, the piece itself carrying the light.
+   ------------------------------------------------------------ */
+
+/* --- Waiting on the proof (inline, beside the purchase button) --- */
+.proof-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  margin: var(--space-md) 0 0;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+.proof-note[hidden] { display: none; }
+.proof-note.is-error { color: var(--color-error, #C47070); }
+
+/* A spinner inside the purchase button, so it never reads as dead. */
+.btn.is-preparing::before {
+  content: "";
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: pf-spin 0.8s linear infinite;
+}
+.btn.is-preparing:disabled { opacity: 0.85; cursor: progress; }
+
+@keyframes pf-spin { to { transform: rotate(360deg); } }
+
+/* --- Backdrop --- */
+body.pf-open { overflow: hidden; }
+
+.pf-root {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(0px, 2vw, 32px);
+  background:
+    radial-gradient(120% 90% at 50% 30%, rgba(66, 56, 44, 0.5) 0%, rgba(15, 13, 11, 0.95) 62%),
+    rgba(15, 13, 11, 0.97);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  overscroll-behavior: contain;
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+.pf-root.is-open { opacity: 1; }
+.pf-root[hidden] { display: none; }
+
+/* --- Dialog shell --- */
+.pf-dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 1040px;
+  max-height: 100%;
+  min-height: 0;
+  background: var(--color-dark-surface, #1a1714);
+  border: 1px solid rgba(196, 168, 130, 0.22);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  outline: none;
+  transform: translateY(14px) scale(0.985);
+  transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.pf-root.is-open .pf-dialog { transform: none; }
+.pf-dialog:focus-visible {
+  outline: 2px solid rgba(196, 168, 130, 0.6);
+  outline-offset: -4px;
+}
+
+/* --- Close (keep editing) --- */
+.pf-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 17, 14, 0.75);
+  border: 1px solid rgba(196, 168, 130, 0.32);
+  border-radius: 50%;
+  color: #EDE7DF;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.pf-close:hover {
+  background: rgba(196, 168, 130, 0.18);
+  border-color: rgba(196, 168, 130, 0.65);
+  color: #fff;
+}
+.pf-close:focus-visible {
+  outline: 2px solid var(--color-warm, #C4A882);
+  outline-offset: 3px;
+}
+.pf-close:disabled { opacity: 0.4; cursor: default; }
+.pf-close .pf-x { font-family: var(--font-body); font-size: 1.6rem; line-height: 1; margin-top: -2px; }
+
+/* --- Scrolling body (heading + the proof itself) --- */
+.pf-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: clamp(var(--space-lg), 4vw, var(--space-2xl)) clamp(var(--space-md), 3vw, var(--space-2xl)) var(--space-md);
+}
+
+.pf-head {
+  max-width: 60ch;
+  margin: 0 auto clamp(var(--space-md), 2.4vw, var(--space-lg));
+  text-align: center;
+  padding-right: 44px;
+  padding-left: 44px;
+}
+.pf-eyebrow {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-warm, #C4A882);
+  margin: 0 0 var(--space-xs);
+}
+.pf-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.45rem, 4.6vw, 2.05rem);
+  line-height: 1.2;
+  color: #F6F1E9;
+  margin: 0 0 var(--space-sm);
+}
+.pf-lede {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: rgba(246, 241, 233, 0.72);
+  margin: 0;
+}
+
+/* --- The proof --- */
+.pf-frame {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.32);
+}
+.pf-img {
+  display: block;
+  max-width: 100%;
+  max-height: 74vh;
+  height: auto;
+  border-radius: 2px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+  cursor: zoom-in;
+}
+.pf-img:not([src]) { visibility: hidden; min-height: 200px; }
+
+/* Zoomed: the proof spills wider than the frame and the frame scrolls, so
+   the poem can be read at a comfortable size even on a 375px phone. */
+.pf-frame.is-zoomed { align-items: flex-start; justify-content: flex-start; }
+.pf-frame.is-zoomed .pf-img {
+  max-width: none;
+  max-height: none;
+  width: 215%;
+  cursor: zoom-out;
+}
+@media (min-width: 900px) {
+  .pf-frame.is-zoomed .pf-img { width: 150%; }
+}
+
+.pf-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: rgba(246, 241, 233, 0.7);
+}
+.pf-loading[hidden] { display: none; }
+.pf-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(196, 168, 130, 0.35);
+  border-top-color: var(--color-warm, #C4A882);
+  border-radius: 50%;
+  animation: pf-spin 0.9s linear infinite;
+}
+
+.pf-tools { display: flex; justify-content: center; margin-top: var(--space-md); }
+.pf-zoom {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(196, 168, 130, 0.35);
+  border-radius: 999px;
+  color: #EDE7DF;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 9px 18px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.pf-zoom:hover { background: rgba(196, 168, 130, 0.16); border-color: rgba(196, 168, 130, 0.6); }
+.pf-zoom:focus-visible { outline: 2px solid var(--color-warm, #C4A882); outline-offset: 3px; }
+.pf-zoom[aria-pressed="true"] { background: rgba(196, 168, 130, 0.16); }
+
+/* --- The approval (always visible, never scrolls away) --- */
+.pf-foot {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: clamp(var(--space-md), 2.6vw, var(--space-lg)) clamp(var(--space-md), 3vw, var(--space-xl));
+  border-top: 1px solid rgba(196, 168, 130, 0.2);
+  background: rgba(15, 13, 11, 0.94);
+}
+
+.pf-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  cursor: pointer;
+}
+.pf-check input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  margin: 1px 0 0;
+  accent-color: var(--color-warm, #C4A882);
+  cursor: pointer;
+}
+.pf-check input[type="checkbox"]:disabled { cursor: default; opacity: 0.5; }
+.pf-check input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--color-warm, #C4A882);
+  outline-offset: 3px;
+}
+.pf-check-text {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.45;
+  color: #F2ECE3;
+}
+
+/* Plain fact, quietly said — not a warning. */
+.pf-final {
+  margin: var(--space-sm) 0 0;
+  padding-left: calc(22px + var(--space-md));
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: rgba(242, 236, 227, 0.62);
+  max-width: 68ch;
+}
+
+.pf-actions { display: flex; flex-direction: column; gap: var(--space-sm); }
+
+.pf-confirm {
+  order: 1;
+  background: var(--color-warm, #C4A882);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--font-body);
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 16px 24px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.pf-confirm:hover:not(:disabled) { background: #b89a74; }
+.pf-confirm:disabled {
+  background: rgba(196, 168, 130, 0.2);
+  color: rgba(242, 236, 227, 0.55);
+  cursor: not-allowed;
+}
+.pf-confirm:focus-visible { outline: 2px solid var(--color-warm, #C4A882); outline-offset: 3px; }
+.pf-confirm.is-busy { cursor: progress; }
+
+.pf-back {
+  order: 2;
+  background: transparent;
+  border: 1px solid rgba(196, 168, 130, 0.35);
+  border-radius: var(--radius);
+  color: rgba(242, 236, 227, 0.85);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  padding: 13px 22px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+.pf-back:hover { border-color: rgba(196, 168, 130, 0.7); color: #fff; background: rgba(196, 168, 130, 0.1); }
+.pf-back:focus-visible { outline: 2px solid var(--color-warm, #C4A882); outline-offset: 3px; }
+.pf-back:disabled { opacity: 0.45; cursor: default; }
+
+.pf-nudge {
+  order: 3;
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: rgba(242, 236, 227, 0.5);
+}
+.pf-nudge[hidden] { display: none; }
+
+.pf-status {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 clamp(var(--space-md), 3vw, var(--space-xl)) var(--space-md);
+  background: rgba(15, 13, 11, 0.94);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: rgba(242, 236, 227, 0.62);
+}
+.pf-status:empty { display: none; }
+.pf-status.is-error { color: #E7B4A5; }
+
+/* --- Roomier viewports: the approval sits in one calm row --- */
+@media (min-width: 860px) {
+  .pf-foot {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-xl);
+  }
+  .pf-approve { flex: 1 1 auto; min-width: 0; }
+  .pf-actions { flex: 0 0 auto; width: min(320px, 40vw); }
+}
+
+/* --- Phones: the proof gets the whole screen --- */
+@media (max-width: 640px) {
+  .pf-root { padding: 0; }
+  .pf-dialog {
+    max-width: none;
+    height: 100%;
+    border: none;
+    border-radius: 0;
+  }
+  .pf-head { padding-right: 40px; padding-left: 40px; }
+  .pf-img { max-height: 62vh; }
+  .pf-final { padding-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-root,
+  .pf-dialog,
+  .pf-close,
+  .pf-zoom,
+  .pf-confirm,
+  .pf-back {
+    transition: none !important;
+  }
+  .pf-root { opacity: 1; }
+  .pf-dialog { transform: none !important; }
+  /* The spinners still turn — they are the only signal that work is
+     happening — but slowly enough not to pull at the eye. */
+  .pf-spinner,
+  .btn.is-preparing::before { animation-duration: 2.4s; }
+}

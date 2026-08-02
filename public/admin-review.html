@@ -66,13 +66,13 @@
       </div>
 
       <div class="admin-card" id="approve-card">
-        <h2>Send to customer</h2>
-        <p style="margin:0;color:#6b6359;font-size:0.95rem;">
-          Approving sends the proof email. The customer reviews and approves it themselves before anything is printed.
+        <h2 id="approve-title">Release to production</h2>
+        <p style="margin:0;color:#6b6359;font-size:0.95rem;" id="approve-blurb">
+          Approving sends this straight to the printer.
         </p>
-        <button class="admin-btn btn-approve" id="approve-btn">Approve &amp; send proof to customer</button>
+        <button class="admin-btn btn-approve" id="approve-btn">Approve &amp; send to printer</button>
         <div class="admin-msg" id="approve-msg"></div>
-        <p class="hint">Nothing reaches the customer until you click approve. There is no automatic send.</p>
+        <p class="hint" id="approve-hint">Nothing is printed until you click approve. There is no automatic release.</p>
       </div>
     </div>
   </main>
@@ -132,8 +132,32 @@
           .map(([key, label]) => `<div class="admin-row"><strong>${label}</strong><span>${esc(o.fields[key])}</span></div>`)
           .join('') || '<p style="color:#9B9590;">No answers on this order.</p>';
 
-        document.getElementById('proof-img').src = o.proofUrl ? `${o.proofUrl}?t=${Date.now()}` : '';
+        document.getElementById('proof-img').src = o.proofUrl ? bust(o.proofUrl) : '';
         document.getElementById('poem-text').value = o.poemText || '';
+
+        // Two different approve actions live behind one button, so say which
+        // one this order gets. Inline-approved orders (the current flow) go
+        // straight to the printer; a legacy order still owes the customer a
+        // look at their proof, so approving emails it to them instead.
+        const approval = o.customerApproval;
+        if (approval) {
+          const when = String(approval.approvedAt || '').replace('T', ' ').replace('Z', '');
+          document.getElementById('approve-title').textContent = 'Release to production';
+          document.getElementById('approve-blurb').innerHTML =
+            `The customer approved this proof themselves on <strong>${esc(when)}</strong>, before paying. ` +
+            'Approving sends it straight to the printer — they are not asked again.';
+          document.getElementById('approve-btn').innerHTML = 'Approve &amp; send to printer';
+          document.getElementById('approve-hint').textContent =
+            'Nothing is printed until you click approve. There is no automatic release.';
+        } else {
+          document.getElementById('approve-title').textContent = 'Send proof to customer';
+          document.getElementById('approve-blurb').textContent =
+            'This order was paid before inline approval, so the customer has never seen their proof. ' +
+            'Approving emails it to them to approve themselves.';
+          document.getElementById('approve-btn').innerHTML = 'Approve &amp; send proof to customer';
+          document.getElementById('approve-hint').textContent =
+            'Nothing reaches the customer until you click approve. There is no automatic send.';
+        }
 
         const editable = o.reviewable;
         document.getElementById('poem-text').disabled = !editable;
@@ -144,6 +168,14 @@
           document.getElementById('approve-msg').textContent =
             o.status === 'proof_ready' ? 'Proof has been sent — waiting on the customer.' : 'This order is past the review stage.';
         }
+      }
+
+      /**
+       * Cache-bust a proof URL. Proof URLs from the inline flow already carry
+       * a `?v=` render stamp, so a second `?` would make a malformed query.
+       */
+      function bust(url) {
+        return url + (url.indexOf('?') === -1 ? '?' : '&') + 't=' + Date.now();
       }
 
       // "What fulfillment receives" — the frame, size, colors, and finish the
@@ -191,7 +223,7 @@
           const s = f.shipping;
           rows.push(frow('Ships to', [s.name, s.address1, s.address2, [s.city, s.state, s.zip].filter(Boolean).join(', ')].filter(Boolean).map(esc).join('<br>')));
         }
-        rows.push(frow('Sent to Luma', 'Only after the customer approves their proof'));
+        rows.push(frow('Sent to Luma', 'Only when you approve on this page'));
         document.getElementById('fulfillment').innerHTML = rows.join('');
       }
 
@@ -218,7 +250,7 @@
           msg.className = 'admin-msg ' + (ok ? 'ok' : 'err');
           msg.textContent = ok ? data.message : (data.error || 'Something went wrong.');
           if (ok && data.proofUrl) {
-            document.getElementById('proof-img').src = `${data.proofUrl}?t=${Date.now()}`;
+            document.getElementById('proof-img').src = bust(data.proofUrl);
           }
         } catch (e) {
           msg.className = 'admin-msg err';
@@ -231,7 +263,9 @@
         const btn = document.getElementById('approve-btn');
         const msg = document.getElementById('approve-msg');
         btn.disabled = true;
-        msg.textContent = 'Sending…';
+        // Releasing renders the print file and the insert card before it
+        // answers, so this can take a few seconds — say so.
+        msg.textContent = 'Working… this takes a moment.';
         msg.className = 'admin-msg';
         try {
           const { ok, data } = await post(`/api/admin/review/${token}/approve`);

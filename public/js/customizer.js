@@ -462,8 +462,8 @@
       </button>
       <p class="proof-note" id="proof-note" role="status" aria-live="polite" hidden></p>
       <ul class="checkout-reassurance">
-        <li>You approve every word before anything is printed</li>
-        <li>Full refund any time before you approve &mdash; no questions asked</li>
+        <li>You see the finished proof and approve it before you pay</li>
+        <li>Full refund any time before it goes to print &mdash; no questions asked</li>
         <li>Free replacement if it ever arrives damaged</li>
       </ul>
       <p class="checkout-securely">Secure checkout &middot; Free US shipping &middot; Made to order in the USA</p>
@@ -2710,13 +2710,15 @@
 
     // Ask for the real, watermarked proof of this exact piece. Compositing it
     // takes a few seconds, so the button says so rather than sitting dead.
+    // The body is built once and kept: the proof they approve and the order
+    // that goes to Stripe describe the same piece, byte for byte.
+    const orderBody = buildOrderBody(product, fields, poemText);
     proofBusy = true;
     setPurchaseButtonBusy(true);
     setProofNote('Setting your words into the frame. This takes a few seconds.', 'wait');
 
     try {
-      const { ok, data } = await postJson('/api/checkout/proof',
-        buildOrderBody(product, fields, poemText), PROOF_TIMEOUT_MS);
+      const { ok, data } = await postJson('/api/checkout/proof', orderBody, PROOF_TIMEOUT_MS);
 
       if (!ok || !data.orderId || !data.proofUrl) {
         setProofNote(data.error ||
@@ -2729,7 +2731,7 @@
       proofOrder = {
         orderId: data.orderId,
         proofUrl: data.proofUrl,
-        body: buildOrderBody(product, fields, poemText),
+        body: orderBody,
         product,
         petName: (fields[nameFieldId()] || '').trim(),
         analyticsFired: false,
@@ -2740,7 +2742,7 @@
       const aborted = err && (err.name === 'AbortError' || err.code === 20);
       setProofNote(aborted
         ? 'That took longer than it should have. Nothing has been charged and your piece is exactly as you left it — please try again.'
-        : 'We couldn’t reach us just now. Nothing has been charged — check your connection and try again.',
+        : 'We couldn’t connect just now. Nothing has been charged — check your connection and try again in a moment.',
         'error');
     } finally {
       proofBusy = false;
@@ -3023,7 +3025,9 @@
     els.img.src = proofOrder.proofUrl;
 
     if (proofCloseTimer) { clearTimeout(proofCloseTimer); proofCloseTimer = null; }
-    proofLastFocus = document.activeElement;
+    // The dialog is always opened from the purchase button, and a disabled
+    // button has already dropped focus by now — so aim the restore there.
+    proofLastFocus = document.getElementById('purchase-btn') || document.activeElement;
     proofOpen = true;
     proofSubmitting = false;
 

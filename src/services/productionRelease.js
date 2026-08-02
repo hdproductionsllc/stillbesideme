@@ -2,15 +2,16 @@
  * Production Release — the single path from "this tribute is approved" to
  * "this tribute is at the printer".
  *
- * Two callers, deliberately sharing one implementation so they can never
- * drift (the same reasoning as fulfillmentSubmitter.js, one layer down):
+ * Called by src/routes/adminReview.js when a human releases an order whose
+ * customer already approved the proof inline, before paying.
  *
- *   • src/routes/adminReview.js  — the NEW flow. The customer already approved
- *     their proof inline, before paying, so David/Rebecca's approval is the
- *     last gate and it releases straight to production.
- *   • src/routes/proofApproval.js — the LEGACY flow, kept alive for orders that
- *     were already mid-round-trip when inline approval shipped: the customer
- *     clicks approve in their proof email and lands here.
+ * This mirrors, step for step, the pipeline still living inside
+ * src/routes/proofApproval.js. That duplication is deliberate and temporary:
+ * proofApproval.js serves orders that were already mid-round-trip when inline
+ * approval shipped, and those are paid orders in flight — refactoring the code
+ * underneath them buys nothing and risks everything. When the last legacy
+ * order clears, that route (and sendProofEmail with it) can simply be deleted
+ * and this becomes the only copy.
  *
  * Steps, in order, and why each failure is treated the way it is:
  *   1. Mark the order proof_approved (never overwriting an inline approval

@@ -221,10 +221,25 @@ async function start() {
     standardHeaders: true,
     legacyHeaders: false,
   }));
+  // Proof rendering gets its OWN bucket, and the checkout limiter below skips
+  // it. Same reasoning as the poem/gift-note split above: the customer now
+  // renders a real proof before paying and re-renders it after every edit, so
+  // sharing one 20-request budget with checkout itself would 429 a careful
+  // buyer at the exact moment they are trying to hand over money. The render
+  // is server work, so it still gets a ceiling — just its own.
+  app.use('/api/checkout/proof', rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 40,
+    message: { error: 'Too many proof updates. Please give it a minute and try again.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  }));
   app.use('/api/checkout', rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 20,
     message: { error: 'Too many checkout attempts. Please try again shortly.' },
+    // req.path is mount-relative here, so the proof endpoint is '/proof'.
+    skip: (req) => req.path === '/proof',
   }));
 
   // Middleware
