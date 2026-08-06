@@ -148,7 +148,46 @@ function wrapText(text, maxChars) {
  * @param {string} opts.poemLabel — "Poem" or "Letter"
  * @returns {Buffer} SVG as a buffer for Sharp compositing
  */
-function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
+function buildTributeSvg({ width: targetW, height: targetH, colors, tributeData, poemLabel }) {
+  // ── Scale invariance ─────────────────────────────────────────────────
+  // The customer approves the PROOF (~1000px wide) and we print the PRINT FILE
+  // (300 DPI, ~3300px wide). They are the same piece and must be the same
+  // composition — the approval says "print it exactly as it is here".
+  //
+  // Deriving the geometry from the target's pixel width made that false. Every
+  // font size passes through Math.round, the wrap width is an integer character
+  // count derived from a fontSize estimate, and the shrink loop steps a whole
+  // pixel — which is ~6.7% of the font at proof scale but ~2% at print scale.
+  // So the two renders quantised differently and settled on different sizes and
+  // different line breaks: a long poem in the hero-left portrait panel set 14
+  // lines on the proof and 28 on the print.
+  //
+  // So the panel is laid out ONCE, in a canonical 1000-unit space, and the
+  // rasteriser scales it via viewBox. Proof and print are now the same geometry
+  // by construction rather than by two calculations agreeing — which is the
+  // same duplication that produced the earlier poem-sizing bug.
+  //
+  // CANON_H tracks the caller's true aspect, so the canonical box is never more
+  // than a rounding step away from the target; preserveAspectRatio="none"
+  // absorbs that instead of letterboxing a hairline of bare canvas along one
+  // edge.
+  //
+  // It is snapped to CANON_QUANTUM because calculateLayout rounds each panel to
+  // whole pixels at whatever scale it is called with, so the proof panel and
+  // the print panel land on aspects that differ in the fourth decimal place —
+  // enough to round CANON_H to 1468 against 1469, and one unit of height is
+  // enough to let the poem grow one step on one of them and not the other.
+  // Snapping collapses that: the worst case is 0.17% of vertical stretch, which
+  // is far below anything the eye resolves, and in exchange the two renders are
+  // bit-identical rather than nearly identical.
+  const CANON_W = 1000;
+  const CANON_QUANTUM = 5;
+  const width = CANON_W;
+  const height = Math.max(
+    CANON_QUANTUM,
+    Math.round((CANON_W * (targetH / targetW)) / CANON_QUANTUM) * CANON_QUANTUM,
+  );
+
   const { name, nickname, birthDate, passDate, poemText, familyName, familyPrefix } = tributeData;
   const padding = Math.round(width * 0.1);
   const innerW = width - padding * 2;
@@ -344,7 +383,7 @@ function buildTributeSvg({ width, height, colors, tributeData, poemLabel }) {
   const contentH = y;
   const offset = Math.max(Math.round(height * 0.05), Math.round((height - contentH) / 2));
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${targetW}" height="${targetH}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
   <rect width="${width}" height="${height}" fill="${escSvg(colors.background)}" />
   <g transform="translate(0, ${offset})">
   ${elements.join('\n  ')}

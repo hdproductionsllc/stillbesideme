@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "lastmod": "node scripts/build-lastmod.js"
+    "lastmod": "node scripts/build-lastmod.js",
+    "check-render": "node scripts/check-render-parity.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.77.0",
