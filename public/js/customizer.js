@@ -2979,13 +2979,40 @@
     }
   }
 
+  // Which corner of the composite the tribute panel occupies, per layout, before
+  // any poem-first swap. Mirrors calculateLayout() in tributeRenderer.js.
+  const TRIBUTE_CORNER = {
+    'side-by-side': { x: 'end', y: 'start' },   // photo left, tribute right
+    stacked: { x: 'start', y: 'end' },          // photo top, tribute bottom
+    'hero-left': { x: 'end', y: 'end' },        // tribute bottom-right
+    'hero-top': { x: 'end', y: 'end' },         // tribute bottom-right
+    'photos-left': { x: 'end', y: 'start' },    // tribute = full right column
+    'tribute-top': { x: 'start', y: 'start' },  // tribute = full top row
+  };
+
   function toggleProofZoom(force) {
     if (!proofEls) return;
     const on = typeof force === 'boolean' ? force : !proofEls.frame.classList.contains('is-zoomed');
     proofEls.frame.classList.toggle('is-zoomed', on);
     proofEls.zoom.setAttribute('aria-pressed', on ? 'true' : 'false');
     proofEls.zoom.textContent = on ? 'Fit the whole piece on screen' : 'Zoom in to read';
-    if (!on) { proofEls.frame.scrollTop = 0; proofEls.frame.scrollLeft = 0; }
+    if (!on) { proofEls.frame.scrollTop = 0; proofEls.frame.scrollLeft = 0; return; }
+
+    // Zooming in has to land on the POEM. The button says "zoom in to read", and
+    // the box beneath it asks them to certify they have read every word — but the
+    // zoomed image overflows its frame, and starting at the top-left corner shows
+    // whichever panel happens to be there. On a phone that is the photo: the
+    // customer taps "read", gets a larger picture of their pet, and the words are
+    // off-screen to the right with nothing to say so. So scroll to the tribute.
+    const corner = TRIBUTE_CORNER[currentLayout] || TRIBUTE_CORNER['side-by-side'];
+    // poemFirst swaps the photo and tribute regions, so it swaps this too.
+    const flip = (edge) => (edge === 'start' ? 'end' : 'start');
+    const x = poemFirst ? flip(corner.x) : corner.x;
+    const y = poemFirst ? flip(corner.y) : corner.y;
+    // Reading scrollWidth flushes the class change above, so these are the
+    // zoomed extents; over-large values clamp to the maximum on assignment.
+    proofEls.frame.scrollLeft = x === 'end' ? proofEls.frame.scrollWidth : 0;
+    proofEls.frame.scrollTop = y === 'end' ? proofEls.frame.scrollHeight : 0;
   }
 
   function openProofDialog() {
