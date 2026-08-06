@@ -1,0 +1,23 @@
+-- Inline proof approval: the customer approves their real, watermarked proof
+-- BEFORE they pay, instead of via an emailed round-trip after payment.
+--
+-- The order row now exists as a 'draft' from the moment the proof is rendered
+-- (POST /api/checkout/proof) — 'draft' is already in the status CHECK from
+-- 001, so no table recreate is needed here. It flips to 'pending_payment' at
+-- the moment approval is recorded and the Stripe session is created
+-- (POST /api/checkout), which keeps the abandoned-checkout expiry handler in
+-- stripeWebhooks.js working exactly as before.
+--
+-- proof_approved_url is the CHARGEBACK DEFENCE, and it is why a second column
+-- is needed rather than reusing proof_url alone: proof_url is mutable (an
+-- admin poem edit regenerates it), while this records the exact, versioned
+-- proof URL that was on screen when the customer ticked the box. Paired with
+-- proof_approved_at (added in 005) and the `proof_approved_inline` row in
+-- order_events, it is the durable record that they saw and accepted this
+-- artwork before any money moved.
+--
+-- Its presence is ALSO the flag that tells adminReview.js which release path
+-- an order belongs to: set = inline-approved (release straight to the
+-- printer), NULL = a legacy in-flight order that has never seen its proof and
+-- still needs the emailed approval round.
+ALTER TABLE orders ADD COLUMN proof_approved_url TEXT;

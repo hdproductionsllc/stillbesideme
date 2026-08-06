@@ -1,9 +1,14 @@
 /**
  * Stripe Webhook Handler
  * Processes checkout.session.completed and checkout.session.expired events.
- * On successful payment: saves shipping, generates proof, and asks David/Rebecca
- * to review it. The customer proof email is only sent from the review page
- * (adminReview.js) — never from here.
+ * On successful payment: saves shipping and asks David/Rebecca to review the
+ * proof internally.
+ *
+ * The customer has ALREADY approved their proof, inline, before paying (see
+ * src/routes/checkout.js) — so nothing here, and nothing downstream, asks them
+ * to approve anything again. The proof they approved is preserved untouched:
+ * it is the evidence behind the payment, so this handler will not re-render
+ * over it.
  */
 
 const express = require('express');
@@ -211,20 +216,35 @@ async function handleCheckoutCompleted(session, db) {
     }
   }
 
-  // Step 2: generate the proof and ask a human to review it.
+  // Step 2: make sure a proof exists, then ask a human to review it.
   //
-  // BRAND RULE: the proof email is NEVER sent to the customer automatically.
-  // Every proof passes David/Rebecca's review first — the only path to
-  // emailService.sendProofEmail runs through the approve action in
-  // adminReview.js. Do not add a bypass flag, an env switch, or an
-  // auto-send fallback here. This is a product promise, not a tech gap.
+  // BRAND RULE: every proof still passes David/Rebecca's review before the
+  // tribute goes to the printer. What changed is that the customer is no
+  // longer in that loop — they approved their proof inline, before paying, so
+  // the review page releases straight to production rather than emailing them
+  // anything. Do not add a customer-facing proof email back into this path.
+  //
+  // When the order carries an inline approval (proof_approved_url), the proof
+  // is NOT regenerated. That file at output/proofs/{orderId}.jpg is the exact
+  // image the customer accepted before any money moved; re-rendering would
+  // overwrite the evidence and, on a paid order, buy us nothing.
   try {
-    const proofGenerator = require('../services/proofGenerator');
-    const updatedOrder = db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
-    const { proofRelativeUrl } = await proofGenerator.generateProof(updatedOrder);
+    const inlineApprovedUrl = order.proof_approved_url || null;
+    let proofRelativeUrl;
 
-    // Save proof URL to order
-    db.run('UPDATE orders SET proof_url = ?, updated_at = datetime(\'now\') WHERE id = ?', [proofRelativeUrl, orderId]);
+    if (inlineApprovedUrl) {
+      proofRelativeUrl = inlineApprovedUrl;
+      console.log(`Order ${orderId}: reusing the customer-approved proof (${proofRelativeUrl})`);
+    } else {
+      // Legacy in-flight order (paid before inline approval shipped): render
+      // the proof here as before.
+      const proofGenerator = require('../services/proofGenerator');
+      const updatedOrder = db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
+      ({ proofRelativeUrl } = await proofGenerator.generateProof(updatedOrder));
+
+      // Save proof URL to order
+      db.run('UPDATE orders SET proof_url = ?, updated_at = datetime(\'now\') WHERE id = ?', [proofRelativeUrl, orderId]);
+    }
 
     const proofImageUrl = `${baseUrl}${proofRelativeUrl}`;
     const reviewUrl = `${baseUrl}/admin/review/${adminToken}`;
@@ -289,6 +309,17 @@ async function handleCheckoutExpired(session, db) {
 
   const order = db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
   if (!order || order.status !== 'pending_payment') return;
+
+  // One order row now serves a whole customize→proof→edit→proof→pay session
+  // (see findOpenSessionOrder in checkout.js), so an order can outlive several
+  // Stripe sessions. An expiry for a SUPERSEDED session must not cancel the
+  // order the customer is actively paying for on the current one — Stripe
+  // expires abandoned sessions up to 24h later, and checkout.js also expires
+  // the previous session itself each time it opens a new one.
+  if (order.stripe_session_id && order.stripe_session_id !== session.id) {
+    console.log(`Order ${orderId}: ignoring expiry of superseded Stripe session ${session.id}`);
+    return;
+  }
 
   db.run(
     `UPDATE orders SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?`,

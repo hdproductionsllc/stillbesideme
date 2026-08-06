@@ -1,17 +1,30 @@
 /**
- * Admin Review Routes — the human gate between payment and the customer
- * proof email.
+ * Admin Review Routes — the human gate between payment and the printer.
  *
- * BRAND RULE: every proof passes David/Rebecca's review before the customer
- * sees it. The approve action below is the ONLY caller of sendProofEmail.
- * Never add an automatic path around this page.
+ * BRAND RULE: every tribute passes David/Rebecca's review before it goes to
+ * production. Never add an automatic path around this page.
+ *
+ * What this page is NO LONGER is a gate in front of a customer proof email.
+ * The customer now approves their real, watermarked proof inline, before they
+ * pay (src/routes/checkout.js), so by the time an order lands here the
+ * approval is already on record — orders.proof_approved_at plus the exact
+ * orders.proof_approved_url they saw. Approving therefore releases the order
+ * STRAIGHT to production. The customer is never asked to approve anything a
+ * second time, and never receives a proof email.
+ *
+ * One exception, and it is temporary: an order that was already paid before
+ * inline approval shipped has no approval on record and has never seen its
+ * proof. Approving one of those keeps the old behaviour and emails them the
+ * proof, because the alternative is printing artwork a grieving customer was
+ * never shown. That branch retires itself once no such orders remain.
  *
  * Uses the same tokenized model as adminOrder.js (admin_token, generated at
  * payment, deliberately separate from the customer-facing proof_token).
  *
  * GET  /api/admin/review/:token/data     — Order + answers + poem + proof
  * POST /api/admin/review/:token/poem     — Save edited poem, regenerate proof
- * POST /api/admin/review/:token/approve  — Send the proof email to the customer
+ * POST /api/admin/review/:token/approve  — Release to production (or, for a
+ *                                          legacy order, send the proof email)
  *
  * Handles both fresh orders (awaiting_review) and customer change requests
  * (change_requested) — same page, same actions.
@@ -53,6 +66,19 @@ function isDigitalOrder(order) {
 function findOrderByAdminToken(db, token) {
   if (!token || token.length < 8) return null;
   return db.get('SELECT * FROM orders WHERE admin_token = ?', [token]);
+}
+
+/**
+ * Did the customer already approve this proof themselves, inline, before
+ * paying? proof_approved_url is written only by POST /api/checkout, in the
+ * same breath as proof_approved_at and before the Stripe session exists, so
+ * its presence is the reliable marker of a new-flow order.
+ *
+ * False means a legacy in-flight order: paid under the old email round-trip
+ * and still owed a look at its own proof.
+ */
+function hasInlineApproval(order) {
+  return !!(order.proof_approved_url && order.proof_approved_at);
 }
 
 // Human labels for the Luma order-item options placeOrder() sends on every
@@ -192,6 +218,12 @@ router.get('/review/:token/data', (req, res) => {
     changeRequestNotes: order.change_request_notes || null,
     reviewedAt: order.reviewed_at || null,
     createdAt: order.created_at,
+    // The customer's own inline approval, taken before payment. When present,
+    // approving on this page releases straight to the printer — the review
+    // page can say so instead of promising an email that will not be sent.
+    customerApproval: hasInlineApproval(order)
+      ? { approvedAt: order.proof_approved_at, proofUrl: order.proof_approved_url }
+      : null,
   });
 });
 
@@ -241,8 +273,15 @@ router.post('/review/:token/poem', async (req, res) => {
 
 /**
  * POST /api/admin/review/:token/approve
- * The gate opens: sends the proof email to the customer.
- * Idempotent — re-posting after approval does not re-email unless ?resend=1.
+ *
+ * The gate opens. What that means depends on the order:
+ *
+ *   • Digital Keepsake      → deliver the finished file (unchanged).
+ *   • Inline-approved order → release straight to production. The customer
+ *                             approved this proof before they paid; there is
+ *                             nothing left to ask them.
+ *   • Legacy in-flight order → the old behaviour: email the proof and wait for
+ *                             the customer's approval at /proof/:token.
  */
 router.post('/review/:token/approve', async (req, res) => {
   const db = req.app.locals.db;
@@ -257,6 +296,16 @@ router.post('/review/:token/approve', async (req, res) => {
     return deliverDigitalOrder(req, res, db, order);
   }
 
+  // The current path: the customer already approved, so approving here is the
+  // last gate before the printer.
+  if (hasInlineApproval(order)) {
+    return releaseApprovedOrder(req, res, db, order);
+  }
+
+  // ── Everything below is the LEGACY path, kept only for orders that were
+  // already paid and mid-flight when inline approval shipped. New orders never
+  // reach it, and it can be deleted (along with sendProofEmail and the
+  // /api/proof routes) once none are left.
   const alreadySent = order.status === 'proof_ready';
   if (!REVIEWABLE_STATUSES.includes(order.status) && !alreadySent) {
     return res.status(400).json({ error: `Order is ${order.status.replace(/_/g, ' ')} — nothing to approve` });
@@ -310,6 +359,83 @@ router.post('/review/:token/approve', async (req, res) => {
   console.log(`Order ${order.id}: review approved — proof emailed to ${order.email}`);
   res.json({ success: true, message: 'Approved — proof emailed to the customer.' });
 });
+
+/**
+ * Release an inline-approved order to production.
+ *
+ * The customer ticked the approval box on this exact proof before paying
+ * (orders.proof_approved_url / proof_approved_at), so this is the last gate:
+ * render the print file, render the insert card, and hand it to the printer.
+ * No customer email is sent from here — they were told the tribute was on its
+ * way in their order confirmation, and asking them to approve again would be
+ * asking twice.
+ *
+ * Idempotent: an order that has already been released answers success without
+ * re-rendering or re-submitting anything.
+ */
+async function releaseApprovedOrder(req, res, db, order) {
+  const RELEASED_STATUSES = ['proof_approved', 'in_production', 'shipped', 'delivered'];
+
+  if (RELEASED_STATUSES.includes(order.status)) {
+    return res.json({ success: true, message: 'This tribute has already been sent to production.' });
+  }
+  if (!REVIEWABLE_STATUSES.includes(order.status)) {
+    return res.status(400).json({ error: `Order is ${order.status.replace(/_/g, ' ')} — nothing to approve` });
+  }
+  if (!order.poem_text) {
+    return res.status(400).json({ error: 'This order has no poem — there is nothing to print' });
+  }
+
+  // Record the human review itself, separately from the customer's approval.
+  db.run(
+    `UPDATE orders SET
+       reviewed_at = datetime('now'),
+       change_request_notes = NULL,
+       updated_at = datetime('now')
+     WHERE id = ?`,
+    [order.id]
+  );
+  db.run(
+    `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+    [order.id, 'review_approved', JSON.stringify({
+      release: 'production',
+      customerApprovedAt: order.proof_approved_at,
+      customerApprovedProofUrl: order.proof_approved_url,
+      // A poem edit on this page regenerates the proof, which would move the
+      // artwork past what the customer accepted. Flag it in the trail rather
+      // than let it pass silently.
+      proofChangedSinceApproval: !!(order.proof_url && order.proof_url !== order.proof_approved_url),
+    })]
+  );
+
+  const { releaseToProduction } = require('../services/productionRelease');
+  const fresh = db.get('SELECT * FROM orders WHERE id = ?', [order.id]);
+
+  let result;
+  try {
+    result = await releaseToProduction(db, fresh, {
+      notifyCustomer: false,
+      context: 'admin review release',
+    });
+  } catch (err) {
+    // Print render failed — releaseToProduction has already logged the event
+    // and alerted the admin. The order stays reviewable so it can be retried.
+    console.error(`Order ${order.id}: release to production failed:`, err.message);
+    return res.status(500).json({
+      error: 'The print file could not be generated, so nothing was sent to the printer. Our team has been notified — try again once it is fixed.',
+    });
+  }
+
+  if (result.fulfillmentError) {
+    return res.json({
+      success: true,
+      message: `Approved and the print file is ready, but the ${result.provider} submission failed. Resubmit it from the admin order page.`,
+    });
+  }
+
+  console.log(`Order ${order.id}: review approved — released to ${result.provider}`);
+  res.json({ success: true, message: 'Approved — sent to the printer.' });
+}
 
 /**
  * Deliver a Digital Keepsake order (fulfillment:"digital").

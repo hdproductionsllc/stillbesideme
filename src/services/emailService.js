@@ -266,8 +266,8 @@ async function sendAbandonedCheckoutRecovery(to, orderData, resumeUrl) {
           A few things to set your mind at ease:
         </p>
         <ul style="color:#2C2C2C;line-height:1.7;margin:0;padding-left:20px;">
-          <li>You'll see a free design proof within 24 hours, and nothing is printed until you've approved every word.</li>
-          <li>You can ask for a full refund any time before you approve your proof &mdash; no questions asked.</li>
+          <li>You'll see the finished proof before you pay &mdash; nothing is printed until you've read every word and said it's right.</li>
+          <li>You can ask for a full refund any time before it goes to print &mdash; no questions asked.</li>
           <li>Shipping within the US is always free.</li>
         </ul>
       </div>
@@ -480,7 +480,8 @@ async function sendReviewRequest(order, { reviewUrl, proofImageUrl }) {
         </a>
       </div>
       <p style="text-align:center;color:#9B9590;font-size:0.8rem;">
-        The customer does not see their proof until you approve it here.
+        The customer already approved this proof before paying. Nothing goes to
+        the printer until you approve it here.
       </p>
     </div>
   `);
