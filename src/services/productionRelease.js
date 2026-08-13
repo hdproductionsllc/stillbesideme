@@ -175,7 +175,7 @@ async function releaseToProduction(db, order, options = {}) {
         orderId: order.id,
         totalCents: order.total_cents,
         templateName: order.template_id,
-      }, statusPageUrl);
+      }, statusPageUrl, noteFileUrl ? `${baseUrl}${noteFileUrl}` : null);
     } catch (err) {
       console.error(`Failed to send approval confirmation email for order ${order.id}:`, err.message);
     }

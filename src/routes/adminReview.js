@@ -366,9 +366,10 @@ router.post('/review/:token/approve', async (req, res) => {
  * The customer ticked the approval box on this exact proof before paying
  * (orders.proof_approved_url / proof_approved_at), so this is the last gate:
  * render the print file, render the insert card, and hand it to the printer.
- * No customer email is sent from here — they were told the tribute was on its
- * way in their order confirmation, and asking them to approve again would be
- * asking twice.
+ * The customer gets the "being printed" email from the release — it asks for
+ * nothing (their approval already happened on screen) and shows the note card
+ * that will be tucked in the box, closing the arc the order confirmation
+ * opened.
  *
  * Idempotent: an order that has already been released answers success without
  * re-rendering or re-submitting anything.
@@ -414,7 +415,7 @@ async function releaseApprovedOrder(req, res, db, order) {
   let result;
   try {
     result = await releaseToProduction(db, fresh, {
-      notifyCustomer: false,
+      notifyCustomer: true,
       context: 'admin review release',
     });
   } catch (err) {
