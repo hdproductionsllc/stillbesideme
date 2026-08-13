@@ -32,12 +32,13 @@ function splitAddresses(value) {
  */
 async function sendViaResendApi(mailOptions) {
   const fs = require('fs');
-  const { from, to, subject, html, text, cc, attachments } = mailOptions;
+  const { from, to, subject, html, text, cc, bcc, attachments } = mailOptions;
 
   const payload = { from, to: splitAddresses(to), subject };
   if (html) payload.html = html;
   if (text) payload.text = text;
   if (cc) payload.cc = splitAddresses(cc);
+  if (bcc) payload.bcc = splitAddresses(bcc);
   if (attachments && attachments.length) {
     payload.attachments = attachments.map(a => ({
       filename: a.filename,
@@ -123,8 +124,20 @@ function wrapHtml(bodyHtml) {
 </html>`;
 }
 
+/**
+ * Every email sent through here quietly BCCs ADMIN_EMAIL, so the shop sees
+ * exactly what each customer receives — a paper trail with zero extra code at
+ * the call sites. Skipped for any address already in to/cc (review requests,
+ * partner mail) so nothing arrives twice.
+ */
 async function send(to, subject, html, extra = {}) {
-  return deliver({ from: FROM, to, subject, html, ...extra });
+  const opts = { from: FROM, to, subject, html, ...extra };
+  if (ADMIN_EMAIL && !opts.bcc) {
+    const already = [opts.to, opts.cc].filter(Boolean).join(',').toLowerCase();
+    const copies = splitAddresses(ADMIN_EMAIL).filter(a => !already.includes(a.toLowerCase()));
+    if (copies.length) opts.bcc = copies.join(', ');
+  }
+  return deliver(opts);
 }
 
 /**
@@ -184,12 +197,14 @@ async function sendOrderConfirmation(to, orderData, statusPageUrl, giftUrl = nul
       </p>
 
       <p style="color:#2C2C2C;line-height:1.6;margin-bottom:16px;">
-        Your payment was received successfully, and we've started designing your tribute.
-        Within the next few hours, you'll receive a second email with your design proof to review and approve.
+        Your payment was received successfully. The design you approved is now with our team,
+        where a real person gives it one final look before it goes to print.
       </p>
 
       <p style="color:#2C2C2C;line-height:1.6;margin-bottom:24px;">
-        Nothing goes to print until you've approved how it looks &mdash; so take your time when the proof arrives.
+        What prints is exactly what you approved on screen. If anything about it is weighing on you
+        &mdash; a date, a spelling, a word in the poem &mdash; just reply to this email and we'll catch it
+        before it prints.
       </p>
 
       ${giftBlock}
