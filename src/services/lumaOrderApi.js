@@ -31,9 +31,9 @@ const LUMA_CONFIG = {
   // (105001) — the old 105005 was a different 1.25" profile, so a fallback
   // order would have shipped a visibly different frame than "Black".
   subcategories: {
-    'classic-dark': 105001,  // 1.25w x 0.875h Black Frame (catalog default)
-    'warm-natural': 105003,  // 1.25w x 0.875h Oak Frame (catalog oak)
-    'soft-light':   105002,  // 1.25w x 0.875h White Frame (catalog white)
+    'classic-dark': 105001,  // 0.875w x 0.875h Black Frame (catalog default; face width confirmed on real order 10001919045)
+    'warm-natural': 105003,  // 0.875w x 0.875h Oak Frame (catalog oak)
+    'soft-light':   105002,  // 0.875w x 0.875h White Frame (catalog white)
   },
 
   // We send Luma a FULL-BLEED print: the mat and bevel are already printed
