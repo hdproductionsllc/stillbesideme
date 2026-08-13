@@ -379,7 +379,7 @@ async function start() {
   const CLEAN_URL_PAGES = [
     'index', 'the-writing', 'pet-memorial-gifts', 'sympathy-gifts', 'memorial-gifts',
     'dog-memorial-gifts', 'cat-memorial-gifts', 'sympathy-message-helper',
-    'pet-memorial-poem-generator', 'rainbow-bridge-poem-for-dogs',
+    'pet-memorial-poem-generator', 'rainbow-bridge-poem-for-dogs', 'rainbow-bridge-poem-for-cats',
     'privacy-policy', 'terms', 'refund-policy', 'shipping-policy', 'contact', 'about',
   ];
   for (const page of CLEAN_URL_PAGES) {
@@ -390,6 +390,7 @@ async function start() {
     'how-to-write-sympathy-card', 'first-year-after-losing-pet',
     'personalized-memorial-gifts-vs-flowers', 'what-to-get-someone-who-lost-a-dog',
     'pet-memorial-poems', 'what-to-send-instead-of-flowers', 'best-memorial-gifts-that-last',
+    'what-to-say-when-a-friends-dog-dies',
   ];
   app.get('/blog/index.html', (req, res) => res.redirect(301, '/blog'));
   // Requesting the error page directly used to answer 200 — a soft 404, which
@@ -410,7 +411,13 @@ async function start() {
     if (process.env.GOOGLE_ADS_ID) env.googleAdsId = process.env.GOOGLE_ADS_ID;
     if (process.env.GOOGLE_ADS_CONVERSION_LABEL) env.googleAdsLabel = process.env.GOOGLE_ADS_CONVERSION_LABEL;
     res.set('Content-Type', 'application/javascript');
-    res.set('Cache-Control', 'public, max-age=300');
+    // This script is parser-blocking in every page's <head> (the Meta Pixel
+    // snippet below it reads window.SBM_ENV), so a cache miss costs a full
+    // round-trip before the parser can move on. Its contents only change when
+    // the ad/pixel env vars change — i.e. on a redeploy — so a 5-minute TTL
+    // bought nothing and made mid-session page views re-fetch it. Matches the
+    // 1-hour TTL used for the other unhashed /js assets.
+    res.set('Cache-Control', 'public, max-age=3600');
     res.send(`window.SBM_ENV=${JSON.stringify(env)};`);
   });
 
@@ -479,6 +486,9 @@ async function start() {
   app.get('/rainbow-bridge-poem-for-dogs', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'rainbow-bridge-poem-for-dogs.html'));
   });
+  app.get('/rainbow-bridge-poem-for-cats', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'rainbow-bridge-poem-for-cats.html'));
+  });
 
   // Blog routes – clean URLs
   app.get('/blog', (req, res) => {
@@ -504,6 +514,9 @@ async function start() {
   });
   app.get('/blog/best-memorial-gifts-that-last', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'blog', 'best-memorial-gifts-that-last.html'));
+  });
+  app.get('/blog/what-to-say-when-a-friends-dog-dies', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'blog', 'what-to-say-when-a-friends-dog-dies.html'));
   });
 
   // Legal pages – clean URLs
@@ -721,6 +734,11 @@ async function start() {
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>${baseUrl}/blog/what-to-say-when-a-friends-dog-dies</loc>${lastmod('blog/what-to-say-when-a-friends-dog-dies.html')}
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>${baseUrl}/sympathy-message-helper</loc>${lastmod('sympathy-message-helper.html')}
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
@@ -732,6 +750,11 @@ async function start() {
   </url>
   <url>
     <loc>${baseUrl}/rainbow-bridge-poem-for-dogs</loc>${lastmod('rainbow-bridge-poem-for-dogs.html')}
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/rainbow-bridge-poem-for-cats</loc>${lastmod('rainbow-bridge-poem-for-cats.html')}
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
