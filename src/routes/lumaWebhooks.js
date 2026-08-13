@@ -21,7 +21,7 @@ router.get('/', (req, res) => {
  * Receives shipping events from Luma Prints.
  * Raw body is parsed here (configured in server.js via express.raw()).
  */
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const db = req.app.locals.db;
 
   let event;
@@ -80,6 +80,31 @@ router.post('/', (req, res) => {
       `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
       [orderId, 'luma_shipped', JSON.stringify(event)]
     );
+
+    // Tell the customer their tribute shipped — the email both the order
+    // confirmation and the being-printed email promised. Luma has no customer
+    // email (their order carries only our account address), so this is the
+    // only shipping notice the customer will ever get. Best-effort: a mail
+    // failure must not make Luma retry the webhook.
+    const order = db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
+    if (order && order.email) {
+      try {
+        const emailService = require('../services/emailService');
+        const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
+        const statusPageUrl = order.proof_token ? `${baseUrl}/order/${order.proof_token}` : null;
+        await emailService.sendShippedEmail(order.email, { orderId }, {
+          number: trackingNumber,
+          carrier,
+          url: trackingUrl,
+        }, statusPageUrl);
+        db.run(
+          `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+          [orderId, 'shipped_email_sent', JSON.stringify({ email: order.email, trackingNumber })]
+        );
+      } catch (err) {
+        console.error(`Failed to send shipped email for order ${orderId}:`, err.message);
+      }
+    }
 
     res.json({ received: true });
   } catch (err) {
