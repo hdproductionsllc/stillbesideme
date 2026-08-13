@@ -9,10 +9,13 @@
  *                   sender name, so the box is never anonymous.
  *   thank-you     — self purchase. A thank-you with a care line.
  *
- * A4 is Luma's constraint, not a choice: we don't control the stock or the fold.
- * So the design leans on what we DO control — the cream paper palette and the
- * Cormorant of the tribute itself — so the sheet reads as a letter that belongs
- * with the frame rather than a packing slip that came with it.
+ * Luma confirmed the physical spec by email (July 2026): 8.5×11 Letter (their
+ * "A4" doc reference was an error on their side), full color, trimmed to size
+ * so full-bleed cream works, enclosed flat with the frame — but on standard
+ * printer paper; we don't control the stock. So the design leans on what we DO
+ * control — the cream paper palette and the Cormorant of the tribute itself —
+ * so the sheet reads as a letter that belongs with the frame rather than a
+ * packing slip that came with it.
  *
  * QR targets, by variant:
  *   gift variants → /tribute/{gift_token}  — the recipient-safe tribute page,
@@ -39,8 +42,8 @@ const {
 const NOTE_SUBDIR = 'note-cards';
 
 const DPI = 300;
-const PAGE_W = 8.5 * DPI;  // 2550 — Luma prints printouts on A4/letter stock.
-const PAGE_H = 11 * DPI;   // 3300
+const PAGE_W = 8.5 * DPI;  // 2550 — Luma-confirmed 8.5×11 Letter; aspect must
+const PAGE_H = 11 * DPI;   // 3300    match exactly (1% tolerance) or order fails.
 const MARGIN = 1.2 * DPI;  // generous — this should feel like stationery
 
 const BASE_URL = () => process.env.BASE_URL || 'http://localhost:3001';
@@ -207,6 +210,17 @@ function resolveInsertContent(order, fields, template, vaultToken) {
   const senderName = (fields.giftFrom || '').trim();
   const subjectName = (fields[(template.tributeMapping || {}).name] || '').trim();
 
+  // The ship-to name is our only guess at who the gift is FOR — checkout never
+  // asks. That guess is wrong in exactly one knowable case: the buyer shipping
+  // to themselves to hand the gift over in person, where it produced a card
+  // reading "For Christopher … – Christopher" (first real order, 4e4644c5).
+  // When the ship-to first name IS the sender's, drop the salutation and let
+  // the note stand on the signature alone.
+  const senderFirst = senderName.split(/\s+/)[0] || '';
+  const selfShipped = recipientFirst && senderFirst &&
+    recipientFirst.toLowerCase() === senderFirst.toLowerCase();
+  const salutation = recipientFirst && !selfShipped ? `For ${recipientFirst}` : '';
+
   const tributeUrl = order.gift_token ? `${BASE_URL()}/tribute/${order.gift_token}` : null;
   const storyUrl = vaultToken ? `${BASE_URL()}/story/${vaultToken}` : null;
 
@@ -221,7 +235,7 @@ function resolveInsertContent(order, fields, template, vaultToken) {
     if (!tributeUrl) return null;
     return {
       variant: 'personal-note',
-      recipientName: recipientFirst ? `For ${recipientFirst}` : '',
+      recipientName: salutation,
       bodyText: noteText,
       senderName,
       qrUrl: tributeUrl,
@@ -236,7 +250,7 @@ function resolveInsertContent(order, fields, template, vaultToken) {
     if (!tributeUrl) return null;
     return {
       variant: 'gift-card',
-      recipientName: recipientFirst ? `For ${recipientFirst}` : '',
+      recipientName: salutation,
       bodyText:
         `This was made for you, with love.\n\n` +
         `${subjectName ? `A tribute to ${subjectName}, printed` : 'A tribute, printed'} on archival paper\n` +
