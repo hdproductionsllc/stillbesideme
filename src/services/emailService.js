@@ -549,10 +549,23 @@ async function sendChangeRequestNotification(orderData, notes, reviewUrl) {
 
 /**
  * Send confirmation to customer that their proof was approved and order is printing.
+ * When noteCardUrl is given (framed orders — the insert card rendered at release),
+ * the email shows the exact note that will be tucked in the box, so the buyer
+ * knows what the recipient will find alongside the frame.
  */
-async function sendApprovalConfirmation(to, orderData, statusPageUrl) {
+async function sendApprovalConfirmation(to, orderData, statusPageUrl, noteCardUrl = null) {
   const { orderId, totalCents } = orderData;
   const shortId = orderId.substring(0, 8).toUpperCase();
+
+  const noteCardBlock = noteCardUrl ? `
+      <div style="margin-top:28px;text-align:left;">
+        <p style="color:#2C2C2C;line-height:1.6;margin:0 0 12px;">
+          Tucked in the box with the frame is this note, printed on cream paper:
+        </p>
+        <img src="${noteCardUrl}" alt="The note enclosed with your framed tribute"
+             style="display:block;width:100%;max-width:420px;margin:0 auto;border:1px solid #E8E4DF;border-radius:8px;">
+      </div>
+  ` : '';
 
   const html = wrapHtml(`
     <div style="background:#fff;border-radius:12px;padding:32px;text-align:center;">
@@ -564,9 +577,10 @@ async function sendApprovalConfirmation(to, orderData, statusPageUrl) {
         Order ${shortId} &middot; ${formatPrice(totalCents)}
       </p>
       <p style="color:#2C2C2C;line-height:1.6;text-align:left;">
-        Your proof has been approved and your tribute is now being printed on archival paper
-        and professionally framed. You'll receive tracking information by email once it ships.
+        The design you approved has passed its final review and is now being printed on archival
+        paper and professionally framed. You'll receive tracking information by email once it ships.
       </p>
+      ${noteCardBlock}
       <p style="color:#9B9590;font-size:0.9rem;margin-top:24px;">
         Estimated delivery: 8&ndash;12 business days
       </p>
