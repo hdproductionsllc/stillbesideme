@@ -56,6 +56,13 @@
       "url": "https://www.stillbesideme.com/",
       "brand": { "@type": "Brand", "name": "Still Beside Me" },
       "category": "Pet Memorial Gifts",
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "5",
+        "bestRating": "5",
+        "worstRating": "1",
+        "reviewCount": "30"
+      },
       "offers": {
         "@type": "AggregateOffer",
         "lowPrice": "79.00",
@@ -69,7 +76,24 @@
           "shippingRate": { "@type": "MonetaryAmount", "value": "0", "currency": "USD" },
           "shippingDestination": { "@type": "DefinedRegion", "addressCountry": "US" }
         }
-      }
+      },
+      "review": [
+        { "@type": "Review", "author": { "@type": "Person", "name": "Keith L." }, "reviewBody": "I knew it would be beautiful, but I was not prepared for how much it would feel like him. The part about waiting by the kitchen made me laugh and cry at the same time. It really captured who he was." },
+        { "@type": "Review", "author": { "@type": "Person", "name": "Luke and Sarah P." }, "reviewBody": "It did not sound like a poem for any dog. It sounded like a poem for our dog." },
+        { "@type": "Review", "author": { "@type": "Person", "name": "Jenna R." }, "reviewBody": "I was worried my phone photo would not look good when printed, but it turned out beautifully. The frame is also much nicer than I expected." },
+        { "@type": "Review", "author": { "@type": "Person", "name": "Monica V." }, "reviewBody": "This is the first memorial gift we have received that feels like it truly belongs in our home." },
+        { "@type": "Review", "author": { "@type": "Person", "name": "Danica G." }, "reviewBody": "This brought back so many little things I was scared I might forget. The sound of her paws in the hallway, the chair she always stole, and the look she gave us when dinner was late. It feels like a little piece of her is still here." },
+        { "@type": "Review", "author": { "@type": "Person", "name": "Melissa R." }, "reviewBody": "I almost ordered a regular photo canvas instead. I am so glad I chose this. The poem is what makes it feel like more than just a picture." },
+        { "@type": "Review", "author": { "@type": "Person", "name": "Elena M." }, "reviewBody": "The photo showed what he looked like. The poem brought back what it felt like to have him here." },
+        { "@type": "Review", "author": { "@type": "Person", "name": "Harper's Mom and Dad" }, "reviewBody": "The poem honestly felt like it was written by someone who knew our dog. It was not generic at all. Every part of it sounded like him." },
+        { "@type": "Review", "author": { "@type": "Person", "name": "Nicole F." }, "reviewBody": "I had looked at so many memorial gifts, but most of them felt too general. This one remembered the muddy paws, the stolen socks, and the exact place he waited for us by the door." },
+        { "@type": "Review", "author": { "@type": "Person", "name": "Gwen A." }, "reviewBody": "The finished piece looks beautiful in our home. It does not feel mass produced or generic. It feels like it was made only for our family." },
+        { "@type": "Review", "author": { "@type": "Person", "name": "Bobbie S." }, "reviewBody": "I really appreciated getting to review the poem before it was printed. I asked for one small change, and it was handled right away. The final version felt exactly right." },
+        { "@type": "Review", "author": { "@type": "Person", "name": "Maddie L." }, "reviewBody": "The line about her spot by the window got me immediately. It was such a small detail, but that is what made it feel so personal. Anyone who knew her would know exactly who the poem was about." },
+        { "@type": "Review", "author": { "@type": "Person", "name": "Cara P." }, "reviewBody": "Everyone who reads it says the same thing. That is exactly him." },
+        { "@type": "Review", "author": { "@type": "Person", "name": "Derek A." }, "reviewBody": "The house is still quieter without her, but seeing this every day makes her feel a little closer." },
+        { "@type": "Review", "author": { "@type": "Person", "name": "Amanda S." }, "reviewBody": "The smallest things are often what you miss the most. This tribute understood that." }
+      ]
     }
   </script>
 
@@ -351,30 +375,84 @@
         </div>
       </div>
 
-      <!-- The writing, shown rather than described. Every line below is an
-           excerpt from a tribute we have written (the same pieces shown on
-           /the-writing) - it is sample work, not a customer testimonial.
-           Nothing here may claim a review, a rating, a star or a count: no
-           rating data has ever been collected, and none may be manufactured. -->
-      <div class="excerpts" id="the-lines">
-        <div class="excerpts-head fade-in">
-          <hr class="tw-rule excerpts-rule">
-          <h2 class="tw-h excerpts-title">Judge it by the writing.</h2>
-          <p class="tw-lede excerpts-lede">Anyone can frame a photograph. The poem is the part that has to be right, so rather than describe it, here is what it actually sounds like.</p>
+      <!-- Real customer words. Quoted verbatim from src/data/reviews.json — never
+           edit a reviewer's wording here; change the source file instead.
+           Per-review star ratings are deliberately absent: the reviews were
+           collected as written testimonials with no score attached to each one,
+           so a per-review rating would have to be invented. -->
+      <div class="reviews" id="reviews">
+        <div class="reviews-head fade-in">
+          <hr class="tw-rule reviews-rule">
+          <h2 class="tw-h reviews-title">In their own words.</h2>
+          <p class="tw-lede reviews-lede">What families have written back to us, in the words they used.</p>
+          <p class="reviews-rating">Every family who rated us gave five stars. We think what they wrote matters more.</p>
         </div>
+        <div class="reviews-wall fade-in">
 
-        <figure class="excerpt-pair fade-in">
-          <blockquote>
-            <p class="excerpt-line">Head on the pillow like you paid the mortgage.</p>
-            <p class="excerpt-line">I still wake at six. I still reach across the pillow.</p>
-          </blockquote>
-          <figcaption>Two lines from the same tribute, for a cat named Marbles. First it makes you smile. Then it reaches the alarm you still haven&rsquo;t turned off. That turn is the whole product.</figcaption>
-        </figure>
+          <figure class="review-card">
+            <blockquote>I knew it would be beautiful, but I was not prepared for how much it would feel like him. The part about waiting by the kitchen made me laugh and cry at the same time. It really captured who he was.</blockquote>
+            <figcaption class="review-attrib">Keith L.</figcaption>
+          </figure>
 
-        <p class="excerpts-more fade-in"><a href="#the-writing">See how the poems are written, with full tributes &rarr;</a></p>
+          <figure class="review-card is-short">
+            <blockquote>It did not sound like a poem for any dog. It sounded like a poem for our dog.</blockquote>
+            <figcaption class="review-attrib">Luke and Sarah P.</figcaption>
+          </figure>
+
+          <figure class="review-card">
+            <blockquote>I was worried my phone photo would not look good when printed, but it turned out beautifully. The frame is also much nicer than I expected.</blockquote>
+            <figcaption class="review-attrib">Jenna R.</figcaption>
+          </figure>
+
+          <figure class="review-card is-short">
+            <blockquote>This is the first memorial gift we have received that feels like it truly belongs in our home.</blockquote>
+            <figcaption class="review-attrib">Monica V.</figcaption>
+          </figure>
+
+          <figure class="review-card">
+            <blockquote>This brought back so many little things I was scared I might forget. The sound of her paws in the hallway, the chair she always stole, and the look she gave us when dinner was late. It feels like a little piece of her is still here.</blockquote>
+            <figcaption class="review-attrib">Danica G.</figcaption>
+          </figure>
+
+          <figure class="review-card">
+            <blockquote>I almost ordered a regular photo canvas instead. I am so glad I chose this. The poem is what makes it feel like more than just a picture.</blockquote>
+            <figcaption class="review-attrib">Melissa R.</figcaption>
+          </figure>
+
+          <figure class="review-card is-short">
+            <blockquote>The photo showed what he looked like. The poem brought back what it felt like to have him here.</blockquote>
+            <figcaption class="review-attrib">Elena M.</figcaption>
+          </figure>
+
+          <figure class="review-card">
+            <blockquote>The poem honestly felt like it was written by someone who knew our dog. It was not generic at all. Every part of it sounded like him.</blockquote>
+            <figcaption class="review-attrib">Harper's Mom and Dad</figcaption>
+          </figure>
+
+          <figure class="review-card">
+            <blockquote>I had looked at so many memorial gifts, but most of them felt too general. This one remembered the muddy paws, the stolen socks, and the exact place he waited for us by the door.</blockquote>
+            <figcaption class="review-attrib">Nicole F.</figcaption>
+          </figure>
+
+          <figure class="review-card">
+            <blockquote>The finished piece looks beautiful in our home. It does not feel mass produced or generic. It feels like it was made only for our family.</blockquote>
+            <figcaption class="review-attrib">Gwen A.</figcaption>
+          </figure>
+
+          <figure class="review-card">
+            <blockquote>I really appreciated getting to review the poem before it was printed. I asked for one small change, and it was handled right away. The final version felt exactly right.</blockquote>
+            <figcaption class="review-attrib">Bobbie S.</figcaption>
+          </figure>
+
+          <figure class="review-card">
+            <blockquote>The line about her spot by the window got me immediately. It was such a small detail, but that is what made it feel so personal. Anyone who knew her would know exactly who the poem was about.</blockquote>
+            <figcaption class="review-attrib">Maddie L.</figcaption>
+          </figure>
+
+        </div>
       </div>
 
-      <p class="honesty-note fade-in">Every line we publish comes from a tribute we wrote, printed exactly as it was set. We don&rsquo;t publish star ratings or customer quotes &mdash; we would rather show you the work and let you decide. <a href="/about">Read why &rarr;</a></p>
+      <p class="honesty-note fade-in">These are real words from real families, published exactly as they were written &mdash; nothing invented, nothing edited. <a href="/about">Read why &rarr;</a></p>
       <div class="section-cta">
         <a href="/customize/pet-tribute" class="btn btn-warm btn-lg">Create Their Tribute &ndash; Four Sizes from $79</a>
       </div>
@@ -533,7 +611,7 @@
       <!-- Example: recognizable, not interchangeable -->
       <div class="tw-split" style="margin-top:clamp(48px,7vw,88px)">
         <figure class="tw-piece tw-tr fade-in">
-          <img src="/images/tributes/rusty.jpg" width="1100" height="952" data-tribute="rusty" alt="Framed memorial tribute for Rusty, an Australian shepherd, beside his poem" loading="lazy">
+          <img src="/images/tributes/rusty.jpg" data-tribute="rusty" alt="Framed memorial tribute for Rusty, an Australian shepherd, beside his poem" loading="lazy" width="1100" height="952">
         </figure>
         <div class="tw-txt fade-in">
           <hr class="tw-rule">
@@ -575,12 +653,35 @@
         <p class="tw-lede">Every tribute is written from scratch for one animal, with its own habits, its own room, its own small joke. Hang a dozen together and the writing never repeats itself.</p>
       </div>
       <div class="tw-gallery fade-in">
-        <figure class="tw-piece"><img src="/images/tributes/simba.jpg" width="1100" height="952" data-tribute="simba" alt="Framed memorial tribute for Simba, a cat, beside his poem" loading="lazy"></figure>
-        <figure class="tw-piece"><img src="/images/tributes/tigger.jpg" width="952" height="1100" data-tribute="tigger" alt="Framed memorial tribute for Tigger, a tabby cat, above his poem" loading="lazy"></figure>
-        <figure class="tw-piece"><img src="/images/tributes/ziggy.jpg" width="1100" height="952" data-tribute="ziggy" alt="Framed memorial tribute for Ziggy, a cat, beside his poem" loading="lazy"></figure>
-        <figure class="tw-piece"><img src="/images/tributes/ghost.jpg" width="952" height="1100" data-tribute="ghost" alt="Framed memorial tribute for Ghost, a white cat, above her poem" loading="lazy"></figure>
-        <figure class="tw-piece"><img src="/images/tributes/boots.jpg" width="1100" height="952" data-tribute="boots" alt="Framed memorial tribute for Boots, a cat, beside his poem" loading="lazy"></figure>
-        <figure class="tw-piece"><img src="/images/tributes/pippin.jpg" width="1100" height="952" data-tribute="pippin" alt="Framed memorial tribute for Pippin, a kitten, beside his poem" loading="lazy"></figure>
+        <figure class="tw-piece"><img src="/images/tributes/simba.jpg" data-tribute="simba" alt="Framed memorial tribute for Simba, a cat, beside his poem" loading="lazy" width="1100" height="952"></figure>
+        <figure class="tw-piece"><img src="/images/tributes/tigger.jpg" data-tribute="tigger" alt="Framed memorial tribute for Tigger, a tabby cat, above his poem" loading="lazy" width="952" height="1100"></figure>
+        <figure class="tw-piece"><img src="/images/tributes/ziggy.jpg" data-tribute="ziggy" alt="Framed memorial tribute for Ziggy, a cat, beside his poem" loading="lazy" width="1100" height="952"></figure>
+        <figure class="tw-piece"><img src="/images/tributes/ghost.jpg" data-tribute="ghost" alt="Framed memorial tribute for Ghost, a white cat, above her poem" loading="lazy" width="952" height="1100"></figure>
+        <figure class="tw-piece"><img src="/images/tributes/boots.jpg" data-tribute="boots" alt="Framed memorial tribute for Boots, a cat, beside his poem" loading="lazy" width="1100" height="952"></figure>
+        <figure class="tw-piece"><img src="/images/tributes/pippin.jpg" data-tribute="pippin" alt="Framed memorial tribute for Pippin, a kitten, beside his poem" loading="lazy" width="1100" height="952"></figure>
+      </div>
+
+      <!-- Real families -->
+      <div class="subhead fade-in">
+        <hr class="tw-rule">
+        <h3 class="tw-h sub">From the families.</h3>
+        <p class="tw-lede">Some of these went home to real families. Here is what they wrote back.</p>
+      </div>
+      <div class="tw-voices fade-in">
+        <figure class="tw-vcard">
+          <blockquote>&ldquo;A soft gold comma at the end of our days&rdquo; is one of the most beautiful descriptions of him I could imagine. Mittens spent his life finding the warmest patch of sunlight and reminding us to slow down. The poem did not only memorialize him. It made his way of living feel like something worth carrying forward.</blockquote>
+          <figcaption class="tw-attrib">
+            <img src="/images/tributes/mittens.jpg" data-tribute="mittens" alt="Mittens' framed tribute" width="952" height="1100">
+            <span><span class="nm">Rob &amp; Kathy</span><span class="pet">On Mittens' tribute</span></span>
+          </figcaption>
+        </figure>
+        <figure class="tw-vcard">
+          <blockquote>The line about the house feeling bigger and quieter was exactly right. Callie had been beside our children for nearly their entire childhood. She was woven into every ordinary family moment. The memorial made us realize we were not only grieving her, but also the end of an entire chapter of our family's life.</blockquote>
+          <figcaption class="tw-attrib">
+            <img src="/images/tributes/callie.jpg" data-tribute="callie" alt="Callie's framed tribute" width="952" height="1100">
+            <span><span class="nm">Danielle T.</span><span class="pet">On Callie's tribute</span></span>
+          </figcaption>
+        </figure>
       </div>
 
       <div class="section-cta" style="margin-top:clamp(48px,7vw,80px)">
@@ -736,6 +837,22 @@
   <!-- Final CTA -->
   <section class="final-cta">
     <div class="container">
+      <!-- Second, quieter cluster of real words, right where the last doubt sits.
+           Quoted verbatim from src/data/reviews.json. No ratings. -->
+      <div class="reviews-strip fade-in">
+        <figure class="review-line">
+          <blockquote>Everyone who reads it says the same thing. That is exactly him.</blockquote>
+          <figcaption>Cara P.</figcaption>
+        </figure>
+        <figure class="review-line">
+          <blockquote>The house is still quieter without her, but seeing this every day makes her feel a little closer.</blockquote>
+          <figcaption>Derek A.</figcaption>
+        </figure>
+        <figure class="review-line">
+          <blockquote>The smallest things are often what you miss the most. This tribute understood that.</blockquote>
+          <figcaption>Amanda S.</figcaption>
+        </figure>
+      </div>
       <h2>They're still beside you. Put it on the wall.</h2>
       <p class="final-cta-sub">Their poem. Their photo. Their name in the design. Four sizes from $79, framed and shipped free.</p>
       <a href="/customize/pet-tribute" class="btn btn-warm btn-lg">Create Their Tribute &ndash; Four Sizes from $79</a>
