@@ -211,9 +211,13 @@ function parseSizeFromSku(sku) {
  * Build order item options. We send a full-bleed print with "No Mat", so no
  * mat color is included — the mat is already printed into the image. (styleVariant
  * is accepted for signature stability / future mat-color path.)
+ *
+ * Luma expects orderItemOptions as a bare array of option-id integers, not
+ * {optionId} objects — anything else is rejected with "option is not
+ * associated to subcategory" (proven against the live API on order 4e4644c5).
  */
 function buildOrderItemOptions(styleVariant) {
-  return LUMA_CONFIG.sharedOptions.map(id => ({ optionId: id }));
+  return LUMA_CONFIG.sharedOptions.slice();
 }
 
 /**
@@ -317,7 +321,7 @@ async function placeOrder(orderId, db) {
     ? LUMA_CONFIG.printOnly.subcategoryId
     : resolveFrameSubcategory(order.template_id, frameId);
   const orderItemOptions = printOnly
-    ? LUMA_CONFIG.printOnly.options.map(id => ({ optionId: id }))
+    ? LUMA_CONFIG.printOnly.options.slice()
     : buildOrderItemOptions(styleVariant);
 
   // Build Luma order payload
