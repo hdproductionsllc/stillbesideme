@@ -6,6 +6,7 @@
   "category": "pet",
   "poemSupport": "ai",
   "colorMode": "auto",
+  "printedMat": false,
   "printSpec": { "matBorderIn": 1.5, "gutterIn": 1.0, "bevelWidthIn": 0.1 },
 
   "canvas": {

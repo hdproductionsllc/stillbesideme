@@ -24,3 +24,11 @@ cache/
 
 # Local QA harness
 run_qa.js
+
+# Analytics/Search Console exports — business data, never in a PUBLIC repo
+*.csv
+*-Performance-on-Search-*.zip
+# Loose screenshots dropped in the repo root
+*.png
+!public/**/*.png
+!src/**/*.png

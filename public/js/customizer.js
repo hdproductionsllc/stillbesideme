@@ -77,6 +77,11 @@
   // Track whether a photo has been uploaded per panel
   const photoUploaded = {};   // panelId -> boolean
 
+  // The uploaded photo itself, per panel: { slotId, url, position, quality }.
+  // Saved with the rest of the state, so a refresh, a phone reclaiming the tab
+  // or Back from Stripe all come back with the photo still in the frame.
+  const uploadedPhotos = {};  // panelId -> photo
+
   // Debounce timer for resize → reattach divider handles
   let resizeTimer = null;
 
@@ -324,6 +329,10 @@
       // Restore saved state
       restoreState();
 
+      // Nothing saved here yet? Then a visitor may be arriving from the free
+      // poem generator with answers and a poem already written.
+      applyPoemHandoff();
+
       // Set initial frame size from selected product
       const initialProduct = document.querySelector('.product-option.selected');
       if (initialProduct && initialProduct.dataset.sku && PreviewRenderer.setFrameSize) {
@@ -569,6 +578,13 @@
         // the tribute background stays an elegant dark. Frame selector is built
         // once at init and is independent of the uploaded photo.)
 
+        uploadedPhotos[panelId] = {
+          slotId,
+          url: data.thumbnailUrl,
+          position: data.crop.position,
+          quality: data.quality
+        };
+
         saveState();
       } else {
         showUploadPreview(slotId, localUrl, wrapper, data.error || 'Upload failed');
@@ -656,6 +672,26 @@
       assurance.innerHTML = '&#10003; A real person reviews every photo before it\'s printed';
       wrapper.appendChild(assurance);
     }
+  }
+
+  // Put a photo from a saved session back where it was: in the frame, with its
+  // adjust controls and its thumbnail in the form pane. The file is already on
+  // the server, so the saved URL is all that's needed — but we load it first,
+  // so a photo the server no longer has leaves the upload zone open instead of
+  // a broken thumbnail.
+  function restoreUploadedPhoto(panelId, photo) {
+    if (!photo || !photo.url) return;
+    const probe = new Image();
+    probe.onload = () => {
+      uploadedPhotos[panelId] = photo;
+      photoUploaded[panelId] = true;
+      PreviewRenderer.setPhoto(panelId, photo.url, photo.position || '50% 50%');
+      ensurePhotoAdjustUI(panelId);
+      const zone = document.getElementById(`upload-zone-${photo.slotId}`);
+      const wrapper = zone && zone.closest('.field-group');
+      if (wrapper) showUploadPreview(photo.slotId, photo.url, wrapper, null, photo.quality);
+    };
+    probe.src = photo.url;
   }
 
   // ── On-photo reposition affordance ─────────────────────────
@@ -1930,7 +1966,10 @@
     // 8x5", under-reporting the printed size by ~40% and warning about a poem
     // that prints perfectly well. Mirror the renderer's own condition instead.
     const spec = template.printSpec;
-    const printsMat = !!(currentColors && /^#[0-9a-fA-F]{6}$/.test(String(currentColors.mat || '')));
+    // Mirrors resolveOrderData: the template's printedMat switch decides first,
+    // then whether this order actually carries colours.
+    const printsMat = template.printedMat !== false
+      && !!(currentColors && /^#[0-9a-fA-F]{6}$/.test(String(currentColors.mat || '')));
     if (printsMat && spec) {
       const border = Number(spec.matBorderIn) || 0;
       const gutter = Number(spec.gutterIn) || 0;
@@ -3186,6 +3225,7 @@
         activeIndices,
         regenCounts,
         poemFormat,
+        photos: uploadedPhotos,
         photoCrop: PreviewRenderer.getPhotoCrop('photo'),
         panel2Crop: PreviewRenderer.getPhotoCrop('panel2'),
         thirdPanelEnabled,
@@ -3305,6 +3345,14 @@
         }
       }
 
+      // Restore the photos themselves before their crops — a crop without a
+      // photo is the one piece of a session nobody can retype.
+      if (state.photos) {
+        for (const [panelId, photo] of Object.entries(state.photos)) {
+          restoreUploadedPhoto(panelId, photo);
+        }
+      }
+
       // Restore photo crops
       if (state.photoCrop) {
         PreviewRenderer.setPhotoCrop('photo',
@@ -3402,6 +3450,77 @@
     } catch (e) {
       // Ignore restore errors
     }
+  }
+
+  // ── Free-tool handoff ──────────────────────────────────────
+  //
+  // The free poem generator writes what the visitor typed and the poem they
+  // settled on to localStorage. The designer opens with both already in place —
+  // the poem as their current version — so the trip from the free tool costs
+  // them nothing they already gave us. It is only ever a gift: no handoff, or a
+  // handoff we can't read, and the designer opens exactly as it always did.
+  const HANDOFF_KEY = 'sbm-generated-poem';
+  const HANDOFF_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+  function readPoemHandoff() {
+    try {
+      // Work already under way in this tab outranks anything the free tool left.
+      if (sessionStorage.getItem(SESSION_KEY)) return null;
+
+      const raw = localStorage.getItem(HANDOFF_KEY);
+      if (!raw) return null;
+
+      const handoff = JSON.parse(raw);
+      if (!handoff || handoff.v !== 1 || !handoff.poem) return null;
+      // A poem written days ago belongs to a visit that's over.
+      if (Date.now() - handoff.savedAt > HANDOFF_MAX_AGE_MS) return null;
+      if (handoff.category !== template.category) return null;
+      return handoff;
+    } catch (e) {
+      return null;   // storage unavailable, or a value we didn't write
+    }
+  }
+
+  /** The select option matching a free-tool answer ('' when it has none). */
+  function matchSelectOption(select, value) {
+    const wanted = String(value).trim().toLowerCase();
+    const options = Array.from(select.options).map(o => o.value).filter(Boolean);
+    return options.find(o => o.toLowerCase() === wanted)
+      || options.find(o => o.toLowerCase() === 'other')
+      || '';
+  }
+
+  function applyPoemHandoff() {
+    const handoff = readPoemHandoff();
+    if (!handoff) return;
+
+    for (const [fieldId, value] of Object.entries(handoff.fields || {})) {
+      const input = document.getElementById(`field-${fieldId}`);
+      if (!input || !value || input.value) continue;
+      input.value = input.tagName === 'SELECT' ? matchSelectOption(input, value) : value;
+      if (!input.value) continue;
+      PreviewRenderer.setField(fieldId, input.value);
+      const count = document.getElementById(`count-${fieldId}`);
+      if (count) count.textContent = input.value.length;
+    }
+
+    if (template.poemFormats && template.poemFormats.some(f => f.id === handoff.format)) {
+      poemFormat = handoff.format;
+      const ft = document.getElementById('poem-format-toggle');
+      if (ft) {
+        ft.querySelectorAll('.order-type-option').forEach(b =>
+          b.classList.toggle('active', b.dataset.format === poemFormat));
+      }
+    }
+
+    // Their poem becomes version 1. It costs none of the designer's own
+    // generations — the free tool never charged them one.
+    poemHistories[fmtKey()] = [handoff.poem];
+    activeIndices[fmtKey()] = 0;
+    PreviewRenderer.setField('poemText', handoff.poem);
+    // (Wired via setTimeout(0) in createPoemSection, so defer one tick.)
+    setTimeout(() => syncPoemSectionToFormat(), 50);
+    saveState();
   }
 
   // ── Preview zoom (magnifier for small tribute text) ─────────

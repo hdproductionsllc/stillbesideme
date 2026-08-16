@@ -17,6 +17,30 @@
 
   let lastPoem = '';
 
+  // The handoff to the designer. customizer.js reads this key and opens with
+  // the answers and the poem already in place, so nobody retypes their memories
+  // or gambles on a regeneration that reads differently from the one they love.
+  const HANDOFF_KEY = 'sbm-generated-poem';
+
+  function saveHandoff(payload, poem) {
+    try {
+      localStorage.setItem(HANDOFF_KEY, JSON.stringify({
+        v: 1,
+        savedAt: Date.now(),
+        category: payload.category,
+        format: payload.format,
+        poem: poem,
+        fields: {
+          petName: payload.petName,
+          petType: payload.petType,
+          personality: payload.personality,
+          favoriteMemory: payload.favoriteMemory,
+          favoriteThing: payload.favoriteThing
+        }
+      }));
+    } catch (e) { /* private mode */ }
+  }
+
   function copyToClipboard(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       return navigator.clipboard.writeText(text);
@@ -72,8 +96,7 @@
 
       lastPoem = data.poem || '';
       resultText.textContent = lastPoem;
-      // Save so the visitor never loses it and a future designer step could pick it up.
-      try { localStorage.setItem('sbm-generated-poem', lastPoem); } catch (e) { /* private mode */ }
+      saveHandoff(payload, lastPoem);
 
       loadingSection.style.display = 'none';
       resultsSection.style.display = 'block';

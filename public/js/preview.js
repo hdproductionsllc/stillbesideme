@@ -430,7 +430,7 @@
       // Printed-mat templates: the panels region represents the openings
       // INSIDE the mat border, so subtract the border from each side.
       // The mat itself is rendered by .mat-board padding around this region.
-      if (template && template.colorMode === 'auto' && template.printSpec) {
+      if (template && template.printedMat !== false && template.colorMode === 'auto' && template.printSpec) {
         var b = template.printSpec.matBorderIn * 2;
         if (w - b > 0 && h - b > 0) { w = w - b; h = h - b; }
       }

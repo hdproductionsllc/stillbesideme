@@ -201,9 +201,12 @@ async function start() {
   // The old '/api/poems' mount also counted the cheap library GET that every
   // customizer page load fires, so a buyer using their full 6-generation
   // budget (3 poems + 3 letters) could be 429'd mid-purchase.
+  // This per-IP ceiling must stay above the combined per-session budgets in
+  // routes/api.js (5 free-tool + 10 customizer per hour), or the free tool
+  // could still 429 a buyer at checkout from the IP layer instead.
   app.use('/api/poems/generate', rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 12,
+    max: 18,
     message: { error: 'Too many requests. Please try again in a few minutes.' },
     standardHeaders: true,
     legacyHeaders: false,

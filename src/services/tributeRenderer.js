@@ -398,9 +398,11 @@ function buildTributeSvg({ width: targetW, height: targetH, colors, tributeData,
 /**
  * Resolve the full tribute color set for an order.
  *
- * Auto-color orders (fields.colors = { mat, bevel, text, tone }) get a
- * derived palette: text prints directly on the mat, the bevel color is
- * the accent (divider + poem), and secondary text is a text/mat blend.
+ * Auto-color templates (pet-tribute) always print the light "paper insert"
+ * the customizer preview shows: cream paper, dark ink, warm gold accent.
+ * The preview is the product truth — the customer designs on this palette and
+ * the canvas never renders the auto-matched swatches, so posted colors must
+ * not reach the proof or the print.
  *
  * Legacy orders (and Letter From Heaven) fall through to styleVariants,
  * so in-flight orders render exactly as before.
@@ -408,6 +410,12 @@ function buildTributeSvg({ width: targetW, height: targetH, colors, tributeData,
  * Returns a superset of the styleVariant.tribute shape, plus mat/bevel.
  */
 function resolveColors(template, fields) {
+  if (template.colorMode === 'auto') {
+    return { ...PAPER_PALETTE };
+  }
+
+  // Only reachable for non-auto templates: a derived mat palette where text
+  // prints directly on the mat and the bevel is the accent (divider + poem).
   const c = fields && fields.colors;
   if (c && colorUtils.isHex(c.mat)) {
     const mat = c.mat;
@@ -430,16 +438,6 @@ function resolveColors(template, fields) {
       bevel,
       tone,
     };
-  }
-
-  // Auto-color templates (pet-tribute) print the same light "paper insert"
-  // the customizer preview shows: cream paper, dark ink, warm gold accent.
-  // The preview is the product truth — the customer designs on this palette,
-  // so the proof and print must come out of it too. (Before this branch,
-  // these orders fell through to the legacy dark classic-dark variant and
-  // shipped the inverse of what was designed.)
-  if (template.colorMode === 'auto') {
-    return { ...PAPER_PALETTE };
   }
 
   // Legacy path: style variant lookup
@@ -571,7 +569,7 @@ async function renderPhotoCover(photoPath, region, cropPosition, jpegQuality, cr
     && cropPosition.match(/^(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%$/);
 
   if (!pctMatch) {
-    return finish(sharp(photoPath).resize(region.width, region.height, {
+    return finish(sharp(photoPath).rotate().resize(region.width, region.height, {
       fit: 'cover',
       position: cropPosition || 'centre',
     }));
@@ -581,14 +579,19 @@ async function renderPhotoCover(photoPath, region, cropPosition, jpegQuality, cr
   const py = Math.max(0, Math.min(1, parseFloat(pctMatch[2]) / 100));
 
   const meta = await sharp(photoPath).metadata();
-  const scale = Math.max(region.width / meta.width, region.height / meta.height);
-  const cropW = Math.min(meta.width, Math.round(region.width / scale));
-  const cropH = Math.min(meta.height, Math.round(region.height / scale));
-  const left = Math.max(0, Math.min(meta.width - cropW, Math.round((meta.width - cropW) * px)));
-  const top = Math.max(0, Math.min(meta.height - cropH, Math.round((meta.height - cropH) * py)));
+  const exifSwapped = (meta.orientation || 1) >= 5;
+  const imgW = exifSwapped ? meta.height : meta.width;
+  const imgH = exifSwapped ? meta.width : meta.height;
+
+  const scale = Math.max(region.width / imgW, region.height / imgH);
+  const cropW = Math.min(imgW, Math.round(region.width / scale));
+  const cropH = Math.min(imgH, Math.round(region.height / scale));
+  const left = Math.max(0, Math.min(imgW - cropW, Math.round((imgW - cropW) * px)));
+  const top = Math.max(0, Math.min(imgH - cropH, Math.round((imgH - cropH) * py)));
 
   return finish(
     sharp(photoPath)
+      .rotate()
       .extract({ left, top, width: cropW, height: cropH })
       .resize(region.width, region.height)
   );
@@ -744,7 +747,13 @@ function resolveOrderData(order) {
   // Per-order colors (auto-matched mat/bevel) or legacy style variant colors
   const tributeColors = resolveColors(template, fields);
   // True when this order carries auto-matched colors → printed mat + bevel render path
-  const hasPrintedMat = !!(fields.colors && colorUtils.isHex(fields.colors.mat));
+  // A printed mat is a PRODUCT decision, not a side effect of what the client
+  // happened to post. Colours are stored only when a customer taps a swatch, so
+  // this previously meant one buyer got a full-bleed piece and another got the
+  // artwork shrunk inside a printed border — same product, same price.
+  // `printedMat: false` settles it: full bleed, and the frame is the only border.
+  const hasPrintedMat = template.printedMat !== false
+    && !!(fields.colors && colorUtils.isHex(fields.colors.mat));
   const mapping = template.tributeMapping || {};
 
   const tributeData = {

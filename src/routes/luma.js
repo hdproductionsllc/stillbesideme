@@ -9,6 +9,23 @@ const router = express.Router();
 const lumaOrderApi = require('../services/lumaOrderApi');
 
 /**
+ * Every route below is an operator tool: submitting an order spends real money
+ * with Luma, /webhook/register repoints their callbacks, and the rest exposes
+ * fulfillment and credential state. Nothing customer-facing calls them — a
+ * buyer's tracking comes from /api/orders — so the whole router sits behind the
+ * same admin session as /admin (ADMIN_PASSWORD + req.session.isAdmin, set by
+ * /admin/login). The Luma webhook RECEIVER is a different router
+ * (lumaWebhooks.js) and stays public.
+ */
+router.use((req, res, next) => {
+  if (!process.env.ADMIN_PASSWORD) {
+    return res.status(503).json({ error: 'Admin access is not configured. Set ADMIN_PASSWORD in the environment.' });
+  }
+  if (req.session && req.session.isAdmin) return next();
+  res.status(401).json({ error: 'Not authorized. Sign in at /admin/login.' });
+});
+
+/**
  * GET /api/luma/health
  * Test Luma API authentication.
  */

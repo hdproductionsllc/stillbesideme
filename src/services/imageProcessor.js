@@ -31,20 +31,28 @@ function isHeic(filename) {
   return ext === '.heic' || ext === '.heif';
 }
 
-/** Generate a display-quality thumbnail (800px wide, JPEG 85%) */
+/**
+ * Generate a display-quality thumbnail (800px wide, JPEG 85%).
+ *
+ * rotate() bakes in EXIF orientation. Sharp drops the EXIF tag on output, so
+ * without it a portrait phone photo reaches the customizer canvas sideways and
+ * the region the customer pans is not the region the renderer crops.
+ */
 async function createThumbnail(inputBuffer) {
   return sharp(inputBuffer)
+    .rotate()
     .resize(800, null, { withoutEnlargement: true })
     .jpeg({ quality: 85 })
     .toBuffer();
 }
 
-/** Get image dimensions from buffer */
+/** Get image dimensions from buffer, as displayed (EXIF orientation applied) */
 async function getDimensions(buffer) {
   const meta = await sharp(buffer).metadata();
+  const exifSwapped = (meta.orientation || 1) >= 5;
   return {
-    width: meta.width,
-    height: meta.height,
+    width: exifSwapped ? meta.height : meta.width,
+    height: exifSwapped ? meta.width : meta.height,
     format: meta.format,
     channels: meta.channels,
     density: meta.density || null
@@ -103,7 +111,11 @@ function assessQuality(imageWidth, imageHeight, printWidthIn = 16, printHeightIn
  */
 async function analyzeCrop(buffer) {
   const meta = await sharp(buffer).metadata();
-  const { width, height } = meta;
+  // Analyze in display orientation (rotate() below) — the percentages returned
+  // here address the thumbnail the customer sees and the print the renderer cuts.
+  const exifSwapped = (meta.orientation || 1) >= 5;
+  const width = exifSwapped ? meta.height : meta.width;
+  const height = exifSwapped ? meta.width : meta.height;
 
   // Downscale for fast entropy analysis
   const analysisWidth = Math.min(width, 400);
@@ -111,6 +123,7 @@ async function analyzeCrop(buffer) {
   const analysisHeight = Math.round(height * scale);
 
   const { data, info } = await sharp(buffer)
+    .rotate()
     .resize(analysisWidth, analysisHeight, { fit: 'fill' })
     .greyscale()
     .raw()
