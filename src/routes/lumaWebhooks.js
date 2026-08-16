@@ -86,7 +86,21 @@ router.post('/', async (req, res) => {
     // email (their order carries only our account address), so this is the
     // only shipping notice the customer will ever get. Best-effort: a mail
     // failure must not make Luma retry the webhook.
-    const order = db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
+    // Send it once and only once. Luma re-delivers any webhook it believes
+    // failed, and a store can carry more than one subscription for the same
+    // event, so this handler must expect to run twice for one shipment. The
+    // database columns above are safe to rewrite with identical values; an
+    // email is not — a grieving customer receiving two "your tribute has
+    // shipped" notices reads it as an order gone wrong.
+    const alreadyEmailed = db.get(
+      `SELECT 1 FROM order_events WHERE order_id = ? AND event_type = 'shipped_email_sent' LIMIT 1`,
+      [orderId]
+    );
+    if (alreadyEmailed) {
+      console.log(`Luma webhook: shipped email already sent for order ${orderId} — skipping duplicate`);
+    }
+
+    const order = alreadyEmailed ? null : db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
     if (order && order.email) {
       try {
         const emailService = require('../services/emailService');
