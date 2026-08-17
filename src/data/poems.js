@@ -1,156 +1,212 @@
 /**
  * Curated memorial poem library.
- * Each poem is appropriate for permanent display on wall art.
+ *
+ * Every poem here is ORIGINAL and ours. That is not a stylistic preference, it
+ * is a legal requirement: a customer can select one of these and we print it on
+ * a product we sell. The library previously carried the Rainbow Bridge piece
+ * (credited in 2023 to Edna Clyne-Rekhy, so a work by a known living author),
+ * "When Tomorrow Starts Without Me" by David Romano, and several unattributed
+ * contemporary verses marked "Unknown". Reproducing verse in an article has a
+ * fair-use argument. Printing it on a product for sale has none, and "Unknown"
+ * does not cure it: an orphan work still belongs to whoever wrote it.
+ *
+ * Only Van Dyke survives from the old set. He died in 1933, so that one is
+ * genuinely public domain.
+ *
+ * Craft rules these were written to, and any future addition must meet:
+ *   - No line longer than ~34 characters. The tribute panel is narrow, and a
+ *     long line gets re-broken by the setter at whatever point it runs out of
+ *     room, which is how a phrase ends up split in the wrong place.
+ *   - No em dashes anywhere.
+ *   - Banned register: rainbow bridge, wings, watching over, in a better place,
+ *     forever in my heart, paw prints on my heart, until we meet again, spirit
+ *     lives on, rest easy, gone too soon, heaven gained an angel.
+ *   - Concrete over abstract. A library poem cannot name one specific animal,
+ *     but it can name a real object and a real hour. "The bowl is still in the
+ *     corner" belongs to everyone who has one and to nobody else's poem.
+ *   - No forced rhyme and no perfect metre. Sing-song reads generated.
  */
 
 const poems = [
   {
-    id: 'rainbow-bridge',
-    title: 'Rainbow Bridge',
-    author: 'Unknown',
+    id: 'the-bowl',
+    title: 'The Bowl',
+    author: 'Still Beside Me',
     category: 'pet',
-    preview: 'Just this side of Heaven is a place called Rainbow Bridge...',
-    text: `Just this side of Heaven
-is a place called Rainbow Bridge.
+    preview: 'The bowl is still in the corner. I have not moved it...',
+    text: `The bowl is still in the corner.
+I have not moved it.
 
-When a pet dies who has been
-especially close to someone here,
-that pet goes to Rainbow Bridge.
+Twice a day my hands still know
+the weight of the bag,
+the sound it made going in,
+the way you came
+from wherever you were.
 
-There are meadows and hills
-for all of our special friends,
-so they can run and play together.
+Hands remember longer
+than the rest of us do.
 
-They are happy and content,
-except for one small thing –
-they each miss someone very special
-who was left behind.
-
-The day comes when one suddenly
-stops and looks into the distance.
-Their bright eyes are intent,
-their eager body begins to quiver.
-
-Suddenly, they break from the group,
-flying over the green grass,
-their legs carrying them
-faster and faster.
-
-You have been spotted,
-and when you and your special friend
-finally meet,
-you cling together in joyous reunion,
-never to be parted again.`
+I will move it
+when I move it.`
   },
   {
-    id: 'if-tears',
-    title: 'If Tears Could Build a Stairway',
-    author: 'Unknown',
-    category: 'universal',
-    preview: 'If tears could build a stairway and memories a lane...',
-    text: `If tears could build a stairway
-and memories a lane,
-I would walk right up to Heaven
-and bring you home again.
-
-No farewell words were spoken,
-no time to say goodbye.
-You were gone before I knew it,
-and only God knows why.
-
-My heart still aches with sadness,
-and secret tears still flow.
-What it meant to lose you,
-no one will ever know.`
-  },
-  {
-    id: 'grieve-not',
-    title: 'Do Not Stand at My Grave and Weep',
-    author: 'Mary Elizabeth Frye',
-    category: 'universal',
-    preview: 'Do not stand at my grave and weep, I am not there...',
-    text: `Do not stand at my grave and weep,
-I am not there, I do not sleep.
-
-I am a thousand winds that blow,
-I am the diamond glints on snow.
-I am the sunlight on ripened grain,
-I am the gentle autumn rain.
-
-When you awaken in the morning hush,
-I am the swift uplifting rush
-of quiet birds in circled flight.
-I am the soft star that shines at night.
-
-Do not stand at my grave and cry,
-I am not there, I did not die.`
-  },
-  {
-    id: 'loyal-friend',
-    title: 'A Loyal Friend',
-    author: 'Unknown',
+    id: 'the-hour',
+    title: 'The Hour That Was Yours',
+    author: 'Still Beside Me',
     category: 'pet',
-    preview: 'You were more than just a pet, you were family...',
-    text: `You were more than just a pet,
-you were family.
-You were more than just a friend,
-you were my heart.
+    preview: 'There was an hour that belonged to you. Late afternoon...',
+    text: `There was an hour
+that belonged to you.
 
-Your paws left prints
-upon my soul
-that time will never fade.
+Late afternoon, when the light
+went long and low,
+you would find me
+wherever I was
+and put your whole weight down.
 
-The house feels quiet now
-without your gentle sounds,
-but love like ours
-knows no such thing as gone.
+The hour still comes.
+It arrives at the same time,
+finds the room
+the way we left it.
 
-You are still beside me,
-in every sunrise,
-in every quiet moment,
-in every beat of my heart.`
+I keep it anyway.`
   },
   {
-    id: 'forever-in-heart',
-    title: 'Forever In My Heart',
-    author: 'Unknown',
+    id: 'stepping-over',
+    title: 'Stepping Over',
+    author: 'Still Beside Me',
     category: 'pet',
-    preview: 'You came into my life so small, and filled it up so tall...',
-    text: `You came into my life so small
-and filled it up so tall.
-With every wag, with every purr,
-you gave your love to all.
+    preview: 'For years I stepped over you in the dark, in the doorway...',
+    text: `For years I stepped over you
+in the dark, in the doorway,
+in the exact wrong place,
+every time, without thinking.
 
-Now the days feel longer,
-and the house feels far too wide,
-but I carry you within me –
-you are always by my side.
+Last night I stepped over nothing.
 
-Not gone. Not forgotten.
-Forever in my heart.`
+My body still knows
+where you were.
+
+Let it.
+It is the last thing that does.`
   },
   {
-    id: 'until-we-meet',
-    title: 'Until We Meet Again',
-    author: 'Unknown',
-    category: 'universal',
-    preview: 'I thought of you today, but that is nothing new...',
-    text: `I thought of you today,
-but that is nothing new.
-I thought about you yesterday
-and days before that too.
+    id: 'the-ordinary-years',
+    title: 'The Ordinary Years',
+    author: 'Still Beside Me',
+    category: 'pet',
+    preview: 'You did not know you were a comfort. You thought you were simply here...',
+    text: `You did not know
+you were a comfort.
 
-I think of you in silence,
-I often speak your name.
-All I have are memories
-and a picture in a frame.
+You thought you were simply here,
+lying where the sun was,
+waiting for someone
+to come home.
 
-Your memory is a keepsake
-from which I'll never part.
-God has you in His arms,
-I have you in my heart.
+That was the whole job,
+and you did it better
+than anyone has ever done
+anything.
 
-Until we meet again.`
+Thank you for the ordinary years.
+They were the good ones.`
+  },
+  {
+    id: 'the-warm-places',
+    title: 'The Warm Places',
+    author: 'Still Beside Me',
+    category: 'pet',
+    preview: 'You chose me the way cats choose, which is to say you arrived...',
+    text: `You chose me the way cats choose,
+which is to say you arrived
+and made it look
+like my idea.
+
+You slept where the warm was.
+You came when it suited you,
+and it suited you
+more than you let on.
+
+The warm places are still here.
+Nobody is using them.`
+  },
+  {
+    id: 'the-best-word',
+    title: 'The Best Word in the House',
+    author: 'Still Beside Me',
+    category: 'pet',
+    preview: 'I say your name out loud sometimes in an empty kitchen...',
+    text: `I say your name out loud
+sometimes, in an empty kitchen,
+for no reason,
+
+the way you say a word
+to check that it still works.
+
+It works.
+
+It is still the best word
+in the house.`
+  },
+  {
+    id: 'both-are-true',
+    title: 'Both Are True',
+    author: 'Still Beside Me',
+    category: 'pet',
+    preview: 'Fifteen years is a long time to be met at the door...',
+    text: `Fifteen years is a long time
+to be met at the door,
+to be followed room to room,
+to be sat beside
+without being asked.
+
+It is also no time at all.
+
+Both of those are true
+and I have stopped trying
+to make them agree.`
+  },
+  {
+    id: 'the-short-version',
+    title: 'The Short Version',
+    author: 'Still Beside Me',
+    category: 'pet',
+    preview: 'We did not get the years we planned for. We got the ones we got...',
+    text: `We did not get
+the years we planned for.
+
+We got the ones we got,
+and you spent every one of them
+entirely certain
+that you were home.
+
+I would not trade
+the short version.
+
+I would just have liked
+more of it.`
+  },
+  {
+    id: 'the-house-learned',
+    title: 'What the House Learned',
+    author: 'Still Beside Me',
+    category: 'pet',
+    preview: 'Nobody meets me at the door now. I still say the words out loud...',
+    text: `Nobody meets me at the door now.
+I still say the words out loud.
+
+The house has learned
+a different quiet,
+the kind that does not
+lift its head.
+
+You were the sound
+this place made.
+
+I am learning the new one
+slowly, and I am not
+in a hurry.`
   },
   {
     id: 'gone-from-sight',
@@ -184,55 +240,6 @@ there are other eyes watching her coming,
 and other voices ready to take up the glad shout,
 
 "Here she comes!"`
-  },
-  {
-    id: 'paw-prints',
-    title: 'Paw Prints on My Heart',
-    author: 'Unknown',
-    category: 'pet',
-    preview: 'You left paw prints on my heart that will never wash away...',
-    text: `You left paw prints on my heart
-that will never wash away.
-The memories we made together
-are with me every day.
-
-You taught me how to love
-without condition or reserve.
-A loyalty so pure and true,
-more than I could ever deserve.
-
-Now when the sun sets golden
-and the evening stars appear,
-I know that you are watching
-and I know that you are near.`
-  },
-  {
-    id: 'crossing-over',
-    title: 'When Tomorrow Starts Without Me',
-    author: 'David Romano',
-    category: 'universal',
-    preview: 'When tomorrow starts without me and I\'m not there to see...',
-    text: `When tomorrow starts without me
-and I'm not there to see,
-if the sun should rise
-and find your eyes
-all filled with tears for me,
-
-I wish so much
-you wouldn't cry
-the way you did today,
-while thinking of the many things
-we didn't get to say.
-
-I know how much you love me,
-as much as I love you,
-and each time that you think of me,
-I know you'll miss me too.
-
-So when tomorrow starts without me,
-don't think we're far apart,
-for every time you think of me,
-I'm right here in your heart.`
   }
 ];
 
