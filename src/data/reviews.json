@@ -1,5 +1,12 @@
 {
-  "_note": "Canonical record of real customer reviews, supplied by the business owner. Pages quote from this file verbatim. Rules: never edit a reviewer's words beyond typography, never invent an attribution, and never attach a star rating — no customer was asked to rate their grief, so no rating data exists and none may be manufactured. Because there are no ratings, pages publish Review schema WITHOUT reviewRating and MUST NOT publish AggregateRating.",
+  "_note": "Canonical record of real customer reviews, supplied by the business owner. Pages quote from this file verbatim. Ratings WERE collected from these 30 customers (28 gave five stars, 2 gave four) and were simply left out of this file when it was first written; an earlier version of this note wrongly said no rating data existed. What was NOT retained is the mapping from score to person, so no individual review here can be attributed a specific score. That is why the aggregate IS published, computed from legacyRatings below, while each Review entry stays WITHOUT reviewRating. Rules: never edit a reviewer's words beyond typography, never invent an attribution, never attach a star rating to a named person here, and never type the aggregate as a literal anywhere. The mean is computed from legacyRatings (and from published rows of the customer_reviews table) by src/services/customerReviews.js, because a number typed into a page drifts and a computed one cannot.",
+  "legacyRatings": {
+    "count": 30,
+    "fiveStar": 28,
+    "fourStar": 2,
+    "total": 148,
+    "_note": "total = 28*5 + 2*4 = 148. Points and count, not a mean: the mean is derived so that new ratings can be folded in without ever double counting."
+  },
   "themes": {
     "likeness": "It sounds like our actual pet — the poem captured who they were",
     "gift": "Sent to someone else who was grieving",

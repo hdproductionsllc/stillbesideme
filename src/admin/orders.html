@@ -42,12 +42,21 @@
   .links a { color:var(--accent); text-decoration:none; margin-right:14px; font-size:.85rem; }
   .empty { color:var(--muted); padding:40px 20px; text-align:center; }
   .saved { color:var(--accent); font-size:.8rem; margin-left:10px; }
+  /* Review moderation */
+  .rev { border:1px solid var(--line); border-radius:8px; padding:14px; margin-bottom:12px; background:var(--panel); }
+  .rev .stars { color:var(--accent); letter-spacing:2px; font-size:1rem; }
+  .rev .body { white-space:pre-wrap; font-size:.9rem; line-height:1.6; margin:8px 0; }
+  .rev .meta { font-size:.78rem; color:var(--muted); }
+  .rev .actions { display:flex; gap:10px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+  .rev label.inc { font-size:.78rem; color:var(--muted); display:flex; gap:5px; align-items:center; cursor:pointer; }
+  .warn { color:#e5a3a3; font-size:.78rem; }
 </style>
 </head>
 <body>
 <header>
   <h1>Still Beside Me — Orders</h1>
   <span class="spacer"></span>
+  <button id="viewToggle">Reviews</button>
   <a class="btn" href="/admin/api/backup">Download DB backup</a>
   <form method="POST" action="/admin/logout" style="margin:0"><button type="submit">Sign out</button></form>
 </header>
@@ -76,6 +85,22 @@
   </div>
   <div class="detail" id="detail"><div class="empty">Select an order to see its full history.</div></div>
 </div>
+
+<!-- Review moderation. Nothing a customer writes appears on the site until it
+     is published from here, by hand. -->
+<div id="reviewsPane" style="display:none; height:calc(100vh - 57px); overflow:auto">
+  <div class="controls">
+    <select id="revStatus">
+      <option value="pending">Pending</option>
+      <option value="published">Published</option>
+      <option value="hidden">Hidden</option>
+      <option value="all">All</option>
+    </select>
+    <span class="muted" id="revSummary" style="align-self:center"></span>
+  </div>
+  <div id="revList" style="padding:16px; max-width:760px"></div>
+</div>
+
 <script>
   const money = c => c != null ? '$' + (c/100).toFixed(2) : '—';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
@@ -191,6 +216,81 @@
       btn.disabled = false;
     };
   }
+
+  // ── Review moderation ──────────────────────────────────────────────
+  const stars = n => '★'.repeat(n) + '☆'.repeat(5 - n);
+
+  async function loadReviews() {
+    const status = document.getElementById('revStatus').value;
+    const r = await fetch('/admin/api/reviews?status=' + encodeURIComponent(status));
+    if (r.status === 401) { location.href = '/admin/login'; return; }
+    const { reviews, summary } = await r.json();
+
+    // The live aggregate, so it is obvious what publishing actually changes.
+    document.getElementById('revSummary').textContent = summary.count
+      ? `Published: ${summary.count} rated review${summary.count === 1 ? '' : 's'}, average ${summary.ratingValue}`
+      : 'Nothing published yet, so no star rating is shown anywhere on the site.';
+
+    const list = document.getElementById('revList');
+    if (!reviews.length) { list.innerHTML = '<div class="empty">Nothing here.</div>'; return; }
+
+    list.innerHTML = reviews.map(v => `
+      <div class="rev" data-id="${v.id}">
+        <div class="stars">${stars(v.rating)}</div>
+        <div class="body">${esc(v.body) || '<span class="muted">No words, rating only.</span>'}</div>
+        <div class="meta">
+          ${esc(v.authorDisplay) || '<span class="muted">no display name given</span>'}
+          · order ${esc(v.shortId)}${v.petName ? ' · ' + esc(v.petName) : ''}
+          · ${esc(v.createdAt)} · <span class="pill">${esc(v.status)}</span>
+          ${v.incentivised ? ' · <span class="pill">complimentary</span>' : ''}
+        </div>
+        ${v.consentToPublish ? '' : '<div class="warn" style="margin-top:8px">This customer did not agree to have their words published, so this one can only be kept private.</div>'}
+        <div class="actions">
+          ${v.consentToPublish && v.status !== 'published'
+            ? `<button class="btn" data-act="publish">Publish</button>
+               <label class="inc"><input type="checkbox" data-inc ${v.incentivised ? 'checked' : ''}> Received a complimentary piece</label>`
+            : ''}
+          ${v.status !== 'hidden' ? '<button class="btn" data-act="hide">Hide</button>' : ''}
+          <span class="muted" data-out></span>
+        </div>
+      </div>`).join('');
+
+    list.querySelectorAll('.rev').forEach(card => {
+      const id = card.dataset.id;
+      const out = card.querySelector('[data-out]');
+      card.querySelectorAll('button[data-act]').forEach(btn => {
+        btn.onclick = async () => {
+          btn.disabled = true; out.textContent = 'Saving…';
+          const act = btn.dataset.act;
+          const incBox = card.querySelector('[data-inc]');
+          try {
+            const rr = await fetch('/admin/api/reviews/' + encodeURIComponent(id) + '/' + act, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ incentivised: !!(incBox && incBox.checked) }),
+            });
+            const data = await rr.json().catch(() => ({}));
+            if (rr.ok) { loadReviews(); return; }
+            out.textContent = data.error || 'Failed';
+          } catch (e) {
+            out.textContent = 'Failed: ' + e.message;
+          }
+          btn.disabled = false;
+        };
+      });
+    });
+  }
+
+  document.getElementById('viewToggle').onclick = (ev) => {
+    const pane = document.getElementById('reviewsPane');
+    const wrap = document.querySelector('.wrap');
+    const showReviews = pane.style.display === 'none';
+    pane.style.display = showReviews ? 'block' : 'none';
+    wrap.style.display = showReviews ? 'none' : 'flex';
+    ev.currentTarget.textContent = showReviews ? 'Orders' : 'Reviews';
+    if (showReviews) loadReviews();
+  };
+  document.getElementById('revStatus').addEventListener('change', loadReviews);
 
   let t;
   document.getElementById('q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(loadList, 200); });

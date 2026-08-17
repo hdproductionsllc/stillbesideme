@@ -27,12 +27,15 @@
   // ============================================================
   // Email signup (popup + footer forms)
   // ============================================================
-  async function submitEmail(email, formEl) {
+  // `source` is carried through so the server knows what was promised. The poem
+  // offer blocks send a source beginning with "poems", which is what makes the
+  // server actually email the poems back rather than just filing the address.
+  async function submitEmail(email, source) {
     try {
       const res = await fetch('/api/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify(source ? { email, source } : { email }),
       });
       return res.ok;
     } catch {
@@ -40,7 +43,7 @@
     }
   }
 
-  // Handle all signup forms (footer + popup)
+  // Handle all signup forms (footer + popup + inline offers)
   document.querySelectorAll('[data-signup-form], #popup-signup-form').forEach(form => {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -51,9 +54,20 @@
 
       btn.disabled = true;
       btn.textContent = 'Sending...';
-      const ok = await submitEmail(email);
+      const ok = await submitEmail(email, form.dataset.source);
 
       if (ok) {
+        // An inline offer declares its own confirmation, so the reader is told
+        // the poems are on their way rather than just seeing a button change.
+        const inlineSuccess = form.parentElement
+          && form.parentElement.querySelector('[data-signup-success]');
+        if (inlineSuccess) {
+          form.hidden = true;
+          inlineSuccess.hidden = false;
+          document.cookie = 'sbm_subscribed=1;max-age=31536000;path=/;SameSite=Lax';
+          return;
+        }
+
         // Show success
         const successEl = form.closest('.email-popup')
           ? form.closest('.email-popup').querySelector('.email-popup-success')

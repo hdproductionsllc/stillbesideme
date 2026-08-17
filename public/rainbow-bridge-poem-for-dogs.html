@@ -171,7 +171,7 @@
     }
     @media print {
       .site-header, .blog-breadcrumb, .blog-cta, .site-footer,
-      .email-popup-overlay, .trust-badges { display: none !important; }
+      .email-popup-overlay, .trust-badges, .poem-offer { display: none !important; }
       .poem-card { border: none; box-shadow: none; margin: 0 0 2rem; padding: 0; background: none; }
       body { background: #fff; }
     }
@@ -325,6 +325,17 @@
         </div>
 
         <p class="poem-licence">Written by Still Beside Me. Free to print, read aloud, or copy into a card. Please do not resell them as your own.</p>
+
+        <aside class="poem-offer">
+          <h2>Would you like these poems by email?</h2>
+          <p>We will send you the five above, the five written for cats, and the rest of our collection, so they are somewhere you can find them again when you need them.</p>
+          <form class="poem-offer-form" data-signup-form data-source="poems-dogs">
+            <input type="email" placeholder="Your email" aria-label="Your email address" required>
+            <button type="submit" class="btn btn-warm">Send me the poems</button>
+          </form>
+          <p class="poem-offer-success" data-signup-success hidden>They are on their way. If they have not arrived in a few minutes, please have a look in your spam folder.</p>
+          <p class="poem-offer-note">The poems stay free on this page either way. We send very little, and you can stop it at any time.</p>
+        </aside>
 
         <h2>Is the Rainbow Bridge Only for Dogs?</h2>
 

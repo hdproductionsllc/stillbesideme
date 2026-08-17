@@ -785,6 +785,130 @@ async function sendShippedEmail(to, orderData, tracking, statusPageUrl) {
   return send(to, `Your tribute has shipped — Order ${sid}`, html);
 }
 
+/**
+ * Ask the customer, some days after their piece shipped, how it turned out.
+ *
+ * NOT to be confused with sendReviewRequest above, which despite its name goes
+ * to David and Rebecca about a proof awaiting approval. This one is the only
+ * email in the system that goes to a customer about reviewing their piece.
+ *
+ * Someone is being asked about an object that commemorates an animal that
+ * died, so this reads as a person asking rather than a form arriving. The two
+ * questions it previews are the two the page actually asks: how the whole thing
+ * went, and what they thought when they opened it.
+ *
+ * It does not ask anyone to rate the poem. Scoring a piece of writing about
+ * your own dead pet is an awkward and faintly absurd request, and it is the
+ * reason no ratings were collected here for three years. What a customer can
+ * fairly judge is the order: the print, the frame, the delivery, the proof
+ * round, whether anyone answered them. That is what the stars are for.
+ *
+ * No deadline, no reminder, no second ask, and a plain reply is offered as an
+ * equal alternative to the form.
+ *
+ * @param {string} to customer email
+ * @param {object} orderData { orderId, petName }
+ * @param {string} reviewUrl the customer's /review/:token page
+ */
+async function sendReviewInvite(to, orderData, reviewUrl) {
+  const esc = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  const pet = orderData && orderData.petName ? String(orderData.petName).trim() : '';
+  const safePet = esc(pet);
+  const possessive = safePet ? `${safePet}'s` : 'your';
+
+  const heading = safePet
+    ? `Did ${safePet}'s piece arrive safely?`
+    : `Did your piece arrive safely?`;
+
+  const html = wrapHtml(`
+    <div style="background:#fff;border-radius:12px;padding:32px;margin-bottom:24px;">
+      <h1 style="font-family:Georgia,serif;font-size:1.6rem;font-weight:400;color:#2C2C2C;text-align:center;margin:0 0 24px;">
+        ${heading}
+      </h1>
+
+      <p style="color:#2C2C2C;line-height:1.6;margin-bottom:16px;">
+        ${possessive.charAt(0).toUpperCase() + possessive.slice(1)} piece left us a little while ago,
+        so by now it should be somewhere you can see it.
+      </p>
+
+      <p style="color:#2C2C2C;line-height:1.6;margin-bottom:24px;">
+        There are two things we would like to know, if you have a moment. How the whole thing went,
+        from ordering it to hanging it up, and what you thought when you opened it.
+      </p>
+
+      <div style="text-align:center;margin-bottom:24px;">
+        <a href="${reviewUrl}"
+           style="display:inline-block;background:#8B9D83;color:#fff;text-decoration:none;padding:14px 40px;border-radius:8px;font-weight:600;font-size:1rem;">
+          Tell us how it turned out
+        </a>
+      </div>
+
+      <div style="background:#FAF7F2;border:1px solid #E8E4DF;border-radius:8px;padding:20px;">
+        <p style="color:#2C2C2C;line-height:1.7;margin:0;">
+          It takes a minute. We are not asking you to grade the poem, only the order around it:
+          the print, the frame, and how we were to deal with. Nothing you write goes on our website
+          unless you tell us it may. If something is not right, that link reaches us, and so does a
+          plain reply to this email.
+        </p>
+      </div>
+    </div>
+  `);
+
+  const subject = pet
+    ? `Did ${pet}'s piece arrive safely?`
+    : `Did your piece arrive safely?`;
+
+  return send(to, subject, html);
+}
+
+/**
+ * Deliver the poems someone asked for by email.
+ *
+ * The exchange on the poem pages is the poems themselves, never a discount, so
+ * this email owes the reader exactly what was promised and nothing else. It
+ * carries no offer, no product pitch and no urgency. The poems live on pages
+ * that are free to read without an address, which is deliberate: the email is
+ * a convenience for someone who wants them to hand, not a toll gate.
+ *
+ * @param {string} to subscriber email
+ */
+async function sendPoemPack(to) {
+  const link = (path, label, note) => `
+    <p style="color:#2C2C2C;line-height:1.6;margin:0 0 16px;">
+      <a href="${BASE_URL}${path}" style="color:#8B9D83;font-weight:600;text-decoration:none;">${label}</a><br>
+      <span style="color:#9B9590;font-size:0.95rem;">${note}</span>
+    </p>`;
+
+  const html = wrapHtml(`
+    <div style="background:#fff;border-radius:12px;padding:32px;margin-bottom:24px;">
+      <h1 style="font-family:Georgia,serif;font-size:1.6rem;font-weight:400;color:#2C2C2C;text-align:center;margin:0 0 24px;">
+        The poems, as promised
+      </h1>
+
+      <p style="color:#2C2C2C;line-height:1.6;margin-bottom:24px;">
+        Here they are. You can read them on the page, print them, or copy the words
+        straight into a card.
+      </p>
+
+      ${link('/rainbow-bridge-poem-for-dogs', 'Five rainbow bridge poems for dogs', 'Plus where the original poem came from, and who wrote it.')}
+      ${link('/rainbow-bridge-poem-for-cats', 'Five rainbow bridge poems for cats', 'Written for cats specifically, not adapted from the dog versions.')}
+      ${link('/blog/pet-memorial-poems', 'The wider collection of pet memorial poems', 'Shorter verses for cards, and longer ones for reading aloud.')}
+
+      <div style="background:#FAF7F2;border:1px solid #E8E4DF;border-radius:8px;padding:20px;margin-top:8px;">
+        <p style="color:#2C2C2C;line-height:1.7;margin:0;">
+          These were written by us and they are free to print, read aloud, or copy into a card.
+          Please do not resell them as your own. If you want to read one at a burial or a
+          scattering, you have our blessing and you need no permission from anyone.
+        </p>
+      </div>
+    </div>
+  `);
+
+  return send(to, 'The poems, as promised', html);
+}
+
 module.exports = {
   // Low-level shell + dispatcher, reused by src/services/vaultEmails.js so the
   // Story Vault occasion emails share this brand wrapper and SMTP fallback.
@@ -801,4 +925,8 @@ module.exports = {
   sendDigitalDeliveryEmail,
   sendPartnerOrderEmail,
   sendShippedEmail,
+  // Customer-facing. sendReviewInvite is the one that asks a BUYER about their
+  // piece; sendReviewRequest above asks the SHOP to approve a proof.
+  sendReviewInvite,
+  sendPoemPack,
 };

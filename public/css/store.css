@@ -2749,3 +2749,121 @@ body.tl-open { overflow: hidden; }
   .tw-piece .tl-trigger:hover,
   .tw-piece .tl-trigger:focus-visible { transform: none; }
 }
+
+/* ============================================================
+   Inline poem offer
+   ------------------------------------------------------------
+   Sits inside the article, after the poems it is offering, so it
+   never covers the words someone came to read. The exchange is the
+   poems themselves and nothing else: there is no discount here, and
+   there must never be one, because this page is read by people whose
+   animal has just died.
+
+   Deliberately quieter than .blog-cta: a soft surface panel rather
+   than the dark conversion band, so it reads as a shelf the reader
+   can take something from rather than a sales interruption.
+   ============================================================ */
+.poem-offer {
+  max-width: 640px;
+  margin: var(--space-2xl) auto;
+  padding: var(--space-xl) var(--space-2xl);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-warm);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--color-surface);
+}
+.poem-offer h2 {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 400;
+  color: var(--color-primary);
+  margin: 0 0 var(--space-sm);
+}
+.poem-offer p {
+  color: var(--color-primary);
+  font-size: 1rem;
+  line-height: 1.7;
+  margin: 0 0 var(--space-md);
+}
+.poem-offer-form {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+/* display:flex above would beat the UA [hidden] rule, so the swap to the
+   success message needs this to actually hide the form. */
+.poem-offer-form[hidden] { display: none; }
+.poem-offer-form input[type="email"] {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  background: var(--color-bg);
+}
+.poem-offer-form input[type="email"]:focus {
+  border-color: var(--color-warm);
+  outline: none;
+}
+.poem-offer-note {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  margin: var(--space-sm) 0 0;
+}
+.poem-offer-success {
+  color: var(--color-success);
+  font-weight: 600;
+  margin: 0;
+}
+.poem-offer-success[hidden] { display: none; }
+
+/* ============================================================
+   Real customer ratings (public/js/customer-reviews.js)
+   ------------------------------------------------------------
+   Only ever rendered from published rows of customer_reviews, so
+   these styles are unused until a real buyer leaves a real rating.
+   The disclosure pill is required by the FTC's 2024 Rule on
+   Consumer Reviews wherever an incentivised review is shown, so it
+   is styled to be legible, not to be tucked away.
+   ============================================================ */
+[data-customer-reviews][hidden] { display: none; }
+.cr-summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-lg);
+}
+.cr-stars { color: var(--color-warm); letter-spacing: 2px; }
+.cr-score { font-weight: 600; color: var(--color-primary); }
+.cr-count { color: var(--color-muted); font-size: 0.9rem; }
+.cr-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-lg); }
+.cr-item {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-lg);
+}
+.cr-body { margin: var(--space-xs) 0 var(--space-sm); line-height: 1.7; }
+.cr-attrib { margin: 0; font-size: 0.9rem; color: var(--color-muted); }
+.cr-disclosure {
+  display: inline-block;
+  margin-left: var(--space-xs);
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+/* Screen-reader text for the star glyphs. */
+.cr-sr {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

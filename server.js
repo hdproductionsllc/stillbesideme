@@ -244,6 +244,17 @@ async function start() {
     // req.path is mount-relative here, so the proof endpoint is '/proof'.
     skip: (req) => req.path === '/proof',
   }));
+  // Review submission. The write is what needs a ceiling, so the GET that
+  // renders the page is skipped: a customer reloading their own review link
+  // must never be locked out of leaving the review.
+  app.use('/api/review', rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { error: 'Too many attempts. Please try again in a few minutes.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => req.method === 'GET' || req.method === 'HEAD',
+  }));
 
   // Middleware
   app.use(express.json({ limit: '50mb' }));
@@ -322,6 +333,24 @@ async function start() {
     };
     runProofReminders();
     setInterval(runProofReminders, 24 * 60 * 60 * 1000).unref();
+  }
+
+  // Review invitations → asks a customer, once, how their piece turned out,
+  // ten days after it shipped. Same daily-timer shape as the three above, and
+  // gated OFF by default like the vault date engine: this is the only email we
+  // send that asks a family for something rather than telling them something,
+  // so it stays dormant until deliberately switched on with
+  // REVIEW_INVITES_ENABLED=true. Exactly one ask per order ever, enforced by
+  // review_invite_sent order_events, and only for orders that shipped inside
+  // the engine's 60-day window (so switching it on cannot email the entire
+  // back catalogue at once).
+  if (process.env.REVIEW_INVITES_ENABLED === 'true') {
+    const { checkAndSend } = require('./src/services/reviewInviteEngine');
+    const runReviewInvites = () => {
+      checkAndSend().catch((err) => console.error('Review invite engine failed:', err.message));
+    };
+    runReviewInvites();
+    setInterval(runReviewInvites, 24 * 60 * 60 * 1000).unref();
   }
 
   // ── Letter From Heaven is discontinued ────────────────────────────────
@@ -792,6 +821,15 @@ async function start() {
     res.sendFile(path.join(__dirname, 'public', 'proof-approval.html'));
   });
 
+  // Customer reviews. Same tokenization as /proof/:token, and deliberately the
+  // same token: a buyer who can approve their proof can say how the finished
+  // piece turned out. Also serves GET /api/reviews, the public read side, which
+  // is the ONLY source a page may use for star ratings or an AggregateRating.
+  app.use('/api', require('./src/routes/customerReview'));
+  app.get('/review/:token', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'review.html'));
+  });
+
   // Digital Keepsake download — same tokenization as /proof/:token (the
   // proof_token doubles as the per-order download key). Serves the rendered
   // 300 DPI file as an attachment. Valid only for delivered digital orders;
@@ -921,7 +959,15 @@ async function start() {
       return res.status(400).json({ error: 'Please enter a valid email address.' });
     }
     const clean = String(email).trim().toLowerCase();
+    const cleanSource = String(source || 'signup').slice(0, 40);
     const db = req.app.locals.db;
+
+    // Signups that came from the poem offer were promised the poems. That
+    // promise is kept below, for every such request, whether or not the address
+    // is already on the list: someone asking a second time wants the email, and
+    // silently doing nothing because they subscribed months ago would be a
+    // capture that takes an address and gives nothing back.
+    const wantsPoems = cleanSource.startsWith('poems');
 
     // Save to our DB. Only treat it as a NEW subscriber (and only alert once)
     // if the address wasn't already captured.
@@ -930,7 +976,7 @@ async function start() {
       const existing = db.get('SELECT id FROM subscribers WHERE email = ?', [clean]);
       if (!existing) {
         db.run('INSERT INTO subscribers (email, source) VALUES (?, ?)',
-          [clean, String(source || 'signup').slice(0, 40)]);
+          [clean, cleanSource]);
         isNew = true;
       }
     } catch (err) {
@@ -944,10 +990,25 @@ async function start() {
         const emailService = require('./src/services/emailService');
         await emailService.sendAdminAlert(
           'New email subscriber',
-          `Someone signed up for updates.\n\nEmail: ${clean}\nSource: ${source || 'signup'}`
+          `Someone signed up for updates.\n\nEmail: ${clean}\nSource: ${cleanSource}`
         );
       } catch (err) {
         console.error('Subscriber admin alert failed:', err.message);
+      }
+    }
+
+    // Deliver what was actually offered. Best-effort in the same sense as the
+    // alert above: the address is already saved, so a mail failure is logged
+    // and the request still succeeds rather than telling the reader their
+    // perfectly good email address was rejected.
+    let poemsSent = false;
+    if (wantsPoems) {
+      try {
+        const emailService = require('./src/services/emailService');
+        await emailService.sendPoemPack(clean);
+        poemsSent = true;
+      } catch (err) {
+        console.error('Poem pack send failed:', err.message);
       }
     }
 
@@ -968,7 +1029,7 @@ async function start() {
       }
     }
 
-    res.json({ success: true });
+    res.json({ success: true, poemsSent });
   });
 
   // Admin: export captured subscribers as CSV (admin token required).

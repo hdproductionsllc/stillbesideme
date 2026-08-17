@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tell Us About Your Piece | Still Beside Me</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=2">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/store.css">
+  <style>
+    .review-page {
+      max-width: 620px;
+      margin: 0 auto;
+      padding: var(--space-2xl) var(--space-md);
+    }
+    .review-header { text-align: center; margin-bottom: var(--space-xl); }
+    .review-header h1 {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 400;
+      margin-bottom: var(--space-xs);
+    }
+    .review-header .subtitle { color: var(--color-muted); font-size: 1.05rem; }
+    .review-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      padding: var(--space-2xl);
+      box-shadow: var(--shadow);
+    }
+    .review-field { margin-bottom: var(--space-xl); }
+    .review-field label.field-label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: var(--space-xs);
+    }
+    .review-field .field-hint {
+      color: var(--color-muted);
+      font-size: 0.9rem;
+      margin-bottom: var(--space-sm);
+    }
+    .review-field textarea,
+    .review-field input[type="text"] {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      font-family: var(--font-body);
+      font-size: 1rem;
+      background: var(--color-bg);
+    }
+    .review-field textarea { min-height: 140px; resize: vertical; line-height: 1.7; }
+    .review-field textarea:focus,
+    .review-field input[type="text"]:focus {
+      border-color: var(--color-warm);
+      outline: none;
+    }
+    /* Stars are radio buttons underneath, so this works with a keyboard and
+       with a screen reader, and it works with JavaScript switched off. */
+    .star-row { display: flex; gap: var(--space-xs); }
+    .star-row input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 1px;
+      height: 1px;
+    }
+    .star-row label {
+      cursor: pointer;
+      font-size: 2rem;
+      line-height: 1;
+      color: var(--color-border);
+      transition: color 0.15s ease;
+    }
+    .star-row label:hover,
+    .star-row.is-set label.is-lit { color: var(--color-warm); }
+    .star-row input[type="radio"]:focus-visible + label {
+      outline: 2px solid var(--color-warm);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    .consent-row {
+      display: flex;
+      gap: var(--space-sm);
+      align-items: flex-start;
+      background: var(--color-bg);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: var(--space-md);
+    }
+    .consent-row input[type="checkbox"] { margin-top: 0.25rem; flex-shrink: 0; }
+    .consent-row label { font-size: 0.95rem; line-height: 1.6; }
+    .review-submit { width: 100%; justify-content: center; }
+    .form-error {
+      color: var(--color-error);
+      font-size: 0.95rem;
+      margin-bottom: var(--space-md);
+      min-height: 1.2em;
+    }
+    .loading-state, .error-state, .thanks-state {
+      text-align: center;
+      padding: var(--space-2xl) var(--space-md);
+      color: var(--color-muted);
+    }
+    .thanks-state h2 {
+      font-family: var(--font-display);
+      font-size: 1.6rem;
+      font-weight: 400;
+      color: var(--color-primary);
+      margin-bottom: var(--space-sm);
+    }
+    .reply-note {
+      text-align: center;
+      color: var(--color-muted);
+      font-size: 0.9rem;
+      margin-top: var(--space-lg);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a href="/" class="site-logo">Still Beside Me</a>
+    </div>
+  </header>
+
+  <main class="review-page" id="reviewPage">
+    <div class="loading-state" id="loading">One moment...</div>
+  </main>
+
+  <script>
+  (function () {
+    const container = document.getElementById('reviewPage');
+    const pathParts = window.location.pathname.split('/');
+    const token = pathParts[pathParts.length - 1];
+
+    const esc = s => String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    if (!token || token === 'review') {
+      container.innerHTML = '<div class="error-state">That link is not complete. Please open the link from your email again.</div>';
+      return;
+    }
+
+    function thanks(message) {
+      container.innerHTML = `
+        <div class="thanks-state">
+          <h2>Thank you</h2>
+          <p>${esc(message)}</p>
+          <p style="margin-top:1.5rem;"><a href="/" class="btn btn-outline btn-sm">Back to Still Beside Me</a></p>
+        </div>`;
+    }
+
+    fetch(`/api/review/${encodeURIComponent(token)}`)
+      .then(r => {
+        if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Not found'); });
+        return r.json();
+      })
+      .then(data => {
+        if (data.alreadySubmitted) {
+          thanks('You have already written to us about this piece. We read every one.');
+          return;
+        }
+
+        const pet = data.petName ? String(data.petName).trim() : '';
+        const safePet = esc(pet);
+        const them = safePet ? safePet : 'them';
+
+        container.innerHTML = `
+          <div class="review-header">
+            <h1>${safePet ? `${safePet}'s piece` : 'Your piece'}</h1>
+            <p class="subtitle">If you have a moment, we would like to know how it turned out. Two questions, and the second one is the one that matters.</p>
+          </div>
+
+          <div class="review-card">
+            <form id="reviewForm" novalidate>
+              <div class="form-error" id="formError"></div>
+
+              <!-- Stars first, because they are one tap, and they are asked
+                   about the WHOLE thing rather than about the poem. Nobody can
+                   sensibly score a piece of writing about their own animal, and
+                   asking them to is what left this business with no ratings for
+                   three years. Ordering, printing, framing, delivery and how we
+                   were to deal with are all things a person can fairly judge. -->
+              <div class="review-field">
+                <label class="field-label">How was the whole thing, from ordering it to hanging it up?</label>
+                <p class="field-hint">One tap. This covers all of it: the print, the frame, how it arrived, and how we were to deal with along the way.</p>
+                <div class="star-row" id="starRow">
+                  ${[1, 2, 3, 4, 5].map(n => `
+                    <input type="radio" name="rating" id="star${n}" value="${n}">
+                    <label for="star${n}" data-star="${n}" title="${n} out of 5" aria-label="${n} out of 5">&#9733;</label>
+                  `).join('')}
+                </div>
+              </div>
+
+              <!-- And this is where the piece itself gets talked about. It is
+                   given the most room on the page because it is the part that
+                   is worth publishing and the part a stranger actually reads. -->
+              <div class="review-field">
+                <label class="field-label" for="reviewBody">What did you think when you opened it?</label>
+                <p class="field-hint">Whether it looks like ${esc(them)}, whether it arrived in one piece, or anything else that comes to mind. This is the part other people read.</p>
+                <textarea id="reviewBody" maxlength="2000" placeholder="A few lines is plenty."></textarea>
+              </div>
+
+              <div class="review-field">
+                <label class="field-label" for="authorDisplay">How should we sign it, if we share it?</label>
+                <p class="field-hint">A first name and a last initial is what most people choose, for example Keith L. Leave it blank and we will not put a name to it.</p>
+                <input type="text" id="authorDisplay" maxlength="60" placeholder="Keith L.">
+              </div>
+
+              <div class="review-field">
+                <div class="consent-row">
+                  <input type="checkbox" id="consent">
+                  <label for="consent">You may show what I have written on your website. If this box is unticked, your words stay between us and are never published.</label>
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-warm btn-lg review-submit" id="submitBtn">Send this to us</button>
+            </form>
+          </div>
+
+          <p class="reply-note">
+            If you would rather not leave a rating at all, simply reply to our email instead.
+            That reaches a person, and it counts just the same.
+          </p>`;
+
+        // Light the stars up to the chosen one.
+        const starRow = document.getElementById('starRow');
+        starRow.addEventListener('change', () => {
+          const chosen = Number((starRow.querySelector('input:checked') || {}).value || 0);
+          starRow.classList.toggle('is-set', chosen > 0);
+          starRow.querySelectorAll('label').forEach(l => {
+            l.classList.toggle('is-lit', Number(l.dataset.star) <= chosen);
+          });
+        });
+
+        document.getElementById('reviewForm').addEventListener('submit', async (ev) => {
+          ev.preventDefault();
+          const btn = document.getElementById('submitBtn');
+          const errBox = document.getElementById('formError');
+          errBox.textContent = '';
+
+          const checked = starRow.querySelector('input:checked');
+          if (!checked) {
+            errBox.textContent = 'Please choose a rating from one to five stars, or reply to our email instead.';
+            return;
+          }
+
+          btn.disabled = true;
+          const original = btn.textContent;
+          btn.textContent = 'Sending...';
+
+          try {
+            const r = await fetch(`/api/review/${encodeURIComponent(token)}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                rating: Number(checked.value),
+                body: document.getElementById('reviewBody').value,
+                authorDisplay: document.getElementById('authorDisplay').value,
+                consentToPublish: document.getElementById('consent').checked,
+              }),
+            });
+            const out = await r.json().catch(() => ({}));
+            if (r.ok) {
+              thanks('This goes straight to us, and we read every one.');
+              return;
+            }
+            if (out.alreadySubmitted) {
+              thanks('You have already written to us about this piece.');
+              return;
+            }
+            errBox.textContent = out.error || 'We could not save that. Please try again.';
+          } catch (e) {
+            errBox.textContent = 'We could not save that. Please try again.';
+          }
+          btn.disabled = false;
+          btn.textContent = original;
+        });
+      })
+      .catch(err => {
+        container.innerHTML = `<div class="error-state">${esc(err.message || 'We could not find that order.')}</div>`;
+      });
+  })();
+  </script>
+</body>
+</html>

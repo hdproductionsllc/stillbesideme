@@ -187,6 +187,104 @@ router.post('/api/orders/:id/notes', requireAdmin, express.json(), (req, res) =>
   res.json({ success: true });
 });
 
+// ── Customer review moderation ──────────────────────────────────────────
+// Nothing a customer submits ever reaches the site on its own. Every review
+// lands as 'pending' and stays invisible until it is published here, by hand.
+//
+// Two rules are enforced on the server rather than left to the UI, because
+// both of them are the kind of thing a stray click could otherwise get wrong:
+// a review without the customer's consent can never be published at all, and
+// publishing an incentivised review carries its disclosure flag with it so the
+// label travels wherever the words go.
+
+// The moderation queue. Defaults to what needs attention.
+router.get('/api/reviews', requireAdmin, (req, res) => {
+  const db = req.app.locals.db;
+  const status = String(req.query.status || 'pending').trim();
+  const params = [];
+  let sql = `SELECT r.*, o.email AS order_email, o.fields_json
+               FROM customer_reviews r
+               LEFT JOIN orders o ON o.id = r.order_id`;
+  if (status && status !== 'all') { sql += ' WHERE r.status = ?'; params.push(status); }
+  sql += ' ORDER BY r.created_at DESC LIMIT 500';
+
+  const rows = db.all(sql, params).map(r => {
+    let petName = '';
+    try {
+      const f = r.fields_json ? JSON.parse(r.fields_json) : {};
+      petName = f.petName || f.name || '';
+    } catch (e) { /* ignore */ }
+    return {
+      id: r.id,
+      orderId: r.order_id,
+      shortId: r.order_id ? String(r.order_id).substring(0, 8).toUpperCase() : '',
+      rating: Number(r.rating),
+      body: r.body || '',
+      authorDisplay: r.author_display || '',
+      consentToPublish: Number(r.consent_to_publish) === 1,
+      incentivised: Number(r.incentivised) === 1,
+      status: r.status,
+      createdAt: r.created_at,
+      publishedAt: r.published_at,
+      email: r.order_email || '',
+      petName,
+    };
+  });
+
+  const customerReviews = require('../services/customerReviews');
+  res.json({ reviews: rows, summary: customerReviews.summary(db) });
+});
+
+// Publish a review. Refused without consent, whatever the UI sent.
+router.post('/api/reviews/:id/publish', requireAdmin, express.json(), (req, res) => {
+  const db = req.app.locals.db;
+  const r = db.get('SELECT * FROM customer_reviews WHERE id = ?', [req.params.id]);
+  if (!r) return res.status(404).json({ error: 'Review not found' });
+  if (Number(r.consent_to_publish) !== 1) {
+    return res.status(400).json({
+      error: 'This customer did not agree to have their words published. It cannot be published.',
+    });
+  }
+
+  // FTC Rule on Consumer Reviews (2024). The shop is the only party that knows
+  // whether this piece was comped, so the flag is set here and nowhere else.
+  const incentivised = req.body && req.body.incentivised ? 1 : 0;
+
+  db.run(
+    `UPDATE customer_reviews
+        SET status = 'published', incentivised = ?, published_at = datetime('now')
+      WHERE id = ?`,
+    [incentivised, r.id]
+  );
+  db.run(
+    `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+    [r.order_id, 'review_published', JSON.stringify({
+      reviewId: r.id, rating: Number(r.rating), incentivised: incentivised === 1,
+      publishedAt: new Date().toISOString(),
+    })]
+  );
+  res.json({ success: true });
+});
+
+// Hide a review: seen, set aside, never shown and never counted.
+router.post('/api/reviews/:id/hide', requireAdmin, (req, res) => {
+  const db = req.app.locals.db;
+  const r = db.get('SELECT * FROM customer_reviews WHERE id = ?', [req.params.id]);
+  if (!r) return res.status(404).json({ error: 'Review not found' });
+
+  db.run(
+    `UPDATE customer_reviews SET status = 'hidden', published_at = NULL WHERE id = ?`,
+    [r.id]
+  );
+  db.run(
+    `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+    [r.order_id, 'review_hidden', JSON.stringify({
+      reviewId: r.id, hiddenAt: new Date().toISOString(),
+    })]
+  );
+  res.json({ success: true });
+});
+
 // Re-send the transactional emails for a paid order whose original sends
 // failed (e.g. an SMTP outage): customer order confirmation, and — when the
 // order is still waiting on review — the admin review request. Only re-sends;

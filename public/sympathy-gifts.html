@@ -43,7 +43,7 @@
     "category": "Pet Loss Gifts",
     "aggregateRating": {
       "@type": "AggregateRating",
-      "ratingValue": "5",
+      "ratingValue": "4.9",
       "bestRating": "5",
       "worstRating": "1",
       "reviewCount": "30"
@@ -526,6 +526,11 @@
   <section class="social-proof" id="reviews">
     <div class="container">
       <h2 class="proof-count">In their own words</h2>
+      <p class="reviews-rating" data-customer-rating>
+            <span class="cr-stars" aria-hidden="true">★★★★★</span>
+            <span class="cr-score">4.9 out of 5</span>
+            <span class="cr-count">from 30 reviews</span>
+          </p>
       <p class="proof-subline">Real words from people who sent this to someone who was grieving, published as they were written.</p>
       <div class="testimonials">
 
@@ -692,5 +697,8 @@
   </div>
 
   <script src="/js/store.js"></script>
+  <!-- Real star ratings from paid orders. Does nothing at all until a genuine
+       rated review is published, and never counts the unrated legacy quotes. -->
+  <script defer src="/js/customer-reviews.js"></script>
 </body>
 </html>
