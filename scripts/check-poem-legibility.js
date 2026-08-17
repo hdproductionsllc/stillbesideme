@@ -4,8 +4,8 @@
  * The tribute renderer lays every piece out in a canonical 1000-unit box and
  * scales it, which is what makes the proof and the print the same picture. The
  * cost is that a font size inside the renderer has no physical meaning: the
- * same "33" is 24pt on an 8x10 and 69pt on a 20x30. For a long time nothing in
- * the system could state the printed size, so nothing could protect it, and a
+ * same setting is ~15pt on an 8x10 and ~45pt on a 20x30. For a long time nothing
+ * in the system could state the printed size, so nothing could protect it, and a
  * legibility warning was tuned against numbers that no longer applied once
  * printed mats were switched off and every panel got roughly 2.5x bigger.
  *
@@ -105,6 +105,25 @@ function measure(sizeLabel, layout, poemText, template) {
   return report;
 }
 
+/**
+ * The builder warns the customer, the renderer sets the type. When those two
+ * disagree about what "too small" means, the warning goes quiet and the piece
+ * ships anyway — which is exactly what happened when printed mats were turned
+ * off and only one of the two numbers was updated. Assert they still agree.
+ */
+function checkThresholdDrift() {
+  const fs = require('fs');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'customizer.js'), 'utf8');
+  const m = src.match(/POEM_COMFORT_PT\s*=\s*([\d.]+)/);
+  if (!m) return `could not find POEM_COMFORT_PT in customizer.js`;
+  const builder = Number(m[1]);
+  if (builder !== POEM_MIN_PT) {
+    return `builder warns below ${builder}pt but the renderer's floor is ${POEM_MIN_PT}pt — `
+      + `orders between the two print too small and say nothing`;
+  }
+  return null;
+}
+
 const strict = process.argv.includes('--strict');
 const template = loadTemplate('pet-tribute');
 let worst = Infinity;
@@ -113,24 +132,36 @@ let below = 0;
 console.log(`\nPrinted poem size. Floor is ${POEM_MIN_PT}pt.\n`);
 for (const [label, poem] of Object.entries(POEMS)) {
   console.log(`  ${label}`);
-  console.log(`    size     ${LAYOUTS.map((l) => l.padEnd(15)).join('')}`);
+  console.log(`    size     ${LAYOUTS.map((l) => l.padEnd(20)).join('')}`);
   for (const size of SIZES) {
     const cells = LAYOUTS.map((layout) => {
       const r = measure(size, layout, poem, template);
-      if (r.poemPt === null || r.poemPt === undefined) return 'n/a'.padEnd(18);
+      if (r.poemPt === null || r.poemPt === undefined) return 'n/a'.padEnd(20);
       worst = Math.min(worst, r.poemPt);
       const short = r.poemPt < POEM_MIN_PT;
       if (short) below++;
-      return ((r.poemPt.toFixed(1) + 'pt').padEnd(9) + (short ? 'TOO SMALL' : '')).padEnd(18);
+      return ((r.poemPt.toFixed(1) + 'pt').padEnd(9) + (short ? 'TOO SMALL' : '')).padEnd(20);
     });
     console.log(`    ${size.padEnd(9)}${cells.join('')}`);
   }
   console.log('');
 }
 
-console.log(`  Smallest anywhere: ${worst.toFixed(1)}pt. ${below} case(s) below the ${POEM_MIN_PT}pt floor.\n`);
+console.log(`  Smallest anywhere: ${worst.toFixed(1)}pt. ${below} case(s) below the ${POEM_MIN_PT}pt floor.`);
 
+const drift = checkThresholdDrift();
+console.log(drift
+  ? `  THRESHOLD DRIFT: ${drift}\n`
+  : `  Builder warns at the same ${POEM_MIN_PT}pt the renderer floors at.\n`);
+
+// The floor is deliberately not a clamp: a tribute is never truncated and the
+// customer may insist. So a case printing below it is not a build failure by
+// itself — the failure is the builder failing to SAY so. Drift is fatal.
+if (drift) {
+  console.error('FAIL: the builder and the renderer disagree about what is too small.');
+  process.exit(1);
+}
 if (strict && below > 0) {
-  console.error(`FAIL: ${below} case(s) print below ${POEM_MIN_PT}pt.`);
+  console.error(`FAIL (--strict): ${below} case(s) print below ${POEM_MIN_PT}pt.`);
   process.exit(1);
 }

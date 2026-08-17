@@ -1895,18 +1895,25 @@
   // same 1.40 leading as the print renderer, so what this file computes tracks
   // what comes off the press to within about 5% and needs no bias correction.
   //
-  // Why 8.5 and not a rounder 10: the note must always mean "your words are
-  // being squeezed", never "you picked a small print". Inside its mat an 8x10
-  // gives the tribute a 3x5 inch panel, which tops out at ~9.1pt even for a
-  // four-line poem — so a 10pt tier would fire on every 8x10 order no matter
-  // what the customer wrote, and the suggestion to size up would read as a
-  // shakedown. 8.5 sits just under that ceiling, so a short poem is silent at
-  // every size and the note only appears once length is genuinely the cause.
+  // These were 8.5 and 6.5, chosen when a printed mat gave the tribute a 3x5
+  // inch window on an 8x10 that topped out around 9.1pt. Printed mats were then
+  // switched off (`printedMat: false`) and every tribute panel became half the
+  // sheet, roughly 2.5x the room and 2.5x the type. The thresholds were never
+  // moved, so they sat far below anything the press could now produce and the
+  // note effectively stopped firing: a long poem setting at 7.5pt on a stacked
+  // 8x10 cleared 8.5 comfortably and said nothing at all.
   //
-  // Measured against the real renderer: an 8-12 line poem or a 10-14 line
-  // letter never trips either tier at the default 11x14 in either layout.
-  const POEM_COMFORT_PT = 8.5;   // below this: a gentle note
-  const POEM_TIGHT_PT = 6.5;     // below this: a firmer (still warm) one
+  // They are now anchored to the renderer's own floor rather than to a number
+  // tuned by hand, so this cannot drift again: see POEM_MIN_PT in
+  // tributeRenderer.js, and `npm run check-legibility` for what every size,
+  // layout and poem length actually prints at.
+  //
+  // Measured against the real renderer at these values: a short or typical poem
+  // is silent at every size in both layouts (the tightest is 15.1pt, a typical
+  // poem on an 8x10). The note appears only once length is genuinely the cause
+  // — a long poem on a stacked 8x10 at 12.1pt, which turning the piece fixes.
+  const POEM_COMFORT_PT = 14;    // below this: a gentle note (renderer's floor)
+  const POEM_TIGHT_PT = 11;      // below this: a firmer (still warm) one
   const FIT_PROBE_W = 900;       // px — only the panel's proportions matter
   const FIT_DEBOUNCE_MS = 250;
 
