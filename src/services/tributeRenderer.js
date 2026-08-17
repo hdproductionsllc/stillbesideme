@@ -148,7 +148,26 @@ function wrapText(text, maxChars) {
  * @param {string} opts.poemLabel — "Poem" or "Letter"
  * @returns {Buffer} SVG as a buffer for Sharp compositing
  */
-function buildTributeSvg({ width: targetW, height: targetH, colors, tributeData, poemLabel }) {
+/**
+ * Smallest printed size we consider readable on a wall, in points.
+ *
+ * The renderer does not clamp to this: a tribute is never truncated, and the
+ * customer is allowed to insist. It is the number everything else judges
+ * against, so the builder can warn while there is still time to act and the
+ * parity harness can prove what a given order will actually set at.
+ */
+const POEM_MIN_PT = 14;
+
+function buildTributeSvg({
+  width: targetW, height: targetH, colors, tributeData, poemLabel,
+  // The panel's printed width in inches, and an optional object to fill with
+  // what the poem settled at. The canonical box below is 1000 units wide at
+  // every scale, which is what makes proof and print identical, but it also
+  // means a font size in here has no physical meaning on its own. Without
+  // being told the inches, this renderer cannot know whether it just set the
+  // poem at 30pt or at 9pt, and for a long time nothing else could either.
+  panelWidthIn = null, report = null,
+}) {
   // ── Scale invariance ─────────────────────────────────────────────────
   // The customer approves the PROOF (~1000px wide) and we print the PRINT FILE
   // (300 DPI, ~3300px wide). They are the same piece and must be the same
@@ -347,6 +366,19 @@ function buildTributeSvg({ width: targetW, height: targetH, colors, tributeData,
         poemSize = fs;
         if (m.total <= poemAvailH) break;
       }
+    }
+
+    // Report what the poem actually settled at, in real printed points, so the
+    // builder and the parity harness judge the same number the press sets.
+    // CANON_W units span panelWidthIn inches, and a point is 1/72 inch.
+    if (report) {
+      report.poemUnits = poemSize;
+      report.poemPt = panelWidthIn ? (poemSize / width) * panelWidthIn * 72 : null;
+      report.panelWidthIn = panelWidthIn;
+      report.belowFloor = report.poemPt !== null && report.poemPt < POEM_MIN_PT;
+      report.authoredLines = poemText.split('\n').filter((l) => l.trim() !== '').length;
+      report.setLines = fit.lines.filter((l) => l !== '').length;
+      report.overflowed = fit.total > poemAvailH;
     }
 
     for (const line of fit.lines) {
@@ -843,4 +875,5 @@ module.exports = {
   OUTPUT_ROOT,
   FONT_SERIF,
   PAPER_PALETTE,
+  POEM_MIN_PT,
 };

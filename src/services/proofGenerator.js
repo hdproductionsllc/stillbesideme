@@ -53,8 +53,13 @@ async function generateProof(order) {
   // Printed-mat proofs use the true print aspect ratio so the proof is an
   // exact scaled-down preview of the final file.
   let totalW, totalH, panels;
+  // Hoisted: the proof is a display-size render, so its pixels mean nothing
+  // physical on their own. Keeping the print dimensions in scope lets us hand
+  // the tribute renderer the panel's real printed width, so the proof reports
+  // the same point size the press will set.
+  const printDimsForScale = calculatePrintDimensions(order.product_sku, layout);
   if (data.hasPrintedMat) {
-    const printDims = calculatePrintDimensions(order.product_sku, layout);
+    const printDims = printDimsForScale;
     totalW = isLandscapeLayout(layout) ? 1600 : 1000;
     totalH = Math.round(totalW * (printDims.height / printDims.width));
     const dpiScale = totalW / printDims.width;
@@ -64,7 +69,7 @@ async function generateProof(order) {
     // is an exact scaled-down preview of the printed file — same composition,
     // same panel proportions, same footer spacing. A hardcoded ratio made the
     // emailed proof (1.6) disagree with the 14/11 print the customer receives.
-    const printDims = calculatePrintDimensions(order.product_sku, layout);
+    const printDims = printDimsForScale;
     totalW = isLandscapeLayout(layout) ? 1600 : 1000;
     totalH = Math.round(totalW * (printDims.height / printDims.width));
     panels = calculateLayout(layout, totalW, totalH, data.customRatios);
@@ -97,12 +102,16 @@ async function generateProof(order) {
   }
 
   // Tribute panel SVG
+  const poemFit = {};
   const tributeSvg = buildTributeSvg({
     width: panels.tribute.width,
     height: panels.tribute.height,
     colors: tributeColors,
     tributeData,
     poemLabel,
+    // Proof pixels are display-size, so convert through the print's own scale.
+    panelWidthIn: (panels.tribute.width / totalW) * (printDimsForScale.width / 300),
+    report: poemFit,
   });
   layers.push({ input: tributeSvg, left: panels.tribute.left, top: panels.tribute.top });
 

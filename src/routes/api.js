@@ -107,6 +107,58 @@ router.post('/images/assess-quality', (req, res) => {
 });
 
 /**
+ * POST /api/poem-fit
+ *
+ * How large will these words actually print, and what would fix it if the
+ * answer is "too small"? Answered by running the real renderer, so the builder
+ * never has to compute it a second way. That duplication is exactly what let a
+ * 7.5pt poem ship without a warning: the builder's copy of the maths was still
+ * measuring a printed mat we stopped printing.
+ *
+ * Cheap: lays out type, builds no image, reads no photo.
+ */
+router.post('/poem-fit', (req, res) => {
+  const { sku, layout, poemText, templateId } = req.body || {};
+  if (!sku || !layout || !poemText) {
+    return res.status(400).json({ error: 'sku, layout and poemText are required' });
+  }
+  if (String(poemText).length > 8000) {
+    return res.status(400).json({ error: 'poemText too long' });
+  }
+
+  try {
+    const poemFit = require('../services/poemFit');
+    const { loadTemplate } = require('../services/tributeRenderer');
+    const template = loadTemplate(templateId || 'pet-tribute');
+    const sellableSkus = (template.printProducts || [])
+      .filter((p) => p.fulfillment !== 'digital')
+      .map((p) => p.sku);
+
+    const result = poemFit.assess({
+      sku,
+      layout,
+      templateId: templateId || 'pet-tribute',
+      sellableSkus,
+      // Only the poem affects the fit; the header and footer are sized from the
+      // panel, so representative values are enough and no customer data is sent.
+      tributeData: {
+        name: req.body.name || 'Name',
+        nickname: req.body.nickname || '',
+        birthDate: req.body.birthDate || '',
+        passDate: req.body.passDate || '',
+        familyName: req.body.familyName || '',
+        poemText,
+      },
+    });
+    if (!result) return res.status(400).json({ error: 'Could not measure that piece' });
+    res.json(result);
+  } catch (err) {
+    console.error('[poem-fit]', err.message);
+    res.status(500).json({ error: 'Could not measure that piece' });
+  }
+});
+
+/**
  * POST /api/images/analyze-crop
  * Re-analyze crop for a different slot or after re-upload
  */

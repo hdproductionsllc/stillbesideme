@@ -1,14 +1,15 @@
 {
   "name": "still-beside-me",
   "version": "1.0.0",
-  "description": "Personalized memorial wall art store – Keep them beside you.",
+  "description": "Personalized memorial wall art store \u2013 Keep them beside you.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
     "lastmod": "node scripts/build-lastmod.js",
     "review-aggregate": "node scripts/build-review-aggregate.js",
-    "check-render": "node scripts/check-render-parity.js"
+    "check-render": "node scripts/check-render-parity.js",
+    "check-legibility": "node scripts/check-poem-legibility.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.77.0",

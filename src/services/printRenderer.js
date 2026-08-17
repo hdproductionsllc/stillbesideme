@@ -14,6 +14,7 @@ const fs = require('fs');
 const {
   resolveOrderData, buildTributeSvg, isLandscapeLayout, calculateLayout,
   calculateMatLayout, buildMatOverlaySvg, renderPhotoCover, emitToOutput,
+  POEM_MIN_PT,
 } = require('./tributeRenderer');
 
 const PRINT_SUBDIR = 'print-ready';
@@ -96,13 +97,26 @@ async function generatePrintFile(order) {
   }
 
   // Tribute text panel
+  // The panel's printed width in inches, so the renderer can report the poem's
+  // real point size. This file is the one place that knows the scale for
+  // certain: every dimension here came from the SKU's inches times DPI.
+  const poemFit = {};
   const tributeSvg = buildTributeSvg({
     width: panels.tribute.width,
     height: panels.tribute.height,
     colors: tributeColors,
     tributeData,
     poemLabel,
+    panelWidthIn: panels.tribute.width / DPI,
+    report: poemFit,
   });
+  if (poemFit.belowFloor) {
+    console.warn(
+      `[print] ${order.id}: poem sets at ${poemFit.poemPt.toFixed(1)}pt on `
+      + `${order.product_sku} (${layout}), below the ${POEM_MIN_PT}pt floor. `
+      + `${poemFit.authoredLines} authored lines set as ${poemFit.setLines}.`
+    );
+  }
   layers.push({ input: tributeSvg, left: panels.tribute.left, top: panels.tribute.top });
 
   // Bevel ring around openings (printed mat orders only) — composited last
