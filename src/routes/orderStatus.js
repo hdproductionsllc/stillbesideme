@@ -41,6 +41,52 @@ function shortId(orderId) {
   return orderId.substring(0, 8).toUpperCase();
 }
 
+/**
+ * The frame this customer actually bought, for display.
+ *
+ * The proof is the artwork alone, because that is what the customer approves
+ * and what goes to the printer. Showing that bare image on a page headed
+ * "Framed 11x14" invites the obvious reaction: this is not what I ordered. So
+ * the status page sets the proof inside their chosen moulding, which is how
+ * they saw it in the builder and how it will arrive.
+ *
+ * Returns null when we cannot say for sure, and the page then shows the plain
+ * proof. Guessing a frame colour would be worse than showing none.
+ */
+function frameForOrder(order) {
+  // Only framed products have a frame. A print-only order ships bare paper for
+  // the customer's own frame, so drawing one around its proof would promise
+  // something we are not sending.
+  if (!String(order.product_sku || '').startsWith('framed-')) return null;
+
+  let choiceId = null;
+  try {
+    const fields = order.fields_json ? JSON.parse(order.fields_json) : null;
+    choiceId = (fields && (fields.frameChoice || fields.frame)) || null;
+  } catch (e) { /* unparseable fields are not worth failing a status page over */ }
+
+  try {
+    const { loadTemplate } = require('../services/tributeRenderer');
+    const template = loadTemplate(order.template_id);
+    const options = template.frameOptions;
+    const all = ((options && options.groups) || [])
+      .reduce((acc, g) => acc.concat(g.choices || []), []);
+    if (!all.length) return null;
+
+    // Resolve exactly as lumaOrderApi.resolveFrameSubcategory does: chosen,
+    // then the template default, then the first. Orders placed before the
+    // customizer posted frameChoice carry no choice at all, and those pieces
+    // were MANUFACTURED in the default frame. Showing it is therefore not a
+    // guess about what they picked, it is a statement of what was built.
+    const chosen = all.find((c) => c.id === choiceId)
+      || all.find((c) => c.id === options.default)
+      || all[0];
+    if (!chosen || !chosen.swatch) return null;
+    return { id: chosen.id, label: chosen.label, swatch: chosen.swatch };
+  } catch (e) { /* template gone or renamed: fall back to no frame */ }
+  return null;
+}
+
 function trackingForOrder(db, order) {
   // Partner-fulfilled orders carry tracking on the orders row itself
   if (order.tracking_number) {
@@ -224,6 +270,7 @@ router.get('/status/:token', (req, res) => {
   const shipping = order.shipping_json ? JSON.parse(order.shipping_json) : null;
   const tracking = trackingForOrder(db, order);
   const digital = isDigitalOrder(order);
+  const frame = digital ? null : frameForOrder(order);
   const downloadUrl = (digital && order.status === 'delivered' && order.print_file_url && order.proof_token)
     ? `/download/${order.proof_token}`
     : null;
@@ -242,6 +289,7 @@ router.get('/status/:token', (req, res) => {
     email: order.email ? maskEmail(order.email) : null,
     proofUrl: order.proof_url,
     proofToken: order.proof_token,
+    frame,
     shipping: digital || !shipping ? null : {
       city: shipping.city,
       state: shipping.state,
@@ -330,3 +378,7 @@ function maskEmail(email) {
 }
 
 module.exports = router;
+// Exposed for tests: which frame a given order is shown in decides whether the
+// customer recognises their own product on the page, and that deserves to be
+// asserted rather than eyeballed.
+module.exports.frameForOrder = frameForOrder;

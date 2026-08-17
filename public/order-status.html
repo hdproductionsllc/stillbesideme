@@ -89,6 +89,49 @@
       box-shadow: var(--shadow-md);
     }
 
+    /* The proof is the artwork on its own, because that is what gets approved
+       and printed. Shown bare under a heading that reads "Framed 11x14" it
+       invites the obvious reaction: this is not what I ordered. So it is set
+       inside the moulding the customer actually chose. The colour comes from
+       the order; the highlight and shadow below are the same bevel the store's
+       frame mockup uses, so a piece looks the same wherever it appears. */
+    .proof-framed {
+      display: block;
+      max-width: 320px;
+      margin: var(--space-md) auto 0;
+      padding: 5.5%;
+      border-radius: 3px;
+      background: var(--frame-colour, #1c1c1c);
+      background-image: linear-gradient(145deg,
+        rgba(255, 255, 255, 0.16) 0%,
+        rgba(255, 255, 255, 0.05) 22%,
+        rgba(0, 0, 0, 0.10) 55%,
+        rgba(0, 0, 0, 0.30) 100%);
+      box-shadow:
+        0 10px 34px rgba(0, 0, 0, 0.30),
+        0 3px 10px rgba(0, 0, 0, 0.22),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.34);
+    }
+
+    .proof-framed img {
+      display: block;
+      width: 100%;
+      /* A thin dark rim where the print recesses behind the moulding, so a
+         cream print against a pale frame still reads as sitting inside it. */
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.22), 0 1px 4px rgba(0, 0, 0, 0.18);
+      border-radius: 1px;
+    }
+
+    .proof-frame-label {
+      display: block;
+      max-width: 320px;
+      margin: 8px auto 0;
+      text-align: center;
+      font-size: 0.82rem;
+      color: var(--color-muted, #9B9590);
+    }
+
     .timeline {
       list-style: none;
       padding: 0;
@@ -364,9 +407,24 @@
 
       const total = data.totalCents ? '$' + (data.totalCents / 100).toFixed(2) : '';
 
-      const proofThumbHtml = data.proofUrl
-        ? '<img src="' + escapeHtml(data.proofUrl) + '" alt="Your proof" class="proof-thumb" onerror="this.style.display=\'none\'" />'
-        : '';
+      // Set the proof inside the moulding they chose. Falls back to the bare
+      // image when we don't know the frame (digital orders, or an older order
+      // whose frame choice was never stored) — showing no frame is honest,
+      // showing the wrong one is not.
+      var proofThumbHtml = '';
+      if (data.proofUrl) {
+        var proofImg = '<img src="' + escapeHtml(data.proofUrl) + '" alt="Your tribute"'
+          + ' onerror="this.style.display=\'none\'" />';
+        if (data.frame && data.frame.swatch) {
+          proofThumbHtml =
+            '<div class="proof-framed" style="--frame-colour:' + escapeHtml(data.frame.swatch) + '">'
+            + proofImg + '</div>'
+            + '<span class="proof-frame-label">' + escapeHtml(data.frame.label) + ' frame</span>';
+        } else {
+          proofThumbHtml = '<img src="' + escapeHtml(data.proofUrl) + '" alt="Your tribute"'
+            + ' class="proof-thumb" onerror="this.style.display=\'none\'" />';
+        }
+      }
 
       // Action buttons depending on status
       const actions = [];
