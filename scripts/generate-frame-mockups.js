@@ -31,9 +31,21 @@ const FRAMES_DIR = path.join(ROOT, 'public', 'images', 'frames');
 // Clean solid moldings — no wood-grain texture (grain reads fake). A gentle
 // diagonal bevel gives depth: lighter top-left catching light, darker bottom-
 // right in shadow, with a thin dark rabbet line where the print recesses.
+// One entry per frame a customer can actually choose in pet-tribute.json, keyed
+// by the same id. A mockup of a finish we do not sell is a promise we cannot
+// keep, which is why the old generic "brown" is gone. Signature frames carry a
+// wider face, so `faceIn` is not uniform.
 const FRAMES = {
-  black: { color: '#1a1a1a', hi: '#3a3a3a', lo: '#000000', faceIn: 0.875 },
-  brown: { color: '#4a3626', hi: '#6b4f38', lo: '#241a12', faceIn: 0.875 },
+  black: { color: '#1c1c1c', hi: '#3a3a3a', lo: '#000000', faceIn: 0.875 },
+  white: { color: '#eeeae1', hi: '#ffffff', lo: '#c9c3b7', faceIn: 0.875 },
+  oak: { color: '#c8a97e', hi: '#dcc39c', lo: '#9c8258', faceIn: 0.875 },
+  driftwood: { color: '#9b978e', hi: '#b6b2a8', lo: '#736f67', faceIn: 2.5 },
+  pleinair: { color: '#4a3b2e', hi: '#6b5744', lo: '#291f16', faceIn: 2.5 },
+  // "Black with Gold" is a black molding with a gold SIGHT EDGE: a thin gilt
+  // line on the inner lip where the frame meets the print. Putting the gold in
+  // `hi` instead gilds the whole bevel, which is a different (and gaudier)
+  // frame than the one we sell.
+  blackgold: { color: '#141414', hi: '#333333', lo: '#000000', faceIn: 2.5, sight: '#c8a24a' },
 };
 
 const WALLS = ['#EDEAE4', '#E4E1D9'];
@@ -131,6 +143,7 @@ async function frameOnWall(printBuffer, frameKey, wallColor, sizeIn) {
       <polygon points="${framedW},0 ${framedW},${framedH} ${framedW - fw},${framedH - fw} ${framedW - fw},${fw}" fill="${frame.lo}" fill-opacity="0.5"/>
       <polygon points="0,${framedH} ${framedW},${framedH} ${framedW - fw},${framedH - fw} ${fw},${framedH - fw}" fill="${frame.lo}" fill-opacity="0.7"/>
       <rect x="${fw - 2}" y="${fw - 2}" width="${aW + 4}" height="${aH + 4}" fill="none" stroke="${frame.lo}" stroke-width="2.5"/>
+      ${frame.sight ? `<rect x="${fw - 6}" y="${fw - 6}" width="${aW + 12}" height="${aH + 12}" fill="none" stroke="${frame.sight}" stroke-width="5"/>` : ''}
     </svg>`
   );
   const framed = await sharp(molding)
@@ -139,10 +152,13 @@ async function frameOnWall(printBuffer, frameKey, wallColor, sizeIn) {
     .toBuffer();
 
   // ── Wall + soft drop shadow ──
-  const margin = Math.round(Math.max(framedW, framedH) * 0.2);
+  // The shadow scales with the molding, so a wide signature frame throws one
+  // wider than a fifth of the piece. The wall has to hold whichever is bigger,
+  // otherwise the shadow layer is larger than the canvas it composites onto.
+  const shadowPad = Math.round(fw * 2.4);
+  const margin = Math.max(Math.round(Math.max(framedW, framedH) * 0.2), Math.round(shadowPad * 1.15));
   const canvasW = framedW + margin * 2;
   const canvasH = framedH + margin * 2;
-  const shadowPad = Math.round(fw * 2.4);
 
   const shadow = await sharp({
     create: { width: framedW + shadowPad * 2, height: framedH + shadowPad * 2, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
@@ -174,13 +190,21 @@ async function frameOnWall(printBuffer, frameKey, wallColor, sizeIn) {
     </svg>`
   );
 
-  return sharp(wallSvg)
+  const buffer = await sharp(wallSvg)
     .composite([
-      { input: shadow, left: margin - shadowPad + Math.round(fw * 0.25), top: margin - shadowPad + Math.round(fw * 0.5) },
+      // Offset scales with the PIECE, not the molding. Tying it to frame width
+      // slid a wide frame's shadow far enough out to read as a separate object.
+      { input: shadow, left: margin - shadowPad + Math.round(framedW * 0.012), top: margin - shadowPad + Math.round(framedH * 0.02) },
       { input: framed, left: margin, top: margin },
     ])
     .jpeg({ quality: 92, chromaSubsampling: '4:4:4' })
     .toBuffer();
+
+  // Publish where the piece landed. Anything that recomposes these mockups
+  // (ad creative, for one) otherwise has to find the frame by sampling pixels,
+  // which cannot separate a white molding from a light wall. The renderer knows
+  // the answer exactly, so it says so rather than leaving it to be guessed.
+  return { buffer, piece: { left: margin, top: margin, width: framedW, height: framedH, canvasW, canvasH } };
 }
 
 function shade(hex, amt) {
@@ -194,7 +218,7 @@ const SAMPLE = {
   id: 'sample', photo: 'DSCF1811.JPG', layout: 'side-by-side',
   petName: 'Willow', petNicknames: 'Wills', birthDate: '2011', passDate: '2024',
   familyName: 'the Bennett family',
-  poemText: `You watched the world from the windowsill,\nunhurried, certain, ours.\n\nA soft weight at the end of the day,\na quiet that asked for nothing\nbut a hand within reach.\n\nThe sill is empty now,\nbut the light still falls there—\nand so do our thoughts of you.`,
+  poemText: `You watched the world from the windowsill,\nunhurried, certain, ours.\n\nA soft weight at the end of the day,\na quiet that asked for nothing\nbut a hand within reach.\n\nThe sill is empty now,\nbut the light still falls there,\nand so do our thoughts of you.`,
 };
 
 // ── Full batch: David's real photos + fitting layouts + sample tributes ──
@@ -207,13 +231,13 @@ const TRIBUTES = [
     poemText: `You held the whole yard in one steady gaze,\nunbothered, unhurried, sure.\n\nKing of the warm stone and the tall grass,\nyou came when you wished\nand stayed when it mattered most.\n\nThe grass still bends where you sat.\nWe still look for you there.` },
   { id: 'rusty', photo: 'P1250758.JPG', layout: 'side-by-side',
     petName: 'Rusty', petNicknames: 'Rus', birthDate: '2009', passDate: '2022', familyName: 'the Delgado family',
-    poemText: `You knew the truck three streets away\nand met it at the gate every single time.\n\nOne tennis ball, gone flat and grey,\nwas the finest thing you ever owned—\nyou carried it to bed like treasure.\n\nGood boy on the long trail, good boy at the door.\nThe ball's still on the porch.\nWe couldn't bring ourselves to move it.` },
+    poemText: `You knew the truck three streets away\nand met it at the gate every single time.\n\nOne tennis ball, gone flat and grey,\nwas the finest thing you ever owned.\nYou carried it to bed like treasure.\n\nGood boy on the long trail, good boy at the door.\nThe ball's still on the porch.\nWe couldn't bring ourselves to move it.` },
   { id: 'biscuit', photo: 'DSCF0098.jpg', layout: 'side-by-side',
     petName: 'Biscuit', petNicknames: 'Bisky', birthDate: '2013', passDate: '2025', familyName: 'the Callahan family',
     poemText: `All paws and hope and headlong joy,\nyou ran at the world like it owed you a game.\n\nYou chewed our shoes and stole our hearts\nand taught us how to greet a morning.\n\nSlow down now, sweet one.\nWe will catch up to you.` },
   { id: 'pixie', photo: 'DSCF1644.JPG', layout: 'stacked', crop: '50% 40%',
     petName: 'Pixie', petNicknames: 'Pix', birthDate: '2011', passDate: '2024', familyName: 'the Romano family',
-    poemText: `You had one chair—the blue one by the window—\nand you guarded it like it held the sun.\n\nEvery night at ten you found my pillow,\nkneaded it twice, and sighed us both to sleep.\n\nYou never asked for more than that:\na warm knee, a slow hand, the ten o'clock hush.\n\nThe blue chair is still yours.\nWe just sit beside it now.` },
+    poemText: `You had one chair, the blue one\nby the window, and you guarded it like it held the sun.\n\nEvery night at ten you found my pillow,\nkneaded it twice, and sighed us both to sleep.\n\nYou never asked for more than that:\na warm knee, a slow hand, the ten o'clock hush.\n\nThe blue chair is still yours.\nWe just sit beside it now.` },
   { id: 'pippin', photo: 'DSCF5706.jpg', layout: 'side-by-side',
     petName: 'Pippin', petNicknames: 'Pip', birthDate: '2014', passDate: '2024', familyName: 'the Novak family',
     poemText: `Curious to your whiskers,\nyou investigated every shadow,\ntested every lap, trusted every hand.\n\nThe world was a question\nand you were determined to answer it.\n\nWe are still learning\nhow to be brave the way you were.` },
@@ -234,32 +258,41 @@ const TRIBUTES = [
     poemText: `You slept on my side of the bed,\nhead on the pillow like you paid the mortgage,\nand woke me at six with a paw to the cheek.\n\nOn the hard days you found me first,\npressed your head to mine\nand stayed until the world went quiet.\n\nI still wake at six.\nI still reach across the pillow.` },
   { id: 'ghost', photo: 'IMG_1673.JPG', layout: 'stacked', crop: '58% 48%',
     petName: 'Ghost', petNicknames: 'Ghosty', birthDate: '2013', passDate: '2025', familyName: 'the Park family',
-    poemText: `Quiet as snowfall, soft as dusk,\nyou appeared where you were needed\nand vanished when the moment passed.\n\nYou chose the good chair, the warm knee,\nthe exact center of every photograph.\n\nYou are still here, somehow—\na small white warmth in the corner of the eye.` },
+    poemText: `Quiet as snowfall, soft as dusk,\nyou appeared where you were needed\nand vanished when the moment passed.\n\nYou chose the good chair, the warm knee,\nthe exact center of every photograph.\n\nYou are still here, somehow,\na small white warmth in the corner of the eye.` },
   { id: 'callie', photo: 'IMG_0243.jpeg', layout: 'stacked', crop: '50% 42%',
     petName: 'Callie', petNicknames: 'Cal', birthDate: '2010', passDate: '2024', familyName: 'the Nguyen family',
     poemText: `You grew up beside the children,\npatient through every game and costume,\nguardian of the small and the sleepy.\n\nYou were the softest place to fall\nand the first to forgive a stumble.\n\nThe house is bigger without you,\nand so much quieter than we'd like.` },
 ];
+
+// Where the framed piece sits inside each rendered wall shot, keyed by filename.
+const GEOMETRY_FILE = path.join(OUT_DIR, 'geometry.json');
+const geometry = fs.existsSync(GEOMETRY_FILE) ? JSON.parse(fs.readFileSync(GEOMETRY_FILE, 'utf8')) : {};
 
 async function renderOne(t, frameKeys, wall, sizeIn) {
   const { printPath } = await generatePrintFile(buildOrder(t));
   const buf = fs.readFileSync(printPath);
   const files = [];
   for (const frameKey of frameKeys) {
-    const out = await frameOnWall(buf, frameKey, wall, sizeIn);
+    const { buffer, piece } = await frameOnWall(buf, frameKey, wall, sizeIn);
     const file = path.join(OUT_DIR, `${t.id}-${frameKey}.jpg`);
-    fs.writeFileSync(file, out);
-    console.log(`  ✓ ${t.petName.padEnd(11)} ${frameKey.padEnd(6)} ${t.layout.padEnd(12)} → ${path.basename(file)} (${Math.round(out.length / 1024)}KB)`);
+    fs.writeFileSync(file, buffer);
+    geometry[path.basename(file)] = { ...piece, layout: t.layout };
+    console.log(`  ✓ ${t.petName.padEnd(11)} ${frameKey.padEnd(10)} ${t.layout.padEnd(12)} → ${path.basename(file)} (${Math.round(buffer.length / 1024)}KB)`);
     files.push(file);
   }
+  fs.writeFileSync(GEOMETRY_FILE, JSON.stringify(geometry, null, 2));
   return files;
 }
+
+const FRAME_KEYS = (process.argv.find((a) => a.startsWith('--frames=')) || '').slice('--frames='.length).split(',').filter(Boolean);
+if (!FRAME_KEYS.length) FRAME_KEYS.push(...Object.keys(FRAMES));
 
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
   if (process.argv.includes('--sample')) {
     console.log('\nRendering ONE corrected sample for sign-off...\n');
-    await renderOne(SAMPLE, ['black', 'brown'], WALLS[0], [11, 14]);
+    await renderOne(SAMPLE, Object.keys(FRAMES), WALLS[0], [11, 14]);
     console.log('\nReview output/wall-mockups/sample-*.jpg\n');
     return;
   }
@@ -272,7 +305,7 @@ async function main() {
   const targets = TRIBUTES.map((t, i) => ({ t, i })).filter(({ t }) => !onlyIds || onlyIds.includes(t.id));
   console.log(`\nRendering ${targets.length} tribute(s) × black + brown frames...\n`);
   for (const { t, i } of targets) {
-    await renderOne(t, ['black', 'brown'], WALLS[i % WALLS.length], [11, 14]);
+    await renderOne(t, FRAME_KEYS, WALLS[i % WALLS.length], [11, 14]);
   }
   console.log(`\nDone — ${targets.length * 2} wall mockups in output/wall-mockups/\n`);
 }
