@@ -9,7 +9,8 @@
     "lastmod": "node scripts/build-lastmod.js",
     "review-aggregate": "node scripts/build-review-aggregate.js",
     "check-render": "node scripts/check-render-parity.js",
-    "check-legibility": "node scripts/check-poem-legibility.js"
+    "check-legibility": "node scripts/check-poem-legibility.js",
+    "check-csp": "node scripts/check-analytics-csp.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.77.0",
