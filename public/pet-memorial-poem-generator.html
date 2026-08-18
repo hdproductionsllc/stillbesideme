@@ -7,6 +7,11 @@
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-CM9DENCN96"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-CM9DENCN96');</script>
   <script src="/js/env.js"></script>
+  <!-- Google Ads tag. Configured HERE, not in the gtag block above, because
+       that block runs before /js/env.js has loaded and window.SBM_ENV does not
+       exist yet. One gtag.js library serves both destinations, so the loaded
+       script id does not have to match. Inert until GOOGLE_ADS_ID is set. -->
+  <script>if(window.SBM_ENV&&window.SBM_ENV.googleAdsId){gtag('config',window.SBM_ENV.googleAdsId);}</script>
   <!-- Meta Pixel (config from /js/env.js; inert until metaPixelId is set) -->
   <script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');if(window.SBM_ENV&&window.SBM_ENV.metaPixelId){fbq('init',window.SBM_ENV.metaPixelId);fbq('track','PageView');}</script>
   <title>Free Pet Memorial Poem Generator | Still Beside Me</title>
