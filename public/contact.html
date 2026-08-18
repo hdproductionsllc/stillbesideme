@@ -326,8 +326,16 @@
             </div>
             <div class="form-group">
               <label for="contact-order">Order Number</label>
-              <input type="text" id="contact-order" name="orderNumber" placeholder="e.g. 4E4644C5">
-              <p class="helper-text">If this is about an existing order</p>
+              <!-- Same treatment as the lookup form on /order: our ids are
+                   uppercase hex, so the field shows them that way. It is not
+                   length-capped here, because someone whose number is a
+                   different shape entirely still needs to be able to send the
+                   message, and silently truncating what they typed would only
+                   confuse the reply. -->
+              <input type="text" id="contact-order" name="orderNumber"
+                     placeholder="e.g. 4E4644C5" autocomplete="off"
+                     style="text-transform:uppercase">
+              <p class="helper-text">If this is about an existing order with us</p>
             </div>
             <div class="form-group">
               <label for="contact-message">Message</label>
