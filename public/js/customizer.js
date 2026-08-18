@@ -571,6 +571,12 @@
       const data = await res.json();
 
       if (data.success) {
+        // The first photo landing is the earliest point we can honestly call
+        // this a started tribute, and it is the event the ad budget is judged
+        // on. Fired here rather than on the file picker opening, so a cancelled
+        // or failed upload never counts as a start.
+        fireBuilderStartAnalytics();
+
         PreviewRenderer.setPhoto(panelId, data.thumbnailUrl, data.crop.position);
         showUploadPreview(slotId, data.thumbnailUrl, wrapper, null, data.quality);
 
@@ -2693,6 +2699,44 @@
    * ask to see the proof. (The marketing pages' CTA-click event is
    * top-of-funnel only; this is the one that carries the amount they pay.)
    */
+  /**
+   * "They have actually started making one."
+   *
+   * Until this existed the funnel had a single event before payment, and it
+   * fired on the checkout button, at the very end of a long build. Meta needs
+   * roughly fifty optimisation events a week per ad set before it stops
+   * guessing, and at any budget this business can afford, checkouts will never
+   * reach that. So it optimised against almost no signal.
+   *
+   * Uploading a photograph of an animal you have lost is the first act in the
+   * builder that nobody does by accident, which makes it the earliest honest
+   * marker of intent. It is perhaps twenty times more common than a checkout,
+   * so it is a target the algorithm can actually learn from.
+   *
+   * CustomizeProduct is a Meta STANDARD event, deliberately: standard events
+   * are selectable as an optimisation goal in Ads Manager and carry Meta's own
+   * priors. A custom event would have needed a manual setup step and started
+   * from nothing.
+   *
+   * Fires ONCE per session. A second photo, a re-upload after a crop, or a
+   * changed mind is the same person starting the same tribute, and counting it
+   * twice would quietly corrupt the cost-per-start number the whole ad budget
+   * is judged on.
+   */
+  let builderStartFired = false;
+  function fireBuilderStartAnalytics() {
+    if (builderStartFired) return;
+    builderStartFired = true;
+    try {
+      if (typeof gtag === 'function') {
+        gtag('event', 'begin_tribute', { currency: 'USD' });
+      }
+      if (typeof fbq === 'function' && window.SBM_ENV && window.SBM_ENV.metaPixelId) {
+        fbq('track', 'CustomizeProduct');
+      }
+    } catch (e) { /* analytics must never block the builder */ }
+  }
+
   function fireCheckoutAnalytics(product) {
     try {
       const upcharge = isFramedSku(product.sku) ? frameUpchargeCents() : 0;
