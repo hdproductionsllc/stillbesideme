@@ -9,14 +9,14 @@
   <!-- Meta Pixel (config from /js/env.js; inert until metaPixelId is set) -->
   <script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');if(window.SBM_ENV&&window.SBM_ENV.metaPixelId){fbq('init',window.SBM_ENV.metaPixelId);fbq('track','PageView');}</script>
   <title>Contact Still Beside Me &ndash; Pet Memorial Gift Support</title>
-  <meta name="description" content="Questions about an order, a proof, or a poem? Email support@stillbesideme.com and a real person replies, usually within one business day.">
+  <meta name="description" content="Questions about an order, a proof, or a poem? Use our contact form and a real person replies, usually within one business day.">
   <link rel="canonical" href="https://www.stillbesideme.com/contact">
 
   <!-- Open Graph -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Still Beside Me">
   <meta property="og:title" content="Contact Still Beside Me &ndash; Pet Memorial Gift Support">
-  <meta property="og:description" content="Questions about an order, a proof, or a poem? Email support@stillbesideme.com and a real person replies, usually within one business day.">
+  <meta property="og:description" content="Questions about an order, a proof, or a poem? Use our contact form and a real person replies, usually within one business day.">
   <meta property="og:url" content="https://www.stillbesideme.com/contact">
   <meta property="og:image" content="https://www.stillbesideme.com/images/og/blog.jpg">
   <meta property="og:image:width" content="1200">
@@ -238,6 +238,28 @@
         padding: 2rem;
       }
     }
+    /* Visible enough to be read before typing, quiet enough not to look like
+       an error or a warning. Someone arriving here has usually lost an animal;
+       a red alert box would be the wrong greeting for either audience. */
+    .wrong-shop {
+      background: #FAF7F2;
+      border: 1px solid #E8E1D6;
+      border-left: 3px solid #C8A97E;
+      border-radius: 6px;
+      padding: 1rem 1.15rem;
+      margin: 0 0 1.75rem;
+    }
+    .wrong-shop p {
+      margin: 0 0 0.6rem;
+      font-size: 0.94rem;
+      line-height: 1.6;
+      color: #4A4A4A;
+    }
+    .wrong-shop p:last-child { margin-bottom: 0; }
+    .wrong-shop-title {
+      font-weight: 600;
+      color: #2C2C2C;
+    }
   </style>
 </head>
 <body>
@@ -255,7 +277,7 @@
   <section class="contact-hero">
     <div class="container">
       <h1>We're here for you</h1>
-      <p class="subtitle">Whether you have questions about your order, need help with your tribute, or just want to talk &mdash; we're real people who care.</p>
+      <p class="subtitle">Whether you have questions about your order, need help with your tribute, or just want to talk, we are real people who care.</p>
     </div>
   </section>
 
@@ -264,6 +286,28 @@
       <div class="contact-grid">
         <div class="contact-form-section">
           <h2>Send us a message</h2>
+
+          <!-- A company with a name very like ours sends a steady stream of its
+               own customers here, most of them looking for a suncatcher. This
+               sits ABOVE the form on purpose: the useful moment is before
+               someone types a message and then waits days for a reply we were
+               never able to give. Warm, factual, and it names where they should
+               actually go. No link out, because they can type it themselves. -->
+          <aside class="wrong-shop">
+            <p class="wrong-shop-title">Looking for a suncatcher?</p>
+            <p>
+              You may want <strong>stillbeside.me</strong>, a different company
+              with a name very like ours. We get a lot of their mail. We cannot
+              see their orders or help with them, and we would hate for you to
+              sit waiting on an answer we are not able to give.
+            </p>
+            <p>
+              If you are in the right place: we write an original poem about
+              your animal, print it beside their photograph, and frame it. Ask
+              us anything below.
+            </p>
+          </aside>
+
           <form id="contact-form" novalidate>
             <div class="form-group">
               <label for="contact-name">Name</label>
@@ -293,7 +337,7 @@
           <h2>Get in touch</h2>
           <div class="contact-info-item">
             <h3>Email</h3>
-            <a href="mailto:hello@stillbesideme.com">hello@stillbesideme.com</a>
+            <a href="/contact">our contact form</a>
           </div>
           <div class="contact-info-item">
             <h3>Response Time</h3>
@@ -331,7 +375,7 @@
         </div>
         <div class="footer-contact">
           <p>Questions about ordering? We're real people who care.</p>
-          <a href="mailto:hello@stillbesideme.com">hello@stillbesideme.com</a>
+          <a href="/contact">our contact form</a>
         <div class="footer-signup">
             <p>Get gentle inspiration delivered to your inbox.</p>
             <form class="footer-signup-form" data-signup-form>
@@ -430,7 +474,7 @@
           form.reset();
         })
         .catch(function() {
-          messageEl.textContent = 'Something went wrong. Please email us directly at hello@stillbesideme.com.';
+          messageEl.textContent = 'Something went wrong. Please email us directly at our contact form.';
           messageEl.className = 'form-message error';
         })
         .finally(function() {

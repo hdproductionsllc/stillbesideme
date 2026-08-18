@@ -599,7 +599,7 @@ async function start() {
       res.json({ success: true });
     } catch (err) {
       console.error('Contact form error:', err);
-      res.status(500).json({ error: 'Failed to send message. Please email us directly.' });
+      res.status(500).json({ error: 'Failed to send message. Please try again in a moment.' });
     }
   });
 
