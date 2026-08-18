@@ -2736,6 +2736,14 @@
         // is only as good as the signal it gets; the tag reports directly.
         // Dormant until both env vars are set, exactly like the purchase tag.
         if (env.googleAdsId && env.googleAdsStartLabel) {
+          // Configure the Ads destination before sending to it. Every page
+          // loads gtag for GA4, but only order-confirmed.html ever configured
+          // the AW- tag, so a conversion fired from the builder would have gone
+          // to a destination this page had never initialised and Google would
+          // have recorded nothing. The campaign would then have been optimising
+          // toward an event that never arrived, which is the most expensive
+          // kind of silent failure there is.
+          gtag('config', env.googleAdsId);
           gtag('event', 'conversion', {
             send_to: env.googleAdsId + '/' + env.googleAdsStartLabel,
           });
