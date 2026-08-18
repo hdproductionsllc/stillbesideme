@@ -155,15 +155,43 @@ async function start() {
         // finished — on mobile, seconds of nothing at the exact moment the
         // photo is supposed to appear — and the upload-failure fallback
         // ("using local preview") had no preview to fall back to.
-        imgSrc: ["'self'", "data:", "blob:", "https://www.google-analytics.com", "https://www.facebook.com", "https://www.googletagmanager.com"],
+        // Google Ads reports conversions by fetching tracking pixels and by
+        // posting to its collection endpoints. scriptSrc already allowed its
+        // libraries, so the tag LOADED and configured cleanly and looked
+        // entirely healthy, but every beacon it then sent was refused by this
+        // policy. Google therefore saw no signal from the site at all: the tag
+        // reported as undetected, and any conversion would have been dropped in
+        // silence while the campaign kept spending. Verified in a real browser
+        // against www.google.com/ccm/collect, /rmkt/collect, /pagead/1p-user-list
+        // and ad.doubleclick.net/ccm/s/collect.
+        imgSrc: [
+          "'self'", "data:", "blob:",
+          "https://www.google-analytics.com",
+          "https://www.facebook.com",
+          "https://www.googletagmanager.com",
+          "https://www.google.com",
+          "https://www.googleadservices.com",
+          "https://googleads.g.doubleclick.net",
+          "https://ad.doubleclick.net",
+        ],
         connectSrc: [
           "'self'",
           "https://www.google-analytics.com",
           "https://analytics.google.com",
           "https://www.facebook.com",
           "https://region1.google-analytics.com",
+          // Google Ads conversion and remarketing beacons (see imgSrc above).
+          "https://www.google.com",
+          "https://www.googleadservices.com",
+          "https://googleads.g.doubleclick.net",
+          "https://ad.doubleclick.net",
         ],
-        frameSrc: ["'self'", "https://js.stripe.com"],
+        frameSrc: [
+          "'self'", "https://js.stripe.com",
+          // The conversion linker drops an iframe here on some conversions.
+          "https://td.doubleclick.net",
+          "https://www.googletagmanager.com",
+        ],
       },
     },
     crossOriginEmbedderPolicy: false,
