@@ -442,6 +442,15 @@ async function start() {
     if (process.env.META_PIXEL_ID) env.metaPixelId = process.env.META_PIXEL_ID;
     if (process.env.GOOGLE_ADS_ID) env.googleAdsId = process.env.GOOGLE_ADS_ID;
     if (process.env.GOOGLE_ADS_CONVERSION_LABEL) env.googleAdsLabel = process.env.GOOGLE_ADS_CONVERSION_LABEL;
+    // A SECOND conversion, for someone starting a tribute rather than paying
+    // for one. Google's bidding needs roughly 30 conversions a month before it
+    // can optimise; at this budget purchases will not reach that for a long
+    // time, so the campaign would be bidding on almost no information. Photo
+    // uploads are perhaps twenty times more frequent, which is the difference
+    // between a campaign that learns and one that guesses. Set this as a
+    // secondary conversion in Google Ads so it steers bidding without being
+    // counted as revenue.
+    if (process.env.GOOGLE_ADS_START_LABEL) env.googleAdsStartLabel = process.env.GOOGLE_ADS_START_LABEL;
     res.set('Content-Type', 'application/javascript');
     // This script is parser-blocking in every page's <head> (the Meta Pixel
     // snippet below it reads window.SBM_ENV), so a cache miss costs a full

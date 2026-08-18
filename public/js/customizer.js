@@ -2728,10 +2728,20 @@
     if (builderStartFired) return;
     builderStartFired = true;
     try {
+      const env = window.SBM_ENV || {};
       if (typeof gtag === 'function') {
         gtag('event', 'begin_tribute', { currency: 'USD' });
+        // Google Ads, as its own conversion rather than a GA4 import. Imported
+        // GA4 conversions arrive late and attributed differently, and bidding
+        // is only as good as the signal it gets; the tag reports directly.
+        // Dormant until both env vars are set, exactly like the purchase tag.
+        if (env.googleAdsId && env.googleAdsStartLabel) {
+          gtag('event', 'conversion', {
+            send_to: env.googleAdsId + '/' + env.googleAdsStartLabel,
+          });
+        }
       }
-      if (typeof fbq === 'function' && window.SBM_ENV && window.SBM_ENV.metaPixelId) {
+      if (typeof fbq === 'function' && env.metaPixelId) {
         fbq('track', 'CustomizeProduct');
       }
     } catch (e) { /* analytics must never block the builder */ }
