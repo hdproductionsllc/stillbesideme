@@ -34,6 +34,8 @@
   <meta name="twitter:description" content="A personalized poem written from your memories of your pet, printed beside their photo. Their name and years set into the design, in an elegant frame you choose. Four sizes from $79.">
   <meta name="twitter:image" content="https://www.stillbesideme.com/images/og/pet-memorial-gifts.jpg">
 
+  <!-- Schema: Reviews (verbatim customer reviews from /src/data/reviews.json).
+       Intentionally no reviewRating and no aggregateRating: no rating data exists. -->
   <!-- Schema: Product -->
   <script type="application/ld+json">
   {
@@ -60,7 +62,12 @@
       "priceCurrency": "USD",
       "priceValidUntil": "2026-12-31",
       "availability": "https://schema.org/InStock"
-    }
+    },
+    "review": [
+      { "@type": "Review", "author": {"@type":"Person","name":"Elena M."}, "reviewBody": "The photo showed what he looked like. The poem brought back what it felt like to have him here." },
+      { "@type": "Review", "author": {"@type":"Person","name":"Melissa R."}, "reviewBody": "I almost ordered a regular photo canvas instead. I am so glad I chose this. The poem is what makes it feel like more than just a picture." },
+      { "@type": "Review", "author": {"@type":"Person","name":"Amanda S."}, "reviewBody": "The smallest things are often what you miss the most. This tribute understood that." }
+    ]
   }
   </script>
 
@@ -142,54 +149,6 @@
   }
   </script>
 
-  <!-- Schema: Reviews (verbatim customer reviews from /src/data/reviews.json).
-       Intentionally no reviewRating and no aggregateRating: no rating data exists. -->
-  <script type="application/ld+json">
-  [
-    {
-      "@context": "https://schema.org",
-      "@type": "Review",
-      "itemReviewed": {
-        "@type": "Product",
-        "name": "Personalized Pet Memorial Gift",
-        "url": "https://www.stillbesideme.com/pet-memorial-gifts"
-      },
-      "author": {
-        "@type": "Person",
-        "name": "Elena M."
-      },
-      "reviewBody": "The photo showed what he looked like. The poem brought back what it felt like to have him here."
-    },
-    {
-      "@context": "https://schema.org",
-      "@type": "Review",
-      "itemReviewed": {
-        "@type": "Product",
-        "name": "Personalized Pet Memorial Gift",
-        "url": "https://www.stillbesideme.com/pet-memorial-gifts"
-      },
-      "author": {
-        "@type": "Person",
-        "name": "Melissa R."
-      },
-      "reviewBody": "I almost ordered a regular photo canvas instead. I am so glad I chose this. The poem is what makes it feel like more than just a picture."
-    },
-    {
-      "@context": "https://schema.org",
-      "@type": "Review",
-      "itemReviewed": {
-        "@type": "Product",
-        "name": "Personalized Pet Memorial Gift",
-        "url": "https://www.stillbesideme.com/pet-memorial-gifts"
-      },
-      "author": {
-        "@type": "Person",
-        "name": "Amanda S."
-      },
-      "reviewBody": "The smallest things are often what you miss the most. This tribute understood that."
-    }
-  ]
-  </script>
 
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=2">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=2">

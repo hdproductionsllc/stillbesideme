@@ -34,6 +34,8 @@
   <meta name="twitter:description" content="A personalized poem written from your memories of your cat, printed beside their photo. Their name and years set into the design, in an elegant frame you choose. Four sizes from $79.">
   <meta name="twitter:image" content="https://www.stillbesideme.com/images/og/cat-memorial-gifts.jpg">
 
+  <!-- Schema: Reviews (verbatim customer reviews from /src/data/reviews.json).
+       Intentionally no reviewRating and no aggregateRating: no rating data exists. -->
   <!-- Schema: Product -->
   <script type="application/ld+json">
   {
@@ -60,7 +62,12 @@
       "priceCurrency": "USD",
       "priceValidUntil": "2026-12-31",
       "availability": "https://schema.org/InStock"
-    }
+    },
+    "review": [
+      { "@type": "Review", "author": {"@type":"Person","name":"Cameron"}, "reviewBody": "I was nervous about ordering this for a friend because I did not know every detail about her cat. I shared what I knew, and the finished poem still felt incredibly personal. She hung it beside the window where he used to sleep." },
+      { "@type": "Review", "author": {"@type":"Person","name":"Danica G."}, "reviewBody": "This brought back so many little things I was scared I might forget. The sound of her paws in the hallway, the chair she always stole, and the look she gave us when dinner was late. It feels like a little piece of her is still here." },
+      { "@type": "Review", "author": {"@type":"Person","name":"Maddie L."}, "reviewBody": "The line about her spot by the window got me immediately. It was such a small detail, but that is what made it feel so personal. Anyone who knew her would know exactly who the poem was about." }
+    ]
   }
   </script>
 
@@ -143,54 +150,6 @@
   }
   </script>
 
-  <!-- Schema: Reviews (verbatim customer reviews from /src/data/reviews.json).
-       Intentionally no reviewRating and no aggregateRating: no rating data exists. -->
-  <script type="application/ld+json">
-  [
-    {
-      "@context": "https://schema.org",
-      "@type": "Review",
-      "itemReviewed": {
-        "@type": "Product",
-        "name": "Personalized Cat Memorial Gift",
-        "url": "https://www.stillbesideme.com/cat-memorial-gifts"
-      },
-      "author": {
-        "@type": "Person",
-        "name": "Cameron"
-      },
-      "reviewBody": "I was nervous about ordering this for a friend because I did not know every detail about her cat. I shared what I knew, and the finished poem still felt incredibly personal. She hung it beside the window where he used to sleep."
-    },
-    {
-      "@context": "https://schema.org",
-      "@type": "Review",
-      "itemReviewed": {
-        "@type": "Product",
-        "name": "Personalized Cat Memorial Gift",
-        "url": "https://www.stillbesideme.com/cat-memorial-gifts"
-      },
-      "author": {
-        "@type": "Person",
-        "name": "Danica G."
-      },
-      "reviewBody": "This brought back so many little things I was scared I might forget. The sound of her paws in the hallway, the chair she always stole, and the look she gave us when dinner was late. It feels like a little piece of her is still here."
-    },
-    {
-      "@context": "https://schema.org",
-      "@type": "Review",
-      "itemReviewed": {
-        "@type": "Product",
-        "name": "Personalized Cat Memorial Gift",
-        "url": "https://www.stillbesideme.com/cat-memorial-gifts"
-      },
-      "author": {
-        "@type": "Person",
-        "name": "Maddie L."
-      },
-      "reviewBody": "The line about her spot by the window got me immediately. It was such a small detail, but that is what made it feel so personal. Anyone who knew her would know exactly who the poem was about."
-    }
-  ]
-  </script>
 
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=2">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=2">

@@ -34,6 +34,11 @@
   <meta name="twitter:description" content="A pet sympathy gift that outlasts flowers: a personalized poem written from their memories, framed beside their pet's photo, ready to hang. Four sizes from $79 with free US shipping.">
   <meta name="twitter:image" content="https://www.stillbesideme.com/images/og/sympathy-gifts.jpg">
 
+  <!-- Schema: Review (real customer reviews shown in the "In their own words"
+       section). Source of truth: /src/data/reviews.json, quoted verbatim.
+       Deliberately NO reviewRating and NO aggregateRating anywhere on this
+       page: no customer was ever asked to rate their grief, so no rating data
+       exists and none may be manufactured. Do not add one. -->
   <!-- Schema: Product (Pet Memorial) -->
   <script type="application/ld+json">
   {
@@ -61,7 +66,15 @@
       "priceCurrency": "USD",
       "priceValidUntil": "2026-12-31",
       "availability": "https://schema.org/InStock"
-    }
+    },
+    "review": [
+      { "@type": "Review", "author": {"@type":"Person","name":"Mika"}, "reviewBody": "I sent this to my sister after she lost her dog of fourteen years. She called me as soon as she opened it and could barely get the words out. She said it was the first gift that made her feel like someone truly understood.", "inLanguage": "en" },
+      { "@type": "Review", "author": {"@type":"Person","name":"Cameron"}, "reviewBody": "I was nervous about ordering this for a friend because I did not know every detail about her cat. I shared what I knew, and the finished poem still felt incredibly personal. She hung it beside the window where he used to sleep.", "inLanguage": "en" },
+      { "@type": "Review", "author": {"@type":"Person","name":"Radhika S."}, "reviewBody": "This meant more than flowers ever could. Months later, it is still hanging on their wall, and my friend says she stops to read it all the time.", "inLanguage": "en" },
+      { "@type": "Review", "author": {"@type":"Person","name":"Ronnie H."}, "reviewBody": "I wanted to give them something that remembered who their dog really was. The poem included his nickname and the funny habit everyone loved about him. It felt thoughtful in a way a regular sympathy gift never could.", "inLanguage": "en" },
+      { "@type": "Review", "author": {"@type":"Person","name":"Tori B."}, "reviewBody": "They had already received flowers and cards, but this was the gift everyone gathered around to read. It got the whole family talking and sharing stories about her.", "inLanguage": "en" },
+      { "@type": "Review", "author": {"@type":"Person","name":"Bobbie S."}, "reviewBody": "I really appreciated getting to review the poem before it was printed. I asked for one small change, and it was handled right away. The final version felt exactly right.", "inLanguage": "en" }
+    ]
   }
   </script>
 
@@ -155,63 +168,6 @@
   }
   </script>
 
-  <!-- Schema: Review (real customer reviews shown in the "In their own words"
-       section). Source of truth: /src/data/reviews.json, quoted verbatim.
-       Deliberately NO reviewRating and NO aggregateRating anywhere on this
-       page: no customer was ever asked to rate their grief, so no rating data
-       exists and none may be manufactured. Do not add one. -->
-  <script type="application/ld+json">
-  [
-    {
-      "@context": "https://schema.org",
-      "@type": "Review",
-      "itemReviewed": { "@type": "Product", "@id": "https://www.stillbesideme.com/sympathy-gifts#product", "name": "Personalized Pet Loss Gift – Framed Poem & Photo Tribute" },
-      "author": { "@type": "Person", "name": "Mika" },
-      "inLanguage": "en",
-      "reviewBody": "I sent this to my sister after she lost her dog of fourteen years. She called me as soon as she opened it and could barely get the words out. She said it was the first gift that made her feel like someone truly understood."
-    },
-    {
-      "@context": "https://schema.org",
-      "@type": "Review",
-      "itemReviewed": { "@type": "Product", "@id": "https://www.stillbesideme.com/sympathy-gifts#product", "name": "Personalized Pet Loss Gift – Framed Poem & Photo Tribute" },
-      "author": { "@type": "Person", "name": "Cameron" },
-      "inLanguage": "en",
-      "reviewBody": "I was nervous about ordering this for a friend because I did not know every detail about her cat. I shared what I knew, and the finished poem still felt incredibly personal. She hung it beside the window where he used to sleep."
-    },
-    {
-      "@context": "https://schema.org",
-      "@type": "Review",
-      "itemReviewed": { "@type": "Product", "@id": "https://www.stillbesideme.com/sympathy-gifts#product", "name": "Personalized Pet Loss Gift – Framed Poem & Photo Tribute" },
-      "author": { "@type": "Person", "name": "Radhika S." },
-      "inLanguage": "en",
-      "reviewBody": "This meant more than flowers ever could. Months later, it is still hanging on their wall, and my friend says she stops to read it all the time."
-    },
-    {
-      "@context": "https://schema.org",
-      "@type": "Review",
-      "itemReviewed": { "@type": "Product", "@id": "https://www.stillbesideme.com/sympathy-gifts#product", "name": "Personalized Pet Loss Gift – Framed Poem & Photo Tribute" },
-      "author": { "@type": "Person", "name": "Ronnie H." },
-      "inLanguage": "en",
-      "reviewBody": "I wanted to give them something that remembered who their dog really was. The poem included his nickname and the funny habit everyone loved about him. It felt thoughtful in a way a regular sympathy gift never could."
-    },
-    {
-      "@context": "https://schema.org",
-      "@type": "Review",
-      "itemReviewed": { "@type": "Product", "@id": "https://www.stillbesideme.com/sympathy-gifts#product", "name": "Personalized Pet Loss Gift – Framed Poem & Photo Tribute" },
-      "author": { "@type": "Person", "name": "Tori B." },
-      "inLanguage": "en",
-      "reviewBody": "They had already received flowers and cards, but this was the gift everyone gathered around to read. It got the whole family talking and sharing stories about her."
-    },
-    {
-      "@context": "https://schema.org",
-      "@type": "Review",
-      "itemReviewed": { "@type": "Product", "@id": "https://www.stillbesideme.com/sympathy-gifts#product", "name": "Personalized Pet Loss Gift – Framed Poem & Photo Tribute" },
-      "author": { "@type": "Person", "name": "Bobbie S." },
-      "inLanguage": "en",
-      "reviewBody": "I really appreciated getting to review the poem before it was printed. I asked for one small change, and it was handled right away. The final version felt exactly right."
-    }
-  ]
-  </script>
 
   <!-- Schema: BreadcrumbList -->
   <script type="application/ld+json">
