@@ -549,9 +549,18 @@
     // preview renders blank and reads as a failed upload. Skip the local
     // preview for those — the server converts to JPEG on upload and we swap
     // in its thumbnail as soon as the response arrives.
+    // A retry starts clean: drop any message left by a previous failure.
+    const staleError = wrapper.querySelector('.upload-error');
+    if (staleError) staleError.remove();
+
     const isHeic = /\.(heic|heif)$/i.test(file.name) || /heic|heif/i.test(file.type || '');
     const localUrl = isHeic ? null : URL.createObjectURL(file);
-    photoUploaded[panelId] = true;
+    // NOT marked uploaded yet. This flag used to be set here, before the
+    // request, so a failed upload left the local preview sitting in the frame
+    // looking successful while the server session held no photo at all — and
+    // the customer only found out at the payment step, where checkout replies
+    // "No photos uploaded. Please upload a photo first." while their photo is
+    // visibly on screen. It is set on success, and only on success.
     if (localUrl) PreviewRenderer.setPhoto(panelId, localUrl, '50% 50%');
     // Now that there's a photo to move, surface the on-photo reposition
     // affordance (drag hint + grab cursor + zoom buttons) right on the preview.
@@ -562,6 +571,11 @@
     const formData = new FormData();
     formData.append('photo', file);
     formData.append('slotId', slotId);
+    // Judge the photo against the size they are actually buying (see
+    // judgedPrintSize). Without these the server assesses against 16x20.
+    const judged = judgedPrintSize();
+    formData.append('printWidth', String(judged.width));
+    formData.append('printHeight', String(judged.height));
 
     try {
       const res = await fetch('/api/images/upload', {
@@ -571,6 +585,7 @@
       const data = await res.json();
 
       if (data.success) {
+        photoUploaded[panelId] = true;
         // The first photo landing is the earliest point we can honestly call
         // this a started tribute, and it is the event the ad budget is judged
         // on. Fired here rather than on the file picker opening, so a cancelled
@@ -588,17 +603,91 @@
           slotId,
           url: data.thumbnailUrl,
           position: data.crop.position,
-          quality: data.quality
+          quality: data.quality,
+          // Kept so the size selector can re-ask the server how this photo
+          // scores at a different print size without a re-upload.
+          dimensions: data.dimensions
         };
 
         saveState();
       } else {
-        showUploadPreview(slotId, localUrl, wrapper, data.error || 'Upload failed');
+        handleFailedUpload(slotId, panelId, wrapper, localUrl,
+          data.error || 'That photo did not upload. Tap to try again.');
       }
     } catch (err) {
       console.error('Upload error:', err);
-      showUploadPreview(slotId, localUrl, wrapper, 'Upload failed \u2013 using local preview');
+      handleFailedUpload(slotId, panelId, wrapper, localUrl,
+        'That photo did not upload \u2013 check your connection and tap to try again.');
     }
+  }
+
+  /**
+   * An upload that did not reach the server must not look like one that did.
+   *
+   * The local object-URL preview is cleared, the slot is put back into its
+   * "drop a photo here" state, and the reason is shown where the customer is
+   * looking. Previously the blob stayed in the frame and the error text went
+   * into a small badge, so the failure was invisible until checkout refused
+   * the order for having no photo.
+   */
+  function handleFailedUpload(slotId, panelId, wrapper, localUrl, message) {
+    photoUploaded[panelId] = false;
+    delete uploadedPhotos[panelId];
+    if (localUrl) URL.revokeObjectURL(localUrl);
+    if (PreviewRenderer.clearPhoto) PreviewRenderer.clearPhoto(panelId);
+
+    const preview = wrapper.querySelector('.upload-preview');
+    if (preview) preview.remove();
+    const zone = wrapper.querySelector('.upload-zone');
+    if (zone) zone.style.display = '';
+
+    let err = wrapper.querySelector('.upload-error');
+    if (!err) {
+      err = document.createElement('p');
+      err.className = 'upload-error';
+      err.setAttribute('role', 'alert');
+      wrapper.appendChild(err);
+    }
+    err.textContent = message;
+    saveState();
+  }
+
+  /**
+   * Re-grade every uploaded photo against the size now selected.
+   *
+   * Runs on size change. Nothing is re-uploaded — the server only needs the
+   * stored pixel dimensions and the new print size. A failure here is silent
+   * on purpose: a stale-but-reasonable badge is better than an error message
+   * about a judgement the customer never asked for.
+   */
+  async function reassessPhotoQuality() {
+    const judged = judgedPrintSize();
+    for (const panelId of Object.keys(uploadedPhotos)) {
+      const photo = uploadedPhotos[panelId];
+      if (!photo || !photo.dimensions) continue;
+      try {
+        const res = await fetch('/api/images/assess-quality', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageWidth: photo.dimensions.width,
+            imageHeight: photo.dimensions.height,
+            printWidth: judged.width,
+            printHeight: judged.height,
+          }),
+        });
+        if (!res.ok) continue;
+        const quality = await res.json();
+        if (!quality || !quality.tier) continue;
+        photo.quality = quality;
+        const zone = document.getElementById(`upload-zone-${photo.slotId}`);
+        const wrapper = zone && zone.closest('.field-group');
+        if (wrapper) showUploadPreview(photo.slotId, photo.url, wrapper, null, quality);
+      } catch (e) {
+        /* keep the previous verdict */
+      }
+    }
+    saveState();
   }
 
   function showUploadPreview(slotId, imageUrl, wrapper, statusMsg, quality) {
@@ -1661,7 +1750,8 @@
           generateBtn.style.display = '';
           updateGenerateButtonLabel();
           generateBtn.disabled = false;
-          alert(data.error || 'Something went wrong. Please try again.');
+          showBlockingNote(data.error || 'The poem did not come through. Please try again.',
+            document.getElementById('poem-section'));
           return;
         }
 
@@ -1709,7 +1799,8 @@
         if (!res.ok) {
           regenBtn.textContent = 'Try another version';
           updateRegenUi();
-          alert(data.error || 'Something went wrong. Please try again.');
+          showBlockingNote(data.error || 'That version did not come through. Please try again.',
+            document.getElementById('poem-section'));
           return;
         }
 
@@ -1859,6 +1950,10 @@
         grid.querySelectorAll('.product-option').forEach(o => o.classList.remove('selected'));
         option.classList.add('selected');
         updateFrameSectionVisibility(product.sku);
+        // The photo's verdict depends on the size it will be printed at, so it
+        // has to move when the size does. /api/images/assess-quality existed
+        // for exactly this and had never been called by anything.
+        reassessPhotoQuality();
         // Rebuild the frame chooser so signature frames appear/disappear with
         // the size (and a now-invalid signature choice resets to the default).
         if (isFramedSku(product.sku) && template.frameOptions) buildFrameSelector();
@@ -1937,6 +2032,32 @@
   function skuArea(sku) {
     const m = String(sku || '').match(/(\d+)x(\d+)/);
     return m ? Number(m[1]) * Number(m[2]) : 0;
+  }
+
+  /**
+   * The print size a photo should be JUDGED against, in inches.
+   *
+   * This exists because the upload used to send no size at all, so the server
+   * fell back to its own default of 16x20 (routes/api.js) — the second-largest
+   * thing we sell — while the customer had the 11x14 selected and usually
+   * never changed it. A perfectly good ~1500px phone photo scores 93 DPI
+   * against 16x20 ("low", and we tell them so) but 107 DPI against 11x14
+   * ("usable", and we tell them it will print nicely). We were telling people
+   * their only photo of a dead pet was too poor to print, about a size they
+   * had not chosen. Nothing else in the funnel can undo that sentence.
+   *
+   * Falls back to the template's DEFAULT product, not to the largest one:
+   * uploads happen before the size section is even on screen, and the default
+   * is what they will buy unless they say otherwise.
+   */
+  function judgedPrintSize() {
+    const selected = getSelectedProduct();
+    const fallback = (template.printProducts || []).find(p => p.default)
+      || (template.printProducts || [])[0];
+    const sku = (selected && selected.sku) || (fallback && fallback.sku) || '';
+    const m = String(sku).match(/(\d+)x(\d+)/);
+    if (!m) return { width: 11, height: 14 };
+    return { width: Number(m[1]), height: Number(m[2]) };
   }
 
   /** "framed-11x14" → "11×14" — how a size reads inside a sentence. */
@@ -2473,6 +2594,13 @@
     const container = document.getElementById('style-selector');
     if (!container || template.colorMode !== 'auto') return;
 
+    // Photo colour-matching was removed, so paletteSwatches is never filled.
+    // With it empty this function used to write an empty string into
+    // #style-selector — which is the FRAME CHOOSER — wiping it. Nothing
+    // noticed only because buildFrameSelector() happened to run nine lines
+    // later on the one path that reaches here. Leave the frame chooser alone.
+    if (!paletteSwatches.length) return;
+
     container.style.display = '';
     container.classList.add('swatch-row');
 
@@ -2788,19 +2916,67 @@
     }
   }
 
+  /**
+   * Say what is missing, next to the thing that is missing.
+   *
+   * Replaces alert() for validation. A native alert in the middle of a
+   * memorial is jarring, it names no field, it cannot be styled, and on iOS
+   * it steals focus and scroll position — so the customer dismisses it and is
+   * left looking at the same long form with no idea which part it meant.
+   */
+  function showBlockingNote(message, anchorEl) {
+    document.querySelectorAll('.blocking-note').forEach(n => n.remove());
+    const note = document.createElement('p');
+    note.className = 'blocking-note';
+    note.setAttribute('role', 'alert');
+    note.textContent = message;
+
+    const host = anchorEl || document.getElementById('cart-section') || document.body;
+    host.appendChild(note);
+    note.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.setTimeout(() => note.remove(), 8000);
+  }
+
   async function handlePurchase() {
     const product = getSelectedProduct();
 
     if (!product) {
-      alert('Please select a size.');
+      showBlockingNote('Please choose a size before checking out.');
       return;
     }
 
     const fields = PreviewRenderer.getFields();
     const poemText = fields.poemText;
 
+    // Checked HERE, before the proof render, not after. Compositing the proof
+    // is a multi-second server round trip; sending a customer into that wait
+    // only to refuse them at the end — which is what "No photos uploaded"
+    // from /api/checkout did — spends their patience to tell them something
+    // we already knew. The server keeps its own checks; this one is about not
+    // making them wait for the bad news.
+    if (!Object.keys(uploadedPhotos).length) {
+      const zone = document.querySelector('.upload-zone');
+      showBlockingNote('Please add their photo before checking out.',
+        zone && zone.closest('.field-group'));
+      return;
+    }
+
+    // Fields the template marks required were never enforced anywhere: the
+    // builder only dropped the "(optional)" tag next to them. A tribute could
+    // be bought, printed and shipped with no name on it.
+    const missing = (template.memoryFields || []).find(f =>
+      f.required && f.type !== 'poem-selector' && !String(fields[f.id] || '').trim());
+    if (missing) {
+      const el = document.getElementById(`field-${missing.id}`);
+      showBlockingNote(`Please fill in "${missing.label}" before checking out.`,
+        el && el.closest('.field-group'));
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); }
+      return;
+    }
+
     if (!poemText || !poemText.trim()) {
-      alert('Please generate or select a poem before purchasing.');
+      const section = document.getElementById('poem-section');
+      showBlockingNote('Please choose or write their poem before checking out.', section);
       return;
     }
 
@@ -2808,8 +2984,9 @@
     // is anonymous — they'd have no idea which friend sent it. The note stays
     // optional; the sender's name does not.
     if (orderType === 'gift' && !(fields.giftFrom || '').trim()) {
-      alert('Please add your name so they know who this gift is from.');
       const el = document.getElementById('field-giftFrom');
+      showBlockingNote('Please add your name so they know who this gift is from.',
+        el && el.closest('.field-group'));
       if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); }
       return;
     }
@@ -3282,6 +3459,59 @@
 
   // ── State Persistence ──────────────────────────────────────
 
+  // Where a half-finished tribute lives between visits.
+  //
+  // This was sessionStorage, which is scoped to one tab and erased when that
+  // tab closes. Two things depended on it surviving and neither did: a
+  // customer who stepped away mid-build lost the poem, the photo placement and
+  // every field, and the abandoned-checkout recovery email — which links to
+  // /customize/<template> and says "pick it back up" — opened an empty
+  // builder. The work is worth more than a tab: keep it in localStorage, and
+  // expire it on read rather than trusting it forever.
+  //
+  // sessionStorage stays as the fallback so a browser that blocks persistent
+  // storage still behaves exactly as it used to within the tab.
+  const STATE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+  function writeBuilderState(json) {
+    try {
+      localStorage.setItem(SESSION_KEY, json);
+      return;
+    } catch (e) {
+      /* fall through to sessionStorage */
+    }
+    try { sessionStorage.setItem(SESSION_KEY, json); } catch (e) { /* nothing to do */ }
+  }
+
+  function readBuilderState() {
+    let raw = null;
+    try { raw = localStorage.getItem(SESSION_KEY); } catch (e) { /* blocked */ }
+    if (!raw) {
+      try { raw = sessionStorage.getItem(SESSION_KEY); } catch (e) { /* blocked */ }
+    }
+    if (!raw) return null;
+
+    // A tribute started a month ago belongs to a visit that is over. Returning
+    // it would put someone else's half-written poem in front of a new visitor
+    // on a shared machine.
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.timestamp && Date.now() - parsed.timestamp > STATE_MAX_AGE_MS) {
+        clearBuilderState();
+        return null;
+      }
+    } catch (e) {
+      clearBuilderState();
+      return null;
+    }
+    return raw;
+  }
+
+  function clearBuilderState() {
+    try { localStorage.removeItem(SESSION_KEY); } catch (e) { /* blocked */ }
+    try { sessionStorage.removeItem(SESSION_KEY); } catch (e) { /* blocked */ }
+  }
+
   function saveState() {
     try {
       const state = {
@@ -3313,9 +3543,9 @@
         selectedSku: document.querySelector('.product-option.selected')?.dataset?.sku,
         timestamp: Date.now()
       };
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(state));
+      writeBuilderState(JSON.stringify(state));
     } catch (e) {
-      // sessionStorage may not be available
+      // storage may not be available (private mode, blocked site data)
     }
 
     // Every meaningful change lands here — poem, size, layout, dividers — so
@@ -3326,7 +3556,7 @@
 
   function restoreState() {
     try {
-      const raw = sessionStorage.getItem(SESSION_KEY);
+      const raw = readBuilderState();
       if (!raw) return;
 
       const state = JSON.parse(raw);
@@ -3533,8 +3763,8 @@
 
   function readPoemHandoff() {
     try {
-      // Work already under way in this tab outranks anything the free tool left.
-      if (sessionStorage.getItem(SESSION_KEY)) return null;
+      // Work already under way outranks anything the free tool left.
+      if (readBuilderState()) return null;
 
       const raw = localStorage.getItem(HANDOFF_KEY);
       if (!raw) return null;

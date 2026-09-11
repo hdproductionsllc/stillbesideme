@@ -221,6 +221,7 @@
   window.PreviewRenderer = {
     init,
     setPhoto,
+    clearPhoto,
     setPhotoCrop,
     getPhotoCrop,
     getPhotoCanvas,
@@ -477,6 +478,19 @@
       queueRender();
     };
     img.src = imageUrl;
+  }
+
+  /**
+   * Take a photo back out of a panel and repaint the empty slot.
+   *
+   * Needed so a failed upload can undo its own local preview: setPhoto has no
+   * "no photo" case (a null URL falls into its two-argument compatibility
+   * branch and sets nothing), which left a blob in the frame after an upload
+   * the server never received.
+   */
+  function clearPhoto(panelId) {
+    delete photos[panelId || 'photo'];
+    queueRender();
   }
 
   function setPhotoCrop(panelIdOrZoom, zoomOrPanX, panXOrPanY, maybePanY) {

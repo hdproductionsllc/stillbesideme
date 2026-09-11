@@ -34,43 +34,6 @@
   <meta name="twitter:description" content="A personalized poem written from your memories of the pet you lost, printed beside their photo, with their name and the years you shared, in an elegant frame. Four sizes from $79.">
   <meta name="twitter:image" content="https://www.stillbesideme.com/images/og/memorial-gifts.jpg">
 
-  <!-- Schema: Reviews (verbatim customer reviews from /src/data/reviews.json).
-       Intentionally no reviewRating and no aggregateRating: no rating data exists. -->
-  <!-- Schema: Product -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "Product",
-    "image": "https://www.stillbesideme.com/images/og/memorial-gifts.jpg",
-    "name": "Personalized Pet Memorial Gift",
-    "description": "A personalized poem written from your memories of a beloved pet, printed beside their photo, with their name and the years you shared, in an elegant frame. Archival, museum-quality print in four sizes, made to order in the USA and ready to hang.",
-    "url": "https://www.stillbesideme.com/customize/pet-tribute",
-    "brand": { "@type": "Brand", "name": "Still Beside Me" },
-    "category": "Memorial Gifts",
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": "4.9",
-      "bestRating": "5",
-      "worstRating": "1",
-      "reviewCount": "30"
-    },
-    "offers": {
-      "@type": "AggregateOffer",
-      "lowPrice": "79.00",
-      "highPrice": "249.00",
-      "priceCurrency": "USD",
-      "offerCount": "4",
-      "priceValidUntil": "2026-12-31",
-      "availability": "https://schema.org/InStock"
-    },
-    "review": [
-      { "@type": "Review", "author": {"@type":"Person","name":"Monica V."}, "reviewBody": "This is the first memorial gift we have received that feels like it truly belongs in our home." },
-      { "@type": "Review", "author": {"@type":"Person","name":"Brianna K."}, "reviewBody": "The beginning made us laugh. The ending made us cry. That was exactly who she was." },
-      { "@type": "Review", "author": {"@type":"Person","name":"Gwen A."}, "reviewBody": "The finished piece looks beautiful in our home. It does not feel mass produced or generic. It feels like it was made only for our family." }
-    ]
-  }
-  </script>
-
   <!-- Schema: FAQPage -->
   <script type="application/ld+json">
   {
@@ -420,8 +383,12 @@
   <!-- ═══════════════════════════════════════════════════════════
        6B. IN THEIR OWN WORDS &ndash; real customer reviews
        Source of truth: /src/data/reviews.json. Quoted verbatim.
-       No ratings anywhere: no customer was asked to score their grief,
-       so no rating data exists and none may be manufactured.
+       Quotes only, with no per-review star rating: ratings were collected
+       from these customers but the score-to-person mapping was not retained,
+       so no named review may be given a rating. The visible aggregate below
+       (data-customer-rating) is real, computed from legacyRatings in
+       reviews.json by scripts/build-review-aggregate.js. The Product schema
+       that carries it lives on the homepage only: this page links to it.
        ═══════════════════════════════════════════════════════════ -->
   <section class="social-proof" id="reviews">
     <div class="container">

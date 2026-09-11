@@ -989,6 +989,30 @@
   gap: 0.35rem;
 }
 
+/* An upload that did not reach the server, said plainly and in place.
+   Soft rose, never the angry red — this is usually a phone on bad signal,
+   not something the customer did wrong. */
+.upload-error {
+  font-size: 0.85rem;
+  color: var(--color-error);
+  margin-top: var(--space-sm);
+  line-height: 1.45;
+}
+
+/* Validation that replaced alert(): sits with the field it is about, in the
+   brand's voice rather than the browser's. Same weight as .quality-message —
+   it asks for one more thing, it does not scold. */
+.blocking-note {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--color-error);
+  background: rgba(196, 112, 112, 0.08);
+  border-left: 3px solid var(--color-error);
+  border-radius: 4px;
+  padding: 0.6rem 0.75rem;
+  margin-top: var(--space-sm);
+}
+
 .crop-hint {
   font-size: 0.8rem;
   color: var(--color-muted);

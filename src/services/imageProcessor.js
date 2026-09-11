@@ -25,10 +25,32 @@ async function convertHeic(inputBuffer) {
   return Buffer.from(outputBuffer);
 }
 
-/** Check if a file is HEIC format */
-function isHeic(filename) {
-  const ext = path.extname(filename).toLowerCase();
-  return ext === '.heic' || ext === '.heif';
+/**
+ * Check if a file is HEIC/HEIF — by what is in it, not only what it is called.
+ *
+ * The extension alone was not enough. iPhone photos arrive named anything a
+ * share sheet, a messaging app or a re-save decides on, and the browser's
+ * reported MIME type is frequently empty for HEIC. A HEIC that reached us
+ * without a .heic name skipped conversion, went straight to Sharp, threw, and
+ * the customer was told "Upload failed. Please try again." — which, for the
+ * same file, never worked.
+ *
+ * HEIC is ISO base media format: bytes 4..8 are the box type 'ftyp' and the
+ * brand that follows says what it really is.
+ */
+const HEIC_BRANDS = new Set(['heic', 'heix', 'heim', 'heis', 'hevc', 'hevx', 'heif', 'mif1', 'msf1']);
+
+function isHeic(filename, buffer) {
+  const ext = path.extname(filename || '').toLowerCase();
+  if (ext === '.heic' || ext === '.heif') return true;
+
+  if (Buffer.isBuffer(buffer) && buffer.length >= 12) {
+    if (buffer.toString('ascii', 4, 8) === 'ftyp') {
+      const brand = buffer.toString('ascii', 8, 12).toLowerCase();
+      if (HEIC_BRANDS.has(brand)) return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -67,7 +89,7 @@ async function getDimensions(buffer) {
  * @param {number} printWidthIn - Target print width in inches
  * @param {number} printHeightIn - Target print height in inches
  */
-function assessQuality(imageWidth, imageHeight, printWidthIn = 16, printHeightIn = 20) {
+function assessQuality(imageWidth, imageHeight, printWidthIn = 11, printHeightIn = 14) {
   const dpiH = imageWidth / printWidthIn;
   const dpiV = imageHeight / printHeightIn;
   const effectiveDpi = Math.min(dpiH, dpiV);
@@ -326,7 +348,7 @@ async function processUpload(buffer, originalName, printWidthIn = 16, printHeigh
   let processedBuffer = buffer;
   let convertedFromHeic = false;
 
-  if (isHeic(originalName)) {
+  if (isHeic(originalName, buffer)) {
     processedBuffer = await convertHeic(buffer);
     convertedFromHeic = true;
   }

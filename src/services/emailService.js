@@ -7,6 +7,13 @@
  * from prod on every port while the HTTPS API delivered instantly). Any other
  * SMTP_HOST still uses Nodemailer, now with hard timeouts so a hung socket
  * can never stall the Stripe webhook path for minutes again.
+ *
+ * Because the HTTPS API needs nothing but an API key, RESEND_API_KEY on its own
+ * is a complete configuration — no SMTP_HOST required. That is the recommended
+ * production setup, and it is also what server.js's boot readiness check counts
+ * as "email works": the two must agree, or a deploy with only RESEND_API_KEY
+ * set prints [ok] at boot while every order confirmation, proof and admin alert
+ * is silently dropped on the floor.
  */
 
 const nodemailer = require('nodemailer');
@@ -17,8 +24,15 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3001';
 
 let transporter = null;
 
+/**
+ * True when mail should go over Resend's HTTPS API instead of SMTP: either
+ * SMTP_HOST names Resend, or there is no SMTP_HOST at all and RESEND_API_KEY
+ * is the only thing configured. An explicit non-Resend SMTP_HOST always wins,
+ * so setting one is still how you choose Nodemailer.
+ */
 function usesResendApi() {
-  return /resend/i.test(process.env.SMTP_HOST || '');
+  if (process.env.SMTP_HOST) return /resend/i.test(process.env.SMTP_HOST);
+  return !!process.env.RESEND_API_KEY;
 }
 
 /** "a@x.com, b@y.com" → ["a@x.com", "b@y.com"] (Resend wants arrays). */
@@ -85,10 +99,18 @@ function getTransporter() {
   return transporter;
 }
 
-/** Single delivery chokepoint for every email this service sends. */
+/**
+ * Single delivery chokepoint for every email this service sends.
+ *
+ * Either transport is enough to send: SMTP_HOST for Nodemailer, or
+ * RESEND_API_KEY for the HTTPS API (which needs no host). Only when BOTH are
+ * missing is there nowhere to send to, and then we log the mail instead — the
+ * same condition server.js reports at boot, so the readiness line cannot claim
+ * email works while this branch is quietly swallowing every message.
+ */
 async function deliver(mailOptions) {
-  if (!process.env.SMTP_HOST) {
-    console.log(`Email (not sent — no SMTP): to=${mailOptions.to} subject="${mailOptions.subject}"`
+  if (!process.env.SMTP_HOST && !process.env.RESEND_API_KEY) {
+    console.log(`Email (not sent — no SMTP_HOST or RESEND_API_KEY): to=${mailOptions.to} subject="${mailOptions.subject}"`
       + (mailOptions.text ? `\n${mailOptions.text}` : ''));
     return { preview: true };
   }

@@ -43,6 +43,29 @@
     }
   }
 
+  /**
+   * A captured email is a conversion and was reported to nobody.
+   *
+   * Email capture is the highest-volume thing that happens on the marketing
+   * pages, and neither GA4 nor Meta heard about it — so the one step between
+   * "read a blog post" and "build a tribute" was invisible in every funnel
+   * report, and there was no audience to build from. Fires only on a
+   * confirmed 2xx from /api/subscribe, so a failed signup never counts.
+   */
+  function trackLead(source) {
+    try {
+      if (typeof gtag === 'function') {
+        gtag('event', 'generate_lead', { method: source || 'signup' });
+      }
+      const env = window.SBM_ENV || {};
+      if (env.metaPixelId && typeof fbq === 'function') {
+        fbq('track', 'Lead', { content_name: source || 'signup' });
+      }
+    } catch (e) {
+      // Never let analytics break a signup that already succeeded.
+    }
+  }
+
   // Handle all signup forms (footer + popup + inline offers)
   document.querySelectorAll('[data-signup-form], #popup-signup-form').forEach(form => {
     form.addEventListener('submit', async (e) => {
@@ -57,6 +80,7 @@
       const ok = await submitEmail(email, form.dataset.source);
 
       if (ok) {
+        trackLead(form.dataset.source);
         // An inline offer declares its own confirmation, so the reader is told
         // the poems are on their way rather than just seeing a button change.
         const inlineSuccess = form.parentElement
@@ -179,6 +203,60 @@
       }
     });
   });
+
+  // ============================================================
+  // view_item on the product pages.
+  //
+  // Without it the funnel jumps straight from page_view to a builder start,
+  // so neither platform can tell a visitor who looked at the product from one
+  // who read a blog post and left — and there is no product-view audience to
+  // remarket to. Driven by the Product JSON-LD that is already on the page
+  // (homepage only, since the landing pages intentionally no longer duplicate
+  // the Product entity), so the price here can never drift from the price we
+  // publish to Google.
+  (function trackViewItem() {
+    try {
+      const blocks = document.querySelectorAll('script[type="application/ld+json"]');
+      if (!blocks.length) return;
+      let product = null;
+      blocks.forEach(b => {
+        if (product) return;
+        try {
+          const parsed = JSON.parse(b.textContent);
+          if (parsed && parsed['@type'] === 'Product') product = parsed;
+        } catch (e) { /* not this block */ }
+      });
+      if (!product) return;
+
+      const offers = Array.isArray(product.offers) ? product.offers : [product.offers];
+      const primary = offers.find(o => o && o['@type'] === 'Offer') || {};
+      const value = Number(primary.price) || 0;
+
+      if (typeof gtag === 'function') {
+        gtag('event', 'view_item', {
+          currency: 'USD',
+          value: value,
+          items: [{
+            item_id: product.sku || 'pet-tribute',
+            item_name: product.name || 'Pet Tribute',
+            price: value,
+            quantity: 1,
+          }],
+        });
+      }
+      const env = window.SBM_ENV || {};
+      if (env.metaPixelId && typeof fbq === 'function') {
+        fbq('track', 'ViewContent', {
+          content_type: 'product',
+          content_ids: [product.sku || 'pet-tribute'],
+          value: value,
+          currency: 'USD',
+        });
+      }
+    } catch (e) {
+      // A page with no product schema simply reports nothing.
+    }
+  })();
 
   // NOTE: the purchase event fires from order-confirmed.html (inline script,
   // deduped per order with the real order total). Do not add it here.

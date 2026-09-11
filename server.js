@@ -6,6 +6,7 @@ const session = require('express-session');
 const FileStore = require('session-file-store')(session);
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const compression = require('compression');
 const Sentry = require('@sentry/node');
 
 // Initialize Sentry (error monitoring)
@@ -23,6 +24,12 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, 'uploads');
 const OUTPUT_DIR = process.env.OUTPUT_DIR || path.join(__dirname, 'output');
 const SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
+
+// The one origin this store is published at. Every page's <link rel="canonical">
+// hardcodes it, so anything else that emits absolute URLs — the sitemap, the
+// readiness check below — has to agree with it or Google is told two different
+// stories about where this site lives.
+const CANONICAL_ORIGIN = 'https://www.stillbesideme.com';
 
 // Ensure required directories exist
 for (const dir of [DATA_DIR, SESSIONS_DIR, UPLOADS_DIR, OUTPUT_DIR]) {
@@ -90,6 +97,12 @@ function logReadiness() {
   const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
   const persistent = !!process.env.DATA_DIR && !dataDir.startsWith(__dirname);
 
+  // Either transport is genuinely enough: emailService sends over Resend's
+  // HTTPS API on RESEND_API_KEY alone (no host needed) and over Nodemailer when
+  // SMTP_HOST is set. This must stay in step with deliver() in
+  // src/services/emailService.js — the whole point of this line is that it is
+  // not allowed to say [ok] while that function is logging mail instead of
+  // sending it.
   const emailOk = has('SMTP_HOST') || has('RESEND_API_KEY');
   const blocking = [
     [has('STRIPE_SECRET_KEY') && has('STRIPE_WEBHOOK_SECRET'), 'Payments',
@@ -110,10 +123,48 @@ function logReadiness() {
     [has('LUMA_STORE_ID'), 'Luma store id', 'LUMA_STORE_ID — run GET /api/luma/setup once'],
   ];
 
+  // Measurement, not fulfilment — deliberately kept out of `blocking`, because
+  // an order is taken, made and shipped perfectly well with none of this set.
+  // It is reported because the failure mode is the same quiet kind: /js/env.js
+  // only exposes the keys that exist, so with these unset the analytics and ads
+  // snippets on every page still load and still look healthy, but the tags are
+  // inert — no pageviews, and not one purchase reported back as a conversion.
+  // Ad spend then optimises against no signal at all, which costs real money
+  // without ever producing an error.
+  const measurement = [
+    [has('GOOGLE_ADS_ID') && has('GOOGLE_ADS_CONVERSION_LABEL'), 'Google Ads',
+      'GOOGLE_ADS_ID / GOOGLE_ADS_CONVERSION_LABEL — tag inert, purchases are NOT reported as conversions'],
+    [has('META_PIXEL_ID'), 'Meta Pixel',
+      'META_PIXEL_ID — pixel inert, no pageviews or purchases reach Meta'],
+  ];
+
+  // BASE_URL is the origin this process stamps onto generated links: the
+  // sitemap below, the proof/status URLs in customer email, and the image URLs
+  // the print lab fetches. The canonical tags, meanwhile, are the hardcoded www
+  // host. If the two disagree in production then the published sitemap argues
+  // with every page's own canonical — and if BASE_URL is simply unset, the
+  // sitemap used to advertise localhost to Google.
+  const baseUrlWarning = (() => {
+    if (process.env.NODE_ENV !== 'production') return null;
+    const raw = (process.env.BASE_URL || '').trim();
+    if (!raw) {
+      return `BASE_URL unset — links fall back to ${CANONICAL_ORIGIN}; set it explicitly`;
+    }
+    let origin = null;
+    try { origin = new URL(raw).origin; } catch (e) { /* not a URL at all */ }
+    if (!origin) return `BASE_URL ("${raw}") is not an absolute URL — generated links will be broken`;
+    if (origin !== CANONICAL_ORIGIN) {
+      return `BASE_URL (${origin}) != canonical ${CANONICAL_ORIGIN} — sitemap disagrees with every canonical tag`;
+    }
+    return null;
+  })();
+
   const failed = blocking.filter(([ok]) => !ok);
   console.log('  ── Readiness ' + '─'.repeat(46));
   blocking.forEach(([ok, l, d]) => console.log(line(ok, l, d)));
   degraded.forEach(([ok, l, d]) => console.log(line(ok, l, d)));
+  measurement.forEach(([ok, l, d]) => console.log(line(ok, l, d)));
+  if (baseUrlWarning) console.log(`  [warn] ${'Canonical URLs'.padEnd(22)} ${baseUrlWarning}`);
   console.log('  ' + '─'.repeat(58));
   if (failed.length) {
     console.warn(`  ${failed.length} setting(s) above will stop real orders from completing.`);
@@ -126,6 +177,14 @@ function logReadiness() {
 // Initialize database (creates tables via migrations)
 async function start() {
   const db = await require('./src/db/database').init();
+
+  // gzip/brotli every text response. This site's weight is almost entirely
+  // markup, CSS and JS — the homepage is ~64KB of HTML, store.css ~69KB,
+  // customizer.js ~150KB — all of which compresses by roughly 4-5x, and all of
+  // which was going out raw. Mounted first so it wraps every later handler
+  // (static assets included); it leaves already-compressed bytes (images, the
+  // rendered JPEGs) alone and honours a client that asks for identity.
+  app.use(compression());
 
   // Webhooks need raw body for signature verification (must be before express.json)
   app.use('/api/whcc-webhooks', express.raw({ type: '*/*' }));
@@ -240,7 +299,24 @@ async function start() {
     legacyHeaders: false,
   }));
   app.use('/api/sympathy', expensiveLimiter);
-  app.use('/api/images/upload', expensiveLimiter);
+  // Photo upload gets its OWN bucket, and a ceiling sized for a real purchase
+  // rather than for abuse. Sharing expensiveLimiter with /api/sympathy meant one
+  // 10-per-15-min counter covered both, so the free sympathy-message tool could
+  // spend a buyer's upload budget. Ten is far too low for this step regardless:
+  // a customer picks a photo, the HEIC fails and they retry, they try a second
+  // photo and prefer the first, a multi-slot template needs several — and two
+  // people behind one office or phone-carrier NAT share this IP. Being told
+  // "too many requests" while trying to hand over a photo of the pet they just
+  // lost is the worst possible place to stop someone, so 30 per 15 minutes:
+  // still a ceiling on the expensive sharp/HEIC pipeline, but far above what
+  // any honest purchase needs.
+  app.use('/api/images/upload', rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    message: { error: 'Too many uploads. Please give it a minute and try again.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  }));
   // Gift-note drafting gets its OWN bucket rather than joining expensiveLimiter.
   // That middleware is one instance, so every path mounted on it shares a single
   // 10-per-15-min counter — a buyer who drafts notes while regenerating poems
@@ -516,13 +592,23 @@ async function start() {
     },
   }));
 
-  // Restrict /uploads — only authenticated sessions can access uploaded photos
-  app.use('/uploads', (req, res, next) => {
-    if (!req.session || !req.session.id) {
-      return res.status(403).send('Forbidden');
-    }
-    next();
-  }, express.static(UPLOADS_DIR));
+  // /uploads is public, deliberately, and the gate that used to sit here was
+  // theatre: with saveUninitialized:true every request — including one with no
+  // cookie at all — gets a session, so `req.session.id` was always truthy and
+  // the 403 could never fire. Worse, a check that actually worked would break
+  // the job: the print labs fetch the customer's photo from
+  // ${BASE_URL}/uploads/... server-to-server (see lumaOrderApi/whccOrderApi),
+  // email clients fetch proof images through their own image proxies, and a
+  // gift recipient opens the tribute page without ever having a session here.
+  // None of those carry our cookie, so a real session check would silently stop
+  // orders reaching the printer.
+  //
+  // What actually protects these files is the filename: storage.js names every
+  // upload with a v4 UUID under a dated directory, so a path is unguessable and
+  // directory listing is off. That is the same "capability URL" model the proof
+  // and tribute links already rely on. Anything that needs stronger protection
+  // than an unguessable URL must not be served from here.
+  app.use('/uploads', express.static(UPLOADS_DIR));
 
   // SEO landing pages – clean URLs
   app.get('/pet-memorial-gifts', (req, res) => {
@@ -688,7 +774,15 @@ async function start() {
   };
 
   app.get('/sitemap.xml', (req, res) => {
-    const baseUrl = process.env.BASE_URL || `http://localhost:${PORT}`;
+    // In production an unset BASE_URL must never publish a sitemap of localhost
+    // URLs to Google — fall back to the canonical origin the pages themselves
+    // declare. Locally, localhost is still the right answer. Trailing slashes
+    // are trimmed because every <loc> below appends its own path.
+    const configured = (process.env.BASE_URL || '').trim().replace(/\/+$/, '');
+    const fallback = process.env.NODE_ENV === 'production'
+      ? CANONICAL_ORIGIN
+      : `http://localhost:${PORT}`;
+    const baseUrl = configured || fallback;
     const lastmod = (relPath) => {
       const d = lastmodFor(relPath);
       return d ? `
@@ -1107,9 +1201,30 @@ async function start() {
 
   // Railway sends SIGTERM when a redeploy replaces this container. Exit 0 so
   // routine shutdowns aren't classified (and emailed) as crashes.
+  //
+  // Flush the database on the way out. Writes are persisted on a 100ms debounce
+  // (src/db/database.js), so without this every write in the final tenth of a
+  // second before a deploy — a Stripe webhook marking an order paid, a proof
+  // approval — existed only in the memory of a container that is about to be
+  // destroyed. Flush three times on purpose: now, for whatever the debounce is
+  // still holding; again once in-flight requests have drained, since those can
+  // write while we wait; and again on the forced-exit path, which is exactly the
+  // case where a write is most likely to be stranded.
+  const { flushSync } = require('./src/db/database');
+  const flushDb = (when) => {
+    try {
+      flushSync();
+    } catch (err) {
+      console.error(`DB flush on shutdown (${when}) failed:`, err.message);
+    }
+  };
+  let shuttingDown = false;
   const shutdown = () => {
-    server.close(() => process.exit(0));
-    setTimeout(() => process.exit(0), 8000).unref();
+    if (shuttingDown) return;
+    shuttingDown = true;
+    flushDb('signal');
+    server.close(() => { flushDb('drained'); process.exit(0); });
+    setTimeout(() => { flushDb('timeout'); process.exit(0); }, 8000).unref();
   };
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);

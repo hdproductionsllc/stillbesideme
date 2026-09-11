@@ -17,6 +17,39 @@ let db = null;
 let _saveTimer = null;
 let _saving = false;
 
+// Every persist is stamped with a monotonic generation so a slower write can
+// never land on top of a newer one. The export is synchronous, so the stamp
+// taken right after it orders snapshots by age; a snapshot whose generation is
+// already behind what is on disk is thrown away instead of renamed into place.
+// This is what keeps the final synchronous flush at shutdown from being undone
+// by an async save that was still mid-write when the signal arrived.
+let _writeSeq = 0;
+let _persistedSeq = 0;
+
+/**
+ * sql.js hands us the whole database as one buffer, so persisting means
+ * replacing the file wholesale — and a process that dies partway through that
+ * write leaves a truncated store.db, i.e. every order gone. So we never write
+ * over the live file: the snapshot goes to a temp file in the SAME directory
+ * (rename is only atomic within a filesystem) and is then renamed over the
+ * target, which either happens completely or not at all.
+ */
+function tempPath(seq) {
+  return `${DB_PATH}.tmp-${process.pid}-${seq}`;
+}
+
+async function persist(data, seq) {
+  const tmp = tempPath(seq);
+  await fs.promises.writeFile(tmp, Buffer.from(data));
+  if (seq < _persistedSeq) {
+    // A newer snapshot (e.g. the shutdown flush) already landed — discard ours.
+    await fs.promises.unlink(tmp).catch(() => {});
+    return;
+  }
+  await fs.promises.rename(tmp, DB_PATH);
+  _persistedSeq = seq;
+}
+
 function save() {
   if (!db) return;
 
@@ -28,13 +61,39 @@ function save() {
     _saving = true;
     try {
       const data = db.export();
-      await fs.promises.writeFile(DB_PATH, Buffer.from(data));
+      await persist(data, ++_writeSeq);
     } catch (err) {
       console.error('Database save error:', err);
     } finally {
       _saving = false;
     }
   }, 100);
+}
+
+/**
+ * Persist immediately, synchronously, and return whether it happened.
+ *
+ * The 100ms debounce above means the last write of a request may exist only in
+ * memory. Railway sends SIGTERM and then replaces the container, so without a
+ * flush on that path anything written in the final tenth of a second of a
+ * deploy — a paid order, a proof approval — is simply lost. Signal handlers
+ * have no time to await, hence the synchronous twin of persist().
+ */
+function flushSync() {
+  if (!db) return false;
+  if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+  try {
+    const data = db.export();
+    const seq = ++_writeSeq;
+    const tmp = tempPath(seq);
+    fs.writeFileSync(tmp, Buffer.from(data));
+    fs.renameSync(tmp, DB_PATH);
+    _persistedSeq = seq;
+    return true;
+  } catch (err) {
+    console.error('Database flush error:', err);
+    return false;
+  }
 }
 
 /** Thin wrapper that provides a clean API and auto-saves on writes */
@@ -156,4 +215,4 @@ function backupNow(stamp, keep = 14) {
   return dest;
 }
 
-module.exports = { init, backupNow, DB_PATH };
+module.exports = { init, backupNow, flushSync, DB_PATH };

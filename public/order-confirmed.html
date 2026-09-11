@@ -370,14 +370,21 @@
       try {
         if (!order || !order.orderId) return;
         const dedupKey = 'sbm_purchase_' + order.orderId;
-        if (localStorage.getItem(dedupKey)) return;
-        localStorage.setItem(dedupKey, '1');
+        try { if (localStorage.getItem(dedupKey)) return; } catch (e) { /* blocked */ }
+
+        // The dedup key used to be written HERE, before anything was sent. If
+        // gtag had not finished loading yet — async script, slow phone — the
+        // send below was skipped, the key was already burned, and no reload
+        // could ever re-fire it. The sale simply never reached Google. Mark it
+        // sent only once something has actually been sent.
+        var sent = false;
 
         const value = order.totalCents ? Math.round(order.totalCents) / 100 : 0;
         const env = window.SBM_ENV || {};
 
         // GA4 purchase
         if (typeof gtag === 'function') {
+          sent = true;
           gtag('event', 'purchase', {
             transaction_id: order.orderId,
             value: value,
@@ -402,13 +409,41 @@
           }
         }
 
-        // Meta Pixel purchase (only when the pixel is live)
+        // Meta Pixel purchase (only when the pixel is live).
+        // eventID matches the order id so a future server-side Conversions API
+        // send of the same purchase is deduplicated against this one rather
+        // than double-counted.
         if (env.metaPixelId && typeof fbq === 'function') {
-          fbq('track', 'Purchase', { value: value, currency: 'USD' });
+          fbq('track', 'Purchase',
+            { value: value, currency: 'USD', content_type: 'product',
+              contents: order.sku ? [{ id: order.sku, quantity: 1, item_price: value }] : [] },
+            { eventID: String(order.orderId) });
+          sent = true;
+        }
+
+        if (sent) {
+          try { localStorage.setItem(dedupKey, '1'); } catch (e) { /* blocked */ }
         }
       } catch (e) {
         // Tracking must never interfere with the confirmation page.
       }
+    }
+
+    // The tribute in the builder has been bought. Clear it so a return visit
+    // starts fresh instead of reopening the piece they already own. (Builder
+    // state now persists across tabs, so it no longer clears itself.)
+    function clearBuilderDraft() {
+      try {
+        for (var i = localStorage.length - 1; i >= 0; i--) {
+          var k = localStorage.key(i);
+          if (k && k.indexOf('sbm-customizer-') === 0) localStorage.removeItem(k);
+          if (k && k.indexOf('sbm-generated-poem') === 0) localStorage.removeItem(k);
+        }
+        for (var j = sessionStorage.length - 1; j >= 0; j--) {
+          var sk = sessionStorage.key(j);
+          if (sk && sk.indexOf('sbm-customizer-') === 0) sessionStorage.removeItem(sk);
+        }
+      } catch (e) { /* storage blocked; nothing to clear */ }
     }
 
     if (!sessionId) {
@@ -416,10 +451,40 @@
       return;
     }
 
-    fetch(`/api/orders/confirmation?session_id=${encodeURIComponent(sessionId)}`)
-      .then(r => r.json())
+    // Stripe redirects the customer here the instant payment succeeds, which
+    // can beat its own checkout.session.completed webhook to our server. The
+    // order row is then not findable yet and the lookup 404s — the customer
+    // used to land on a bare "Thank you for your order!" with the sale never
+    // reported to Google or Meta at all. It is a race, not a failure, so give
+    // it a few seconds before believing it.
+    function fetchConfirmation(attempt) {
+      return fetch(`/api/orders/confirmation?session_id=${encodeURIComponent(sessionId)}`)
+        .then(r => r.json())
+        .then(order => {
+          const missing = !order || order.error;
+          if (missing && attempt < 4) {
+            return new Promise(resolve => setTimeout(resolve, 1200 * (attempt + 1)))
+              .then(() => fetchConfirmation(attempt + 1));
+          }
+          return order;
+        });
+    }
+
+    fetchConfirmation(0)
       .then(order => {
         if (order.error) {
+          // Paid, but we still cannot read the order back. Record that this
+          // happened so it is visible in analytics rather than looking like a
+          // customer who simply never converted. No value is sent: a purchase
+          // reported with a 0 value would teach the bidder the wrong thing.
+          try {
+            if (typeof gtag === 'function') {
+              gtag('event', 'purchase_confirmation_unavailable', {
+                transaction_id: sessionId,
+              });
+            }
+          } catch (e) { /* never break the page */ }
+          clearBuilderDraft();
           container.innerHTML = `
             <div class="confirmation-icon">&#10003;</div>
             <h1>Thank you for your order!</h1>
@@ -486,6 +551,7 @@
         `;
 
         trackPurchase(order);
+        clearBuilderDraft();
 
         // Gentle "remember them" opt-in. Renders only when the confirmation
         // payload carries the vault token (see report note); otherwise it
@@ -501,6 +567,16 @@
         }
       })
       .catch(() => {
+        // Same situation as the error branch: the money moved, we just cannot
+        // read the order. Flag it rather than losing it silently.
+        try {
+          if (typeof gtag === 'function') {
+            gtag('event', 'purchase_confirmation_unavailable', {
+              transaction_id: sessionId,
+            });
+          }
+        } catch (e) { /* never break the page */ }
+        clearBuilderDraft();
         container.innerHTML = `
           <div class="confirmation-icon">&#10003;</div>
           <h1>Thank you for your order!</h1>

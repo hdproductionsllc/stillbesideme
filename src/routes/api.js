@@ -37,8 +37,13 @@ router.post('/images/upload', upload.single('photo'), async (req, res) => {
     }
 
     const slotId = req.body.slotId || 'main';
-    const printWidth = parseFloat(req.body.printWidth) || 16;
-    const printHeight = parseFloat(req.body.printHeight) || 20;
+    // Default to the size most people actually buy (framed 11x14), not to
+    // 16x20. The builder now always sends the selected size, but when it did
+    // not this fallback quietly graded every photo against the second-largest
+    // print we sell and told customers their photo was too small for a size
+    // they had never chosen.
+    const printWidth = parseFloat(req.body.printWidth) || 11;
+    const printHeight = parseFloat(req.body.printHeight) || 14;
 
     // Process: convert, thumbnail, quality, crop
     const result = await imageProcessor.processUpload(
@@ -49,8 +54,12 @@ router.post('/images/upload', upload.single('photo'), async (req, res) => {
     );
 
     // Store original (or HEIC-converted) and thumbnail
+    // A converted file must be stored under a .jpg name whatever it arrived
+    // as. HEIC is now detected by content as well as extension, so the name
+    // we were handed may be "IMG_0421", "photo.jpg" or anything else — a
+    // blind .heic→.jpg substitution would leave those mislabelled on disk.
     const originalName = result.convertedFromHeic
-      ? req.file.originalname.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg')
+      ? req.file.originalname.replace(/\.[^.]*$/, '') + '.jpg'
       : req.file.originalname;
 
     const stored = storage.storeFile(result.processedBuffer, originalName);
@@ -100,7 +109,7 @@ router.post('/images/assess-quality', (req, res) => {
 
   const quality = imageProcessor.assessQuality(
     imageWidth, imageHeight,
-    printWidth || 16, printHeight || 20
+    printWidth || 11, printHeight || 14
   );
 
   res.json(quality);
