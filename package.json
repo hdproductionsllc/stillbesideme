@@ -8,6 +8,7 @@
     "dev": "node --watch server.js",
     "lastmod": "node scripts/build-lastmod.js",
     "review-aggregate": "node scripts/build-review-aggregate.js",
+    "report": "node scripts/acquisition-report.js",
     "check-render": "node scripts/check-render-parity.js",
     "check-legibility": "node scripts/check-poem-legibility.js",
     "check-csp": "node scripts/check-analytics-csp.js"
