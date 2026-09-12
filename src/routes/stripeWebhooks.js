@@ -168,22 +168,44 @@ async function handleCheckoutCompleted(session, db) {
   // admin/gift tokens above. Dates are best-effort prefill from the free-text
   // birthDate/passDate fields: only a real month+day becomes an mmdd (a bare
   // year like "2014" never does), and a passing year is kept when present.
+  //
+  // NOT for gift orders. The vault is keyed to the email that paid, and on a
+  // gift that is the sender, not the family who lost the animal. Left
+  // unguarded it invited the *buyer* to be reminded, every year, of the death
+  // of someone else's pet — and asked them on the confirmation page for the
+  // birthday, gotcha day and date of passing, which are precisely the three
+  // facts a gift buyer does not have. Skipping creation is the whole fix:
+  // every reader downstream already treats a missing vault as normal
+  // (checkout.js returns vaultToken null and the confirmation card renders
+  // nothing; the insert card for a gift points at /tribute/{gift_token} and
+  // never used the vault anyway; the date engine has nothing to select).
+  // Remembering the days is still the right offer — it just has to reach the
+  // recipient, through the tribute page, and not the person who paid.
   const vaultToken = uuidv4();
   try {
     // Everything here is best-effort: a malformed fields_json (or any other
     // surprise) must never block the confirmation email / proof steps below.
     const vaultFields = order.fields_json ? JSON.parse(order.fields_json) : {};
-    const bd = parsePetDate(vaultFields.birthDate);
-    const pd = parsePetDate(vaultFields.passDate);
-    db.run(
-      `INSERT INTO vaults (order_id, email, pet_name, token, birthday_mmdd, passing_mmdd, passing_year)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [orderId, email, vaultFields.petName || '', vaultToken, bd.mmdd, pd.mmdd, pd.year]
-    );
-    db.run(
-      `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
-      [orderId, 'vault_created', JSON.stringify({ token: vaultToken })]
-    );
+    if (vaultFields.orderType === 'gift') {
+      db.run(
+        `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+        [orderId, 'vault_skipped_gift', JSON.stringify({
+          reason: 'gift order - the paying email is the sender, not the family',
+        })]
+      );
+    } else {
+      const bd = parsePetDate(vaultFields.birthDate);
+      const pd = parsePetDate(vaultFields.passDate);
+      db.run(
+        `INSERT INTO vaults (order_id, email, pet_name, token, birthday_mmdd, passing_mmdd, passing_year)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [orderId, email, vaultFields.petName || '', vaultToken, bd.mmdd, pd.mmdd, pd.year]
+      );
+      db.run(
+        `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+        [orderId, 'vault_created', JSON.stringify({ token: vaultToken })]
+      );
+    }
   } catch (err) {
     // Non-fatal — a missing vault must never block a paid order from proceeding.
     console.error(`Failed to create story vault for order ${orderId}:`, err.message);

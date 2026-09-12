@@ -81,19 +81,45 @@
       "petName": "What was their pet's name?",
       "petNicknames": "Any nicknames you know?",
       "petType": "What kind of pet?",
-      "personality": "What made this pet special?",
-      "favoriteMemory": "A memory you've heard about",
-      "favoriteThing": "A favorite toy or treat you know of?",
+      "breed": "Breed, if you know it",
+      "birthDate": "When were they born?",
+      "passDate": "When did your friend lose them?",
+      "personality": "What does your friend always say about them?",
+      "favoriteMemory": "A story you've heard about them",
+      "favoriteThing": "Anything they were known for?",
       "familyName": "Who is this gift for?"
     },
     "self": {
       "petName": "What did you call them?",
       "petNicknames": "Any nicknames?",
       "petType": "What kind of companion?",
+      "breed": "Breed",
+      "birthDate": "When were they born?",
+      "passDate": "When did they cross the rainbow bridge?",
       "personality": "What made them special?",
       "favoriteMemory": "A favorite memory",
       "favoriteThing": "Their favorite toy or treat?",
       "familyName": "Who will miss them most?"
+    }
+  },
+
+  "_giftSublabelsNote": "Sublabels per order type. Previously four of these were hardcoded in customizer.js, which is why birthDate and passDate had no gift wording at all and asked a gift buyer, in the owner's voice, for two dates only the owner knows. Every id here must also exist in giftLabels for BOTH order types, or toggling gift/self leaves the previous wording stranded on screen.",
+  "giftSublabels": {
+    "gift": {
+      "birthDate": "Only if you happen to know",
+      "passDate": "Roughly is fine",
+      "personality": "Even one line you've heard them say is enough",
+      "favoriteMemory": "A story you've heard, or something you saw yourself",
+      "favoriteThing": "A toy, a treat, a habit they had",
+      "familyName": "Their name or family name \u2013 this appears on the tribute"
+    },
+    "self": {
+      "birthDate": "Year or full date",
+      "passDate": "Year or full date",
+      "personality": "The thing that made them uniquely yours",
+      "favoriteMemory": "The one that makes you smile through tears",
+      "favoriteThing": "The thing they couldn't live without",
+      "familyName": "Your family name or your name"
     }
   },
 

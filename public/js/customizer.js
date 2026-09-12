@@ -2273,21 +2273,18 @@
       }
     }
 
-    const personalitySub = document.querySelector('#field-personality')?.parentElement?.querySelector('.sublabel');
-    const memorySub = document.querySelector('#field-favoriteMemory')?.parentElement?.querySelector('.sublabel');
-    const familySub = document.querySelector('#field-familyName')?.parentElement?.querySelector('.sublabel');
-    const thingSub = document.querySelector('#field-favoriteThing')?.parentElement?.querySelector('.sublabel');
+    // Sublabels, same shape as the labels above and from the same source. These
+    // were four hardcoded field ids, which is why birthDate and passDate — the
+    // two questions only the pet's owner can answer — had no gift wording and
+    // asked a gift buyer, in the owner's voice, when they lost a pet that was
+    // never theirs. Driving them from the template means adding a field is a
+    // JSON edit, and a field can never again be half-translated.
+    const sublabels = template.giftSublabels && (template.giftSublabels[orderType] || template.giftSublabels['self']);
+    if (!sublabels) return;
 
-    if (orderType === 'gift') {
-      if (personalitySub) personalitySub.textContent = 'Anything you know about them, or skip this';
-      if (memorySub) memorySub.textContent = 'A story you\'ve heard, or skip this';
-      if (familySub) familySub.textContent = 'Their name or family name \u2013 this appears on the tribute';
-      if (thingSub) thingSub.textContent = 'If you know it, great. If not, no worries';
-    } else {
-      if (personalitySub) personalitySub.textContent = 'The thing that made them uniquely yours';
-      if (memorySub) memorySub.textContent = 'The one that makes you smile through tears';
-      if (familySub) familySub.textContent = 'Your family name or your name';
-      if (thingSub) thingSub.textContent = 'The thing they couldn\'t live without';
+    for (const [fieldId, text] of Object.entries(sublabels)) {
+      const sub = document.querySelector(`#field-${fieldId}`)?.parentElement?.querySelector('.sublabel');
+      if (sub) sub.textContent = text;
     }
   }
 
