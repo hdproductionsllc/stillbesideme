@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Etsy order intake — Admin</title>
+<style>
+  :root { --bg:#1a1714; --panel:#26211c; --line:#3a332c; --text:#f4f1ea; --muted:#a89e90; --accent:#C4A882; --warn:#e5a3a3; --ok:#8B9D83; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:1rem; margin:0; font-weight:600; }
+  header .spacer { flex:1; }
+  header a { color:var(--accent); text-decoration:none; font-size:.85rem; }
+  .wrap { max-width:760px; margin:0 auto; padding:24px 20px 80px; }
+  .lede { color:var(--muted); font-size:.9rem; line-height:1.55; margin:0 0 24px; }
+  .lede strong { color:var(--text); font-weight:600; }
+  fieldset { border:1px solid var(--line); border-radius:10px; padding:16px 18px 20px; margin:0 0 18px; }
+  legend { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding:0 6px; }
+  label { display:block; font-size:.82rem; margin:14px 0 5px; }
+  label:first-of-type { margin-top:4px; }
+  label .req { color:var(--accent); }
+  .hint { color:var(--muted); font-size:.75rem; margin:4px 0 0; line-height:1.45; }
+  input[type=text], input[type=number], select, textarea {
+    width:100%; background:var(--panel); color:var(--text); border:1px solid var(--line);
+    border-radius:8px; padding:9px 10px; font-family:inherit; font-size:.88rem;
+  }
+  textarea { min-height:84px; resize:vertical; }
+  input[type=file] { font-size:.82rem; color:var(--muted); }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:0 14px; }
+  @media (max-width:620px){ .row { grid-template-columns:1fr; } }
+  .actions { display:flex; align-items:center; gap:14px; margin-top:6px; }
+  button { background:var(--accent); color:#1a1714; border:0; border-radius:8px; padding:11px 20px; font-size:.9rem; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  .msg { font-size:.85rem; line-height:1.5; }
+  .msg.err { color:var(--warn); }
+  .msg.ok { color:var(--ok); }
+  .result { border:1px solid var(--accent); border-radius:10px; padding:16px 18px; margin-top:20px; display:none; }
+  .result h2 { font-size:.95rem; margin:0 0 8px; }
+  .result a { color:var(--accent); }
+  .result p { font-size:.85rem; color:var(--muted); line-height:1.55; margin:8px 0 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Etsy order intake</h1>
+  <div class="spacer"></div>
+  <a href="/admin/orders">All orders</a>
+</header>
+
+<div class="wrap">
+  <p class="lede">
+    For a sale that came in through Etsy. Copy what the buyer answered at
+    checkout, add their photo, and this creates a real order in
+    <strong>awaiting review</strong>, exactly like one from our own site.
+    Nothing is written, proofed or printed here: the next stop is the normal
+    review page, and <strong>nothing reaches the printer until you record the
+    buyer approving their proof</strong> in Etsy Messages.
+  </p>
+
+  <form id="f">
+    <fieldset>
+      <legend>The sale</legend>
+      <label for="etsyReceiptId">Etsy order number <span class="req">*</span></label>
+      <input type="text" id="etsyReceiptId" name="etsyReceiptId" required autocomplete="off">
+      <p class="hint">From the Etsy order page. Stored so the same sale can never be entered twice.</p>
+
+      <div class="row">
+        <div>
+          <label for="sku">Size <span class="req">*</span></label>
+          <select id="sku" name="sku" required>
+            <option value="framed-8x10">Framed 8×10 — $79</option>
+            <option value="framed-11x14" selected>Framed 11×14 — $119</option>
+            <option value="framed-16x20">Framed 16×20 — $169</option>
+            <option value="framed-20x30">Framed 20×30 — $249</option>
+          </select>
+        </div>
+        <div>
+          <label for="frameChoice">Frame <span class="req">*</span></label>
+          <select id="frameChoice" name="frameChoice" required>
+            <option value="black" selected>Black</option>
+            <option value="white">White</option>
+            <option value="oak">Natural Wood</option>
+          </select>
+        </div>
+      </div>
+
+      <label for="totalCents">What Etsy collected, in dollars</label>
+      <input type="number" id="totalCents" name="totalCents" step="0.01" placeholder="119.00" autocomplete="off">
+      <p class="hint">Optional. Left blank, the list price for the size is recorded.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Their pet</legend>
+      <div class="row">
+        <div>
+          <label for="petName">Name <span class="req">*</span></label>
+          <input type="text" id="petName" name="petName" required maxlength="40" autocomplete="off">
+        </div>
+        <div>
+          <label for="petType">Dog, cat, or…</label>
+          <input type="text" id="petType" name="petType" maxlength="30" placeholder="Dog" autocomplete="off">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="birthDate">Born</label>
+          <input type="text" id="birthDate" name="birthDate" maxlength="40" placeholder="2014" autocomplete="off">
+        </div>
+        <div>
+          <label for="passDate">Passed</label>
+          <input type="text" id="passDate" name="passDate" maxlength="40" placeholder="2026" autocomplete="off">
+        </div>
+      </div>
+      <p class="hint">Split whatever they wrote in "Their years" across these two. Either can be left blank.</p>
+
+      <label for="petNicknames">Nicknames</label>
+      <input type="text" id="petNicknames" name="petNicknames" maxlength="80" autocomplete="off">
+
+      <label for="personality">What they told us about them <span class="req">*</span></label>
+      <textarea id="personality" name="personality" maxlength="1024" required></textarea>
+      <p class="hint">Paste their answer to "Tell us about them" verbatim. This is what the poem is written from, so their words matter more than tidy ones.</p>
+
+      <label for="favoriteMemory">A favourite memory, if they gave one separately</label>
+      <textarea id="favoriteMemory" name="favoriteMemory" maxlength="300"></textarea>
+    </fieldset>
+
+    <fieldset>
+      <legend>The poem</legend>
+      <label for="ownPoem">Their own words, if they chose "I have my own words"</label>
+      <textarea id="ownPoem" name="ownPoem"></textarea>
+      <p class="hint">Leave this empty when they asked us to write it. The review page is where the poem gets written or edited either way.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Their photo</legend>
+      <label for="photos">Photo <span class="req">*</span></label>
+      <input type="file" id="photos" name="photos" accept="image/*,.heic,.heif" multiple required>
+      <p class="hint">Up to three, downloaded from the Etsy order. The first one is the one that gets printed; the rest ride along in case the first will not do.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Shipping, from the Etsy order</legend>
+      <label for="shipName">Name</label>
+      <input type="text" id="shipName" name="shipName" autocomplete="off">
+      <label for="shipLine1">Address</label>
+      <input type="text" id="shipLine1" name="shipLine1" autocomplete="off">
+      <input type="text" id="shipLine2" name="shipLine2" placeholder="Line 2" style="margin-top:6px" autocomplete="off">
+      <div class="row">
+        <div>
+          <label for="shipCity">City</label>
+          <input type="text" id="shipCity" name="shipCity" autocomplete="off">
+        </div>
+        <div>
+          <label for="shipState">State</label>
+          <input type="text" id="shipState" name="shipState" autocomplete="off">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="shipZip">ZIP</label>
+          <input type="text" id="shipZip" name="shipZip" autocomplete="off">
+        </div>
+        <div>
+          <label for="shipCountry">Country</label>
+          <input type="text" id="shipCountry" name="shipCountry" value="US" autocomplete="off">
+        </div>
+      </div>
+      <p class="hint">Can be added later on the review page, but Luma cannot ship without it.</p>
+
+      <label for="notes">Notes for yourself</label>
+      <textarea id="notes" name="notes" style="min-height:60px"></textarea>
+    </fieldset>
+
+    <div class="actions">
+      <button type="submit" id="go">Create the order</button>
+      <span class="msg" id="msg"></span>
+    </div>
+  </form>
+
+  <div class="result" id="result">
+    <h2 id="resultTitle"></h2>
+    <div id="resultBody"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var form = document.getElementById('f');
+  var go = document.getElementById('go');
+  var msg = document.getElementById('msg');
+  var result = document.getElementById('result');
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // A weak photo is worth saying out loud here rather than discovering at the
+  // printer. It is not a blocker: the review page shows the proof, and a
+  // grainy phone photo is often still the only one they have.
+  function qualityNote(q) {
+    if (!q) return '';
+    var level = q.level || q.rating || '';
+    if (!level || /good|excellent|great/i.test(level)) return '';
+    return '<p><strong>Heads up on the photo:</strong> ' + esc(level) +
+      (q.message ? '. ' + esc(q.message) : '') +
+      '. Look at the proof before you send it to them.</p>';
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    go.disabled = true;
+    msg.className = 'msg';
+    msg.textContent = 'Creating…';
+    result.style.display = 'none';
+
+    fetch('/admin/api/intake', { method: 'POST', body: new FormData(form) })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        go.disabled = false;
+        if (!res.ok) {
+          msg.className = 'msg err';
+          msg.textContent = res.d.error || 'Could not create that order.';
+          if (res.d.reviewUrl) {
+            result.style.display = 'block';
+            document.getElementById('resultTitle').textContent = 'Already in the system';
+            document.getElementById('resultBody').innerHTML =
+              '<p>That Etsy order number is on an order already. ' +
+              '<a href="' + esc(res.d.reviewUrl) + '">Open it</a> rather than making a second one.</p>';
+          }
+          return;
+        }
+        msg.className = 'msg ok';
+        msg.textContent = '';
+        result.style.display = 'block';
+        document.getElementById('resultTitle').textContent = 'Order ' + esc(res.d.shortId) + ' created';
+        document.getElementById('resultBody').innerHTML =
+          '<p><a href="' + esc(res.d.reviewUrl) + '">Open the review page</a> to write the poem and make the proof.</p>' +
+          qualityNote(res.d.photoQuality) +
+          '<p>Then send that proof to the buyer in Etsy Messages. Once they reply, ' +
+          'paste their reply on the review page. The printer stays locked until you do.</p>';
+        form.reset();
+        document.getElementById('shipCountry').value = 'US';
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      })
+      .catch(function () {
+        go.disabled = false;
+        msg.className = 'msg err';
+        msg.textContent = 'Something went wrong. The order was probably not created; check All orders before retrying.';
+      });
+  });
+})();
+</script>
+</body>
+</html>

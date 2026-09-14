@@ -491,4 +491,8 @@ router.get('/api/backup', requireAdmin, (req, res) => {
   res.download(DB_PATH, `store-backup.db`);
 });
 
+// Exported so other admin routers gate on the SAME check rather than each
+// re-deriving "is this person allowed". A second copy of this function is a
+// second place for the admin gate to be wrong.
 module.exports = router;
+module.exports.requireAdmin = requireAdmin;

@@ -48,6 +48,28 @@ function hasFulfillmentRecord(db, orderId) {
  * number/confirmation id (null for the partner email flow).
  */
 async function submitFulfillment(order, db) {
+  // The last gate before a printer, and deliberately here rather than in the
+  // callers. Every route to production goes through this function, so one
+  // check covers the customer's own approval, the admin review release, the
+  // admin resubmit, the Etsy path, and any route not yet written. Guards
+  // spread across callers protect only the callers somebody remembered.
+  //
+  // proof_approved_at is the single fact that matters: some human said yes to
+  // this artwork. It is set by the buyer clicking their own proof link, or by
+  // the shop recording a buyer's approval from an Etsy conversation. Absent
+  // it, we would be printing a dead pet onto somebody's wall on nobody's
+  // authority, which is the one failure this business cannot absorb.
+  //
+  // Throwing (rather than returning) is intentional: callers already catch,
+  // log a `${provider}_submit_failed` event and alert the admin, so a blocked
+  // order surfaces loudly instead of sitting silently unfulfilled.
+  if (!order.proof_approved_at) {
+    throw new Error(
+      `Order ${order.id} has no recorded customer approval — refusing to send it to the printer. ` +
+      `Record the approval first (the buyer's click, or their reply in Etsy Messages).`
+    );
+  }
+
   const provider = resolveProvider(order);
 
   if (provider === 'partner') {

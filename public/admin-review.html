@@ -55,7 +55,14 @@
 
       <div class="admin-card">
         <h2>Proof</h2>
-        <img class="proof-img" id="proof-img" alt="Proof awaiting review">
+        <img class="proof-img" id="proof-img" alt="Proof awaiting review" hidden>
+        <!-- A direct order always arrives with a proof already rendered. A
+             marketplace order never does, because nobody has written the poem
+             yet, so this is the normal opening state for one and worth saying
+             in words rather than showing as a broken image. -->
+        <p id="proof-empty" style="margin:0;color:#9B9590;font-size:0.95rem;" hidden>
+          No proof yet. Write the poem below and save it, and the proof appears here.
+        </p>
       </div>
 
       <div class="admin-card" id="poem-card">
@@ -63,6 +70,32 @@
         <textarea class="poem-box" id="poem-text"></textarea>
         <button class="admin-btn btn-save" id="save-btn">Save poem &amp; regenerate proof</button>
         <div class="admin-msg" id="save-msg"></div>
+      </div>
+
+      <!-- Marketplace approval gate. Hidden for direct orders, whose buyers
+           approve their own proof before paying. An Etsy buyer cannot: Etsy's
+           API can neither send nor read messages, so the proof goes out by
+           hand and their reply comes back by hand. This card is where that
+           reply becomes a record, and until it does the printer stays shut. -->
+      <div class="admin-card" id="etsy-card" hidden>
+        <h2>Record the buyer's approval</h2>
+        <p style="margin:0;color:#6b6359;font-size:0.95rem;">
+          This came from Etsy, so the buyer has not seen anything yet. Save the poem to
+          generate the proof, download it, and send it to them in Etsy Messages. When they
+          reply, paste their reply here.
+        </p>
+        <p style="margin:10px 0 0;font-size:0.95rem;">
+          <a id="etsy-proof-link" href="#" download style="color:#8B7355;">Download the proof to send</a>
+          <span id="etsy-receipt" style="color:#9B9590;"></span>
+        </p>
+        <textarea class="poem-box" id="etsy-evidence" style="min-height:90px"
+          placeholder="Paste what they actually wrote, for example: &quot;That's perfect, I love it, please go ahead.&quot;"></textarea>
+        <button class="admin-btn btn-save" id="etsy-record-btn">Record their approval</button>
+        <div class="admin-msg" id="etsy-msg"></div>
+        <p class="hint">
+          Their words are stored on the order. If they ever say they did not approve it,
+          this is the record. Only record a reply that actually says yes.
+        </p>
       </div>
 
       <div class="admin-card" id="approve-card">
@@ -132,7 +165,10 @@
           .map(([key, label]) => `<div class="admin-row"><strong>${label}</strong><span>${esc(o.fields[key])}</span></div>`)
           .join('') || '<p style="color:#9B9590;">No answers on this order.</p>';
 
-        document.getElementById('proof-img').src = o.proofUrl ? bust(o.proofUrl) : '';
+        const proofImg = document.getElementById('proof-img');
+        if (o.proofUrl) proofImg.src = bust(o.proofUrl);
+        proofImg.hidden = !o.proofUrl;
+        document.getElementById('proof-empty').hidden = !!o.proofUrl;
         document.getElementById('poem-text').value = o.poemText || '';
 
         // Two different approve actions live behind one button, so say which
@@ -140,15 +176,46 @@
         // straight to the printer; a legacy order still owes the customer a
         // look at their proof, so approving emails it to them instead.
         const approval = o.customerApproval;
+        const isMarketplace = !!o.marketplace;
+
+        // The marketplace gate only matters while the approval is missing.
+        // Once recorded, an Etsy order is just an approved order and reads
+        // exactly like a direct one below.
+        const etsyCard = document.getElementById('etsy-card');
+        etsyCard.hidden = !(isMarketplace && !approval);
+        if (!etsyCard.hidden) {
+          const link = document.getElementById('etsy-proof-link');
+          if (o.proofUrl) {
+            link.href = bust(o.proofUrl);
+            link.textContent = 'Download the proof to send';
+          } else {
+            link.removeAttribute('href');
+            link.textContent = 'No proof yet — save the poem above to make one';
+          }
+          document.getElementById('etsy-receipt').textContent =
+            o.marketplace.receiptId ? `  ·  Etsy order ${o.marketplace.receiptId}` : '';
+        }
+
         if (approval) {
           const when = String(approval.approvedAt || '').replace('T', ' ').replace('Z', '');
           document.getElementById('approve-title').textContent = 'Release to production';
-          document.getElementById('approve-blurb').innerHTML =
-            `The customer approved this proof themselves on <strong>${esc(when)}</strong>, before paying. ` +
-            'Approving sends it straight to the printer — they are not asked again.';
+          document.getElementById('approve-blurb').innerHTML = approval.channel === 'etsy'
+            ? `The buyer approved this in Etsy Messages on <strong>${esc(when)}</strong>. ` +
+              `They wrote: <em>${esc(approval.evidence || '')}</em><br>` +
+              'Approving sends it straight to the printer.'
+            : `The customer approved this proof themselves on <strong>${esc(when)}</strong>, before paying. ` +
+              'Approving sends it straight to the printer — they are not asked again.';
           document.getElementById('approve-btn').innerHTML = 'Approve &amp; send to printer';
           document.getElementById('approve-hint').textContent =
             'Nothing is printed until you click approve. There is no automatic release.';
+        } else if (isMarketplace) {
+          document.getElementById('approve-title').textContent = 'Release to production';
+          document.getElementById('approve-blurb').textContent =
+            'Locked. Record the buyer\'s approval above first — nothing from Etsy reaches the printer ' +
+            'until someone has seen them say yes.';
+          document.getElementById('approve-btn').innerHTML = 'Approve &amp; send to printer';
+          document.getElementById('approve-hint').textContent =
+            'The button unlocks once their approval is on record.';
         } else {
           document.getElementById('approve-title').textContent = 'Send proof to customer';
           document.getElementById('approve-blurb').textContent =
@@ -162,7 +229,12 @@
         const editable = o.reviewable;
         document.getElementById('poem-text').disabled = !editable;
         document.getElementById('save-btn').disabled = !editable;
-        document.getElementById('approve-btn').disabled = !editable;
+        // A marketplace order with no recorded approval cannot be released at
+        // all. The server refuses it too; this only stops the click being
+        // offered in the first place.
+        document.getElementById('approve-btn').disabled =
+          !editable || (isMarketplace && !approval);
+        document.getElementById('etsy-record-btn').disabled = !editable || !o.proofUrl;
         if (!editable) {
           document.getElementById('approve-msg').className = 'admin-msg ok';
           document.getElementById('approve-msg').textContent =
@@ -250,7 +322,10 @@
           msg.className = 'admin-msg ' + (ok ? 'ok' : 'err');
           msg.textContent = ok ? data.message : (data.error || 'Something went wrong.');
           if (ok && data.proofUrl) {
-            document.getElementById('proof-img').src = bust(data.proofUrl);
+            const img = document.getElementById('proof-img');
+            img.src = bust(data.proofUrl);
+            img.hidden = false;
+            document.getElementById('proof-empty').hidden = true;
           }
         } catch (e) {
           msg.className = 'admin-msg err';
@@ -272,6 +347,36 @@
           msg.className = 'admin-msg ' + (ok ? 'ok' : 'err');
           msg.textContent = ok ? data.message : (data.error || 'Something went wrong.');
           if (ok) load();
+        } catch (e) {
+          msg.className = 'admin-msg err';
+          msg.textContent = 'Could not reach the server. Please try again.';
+          btn.disabled = false;
+        }
+      });
+
+      document.getElementById('etsy-record-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('etsy-record-btn');
+        const msg = document.getElementById('etsy-msg');
+        const evidence = document.getElementById('etsy-evidence').value.trim();
+        if (evidence.length < 2) {
+          msg.className = 'admin-msg err';
+          msg.textContent = 'Paste what the buyer wrote first.';
+          return;
+        }
+        btn.disabled = true;
+        msg.className = 'admin-msg';
+        msg.textContent = 'Recording…';
+        try {
+          const { ok, data } = await post(`/api/admin/review/${token}/etsy-approval`, { evidence });
+          msg.className = 'admin-msg ' + (ok ? 'ok' : 'err');
+          msg.textContent = ok
+            ? 'Recorded. You can release this to the printer now.'
+            : (data.error || 'Something went wrong.');
+          // Reload so the page re-reads the approval and re-opens the release
+          // button from the server's answer, never from this button's own
+          // optimism about what just happened.
+          if (ok) load();
+          else btn.disabled = false;
         } catch (e) {
           msg.className = 'admin-msg err';
           msg.textContent = 'Could not reach the server. Please try again.';

@@ -69,16 +69,30 @@ function findOrderByAdminToken(db, token) {
 }
 
 /**
- * Did the customer already approve this proof themselves, inline, before
- * paying? proof_approved_url is written only by POST /api/checkout, in the
- * same breath as proof_approved_at and before the Stripe session exists, so
- * its presence is the reliable marker of a new-flow order.
+ * Has the customer approved the artwork we are about to print?
  *
- * False means a legacy in-flight order: paid under the old email round-trip
- * and still owed a look at its own proof.
+ * This asks about EVIDENCE, not about mechanism: did a customer accept THIS
+ * proof image, at THIS time. Two things can satisfy it, and the release path
+ * below deliberately cannot tell them apart:
+ *
+ *   direct  — the buyer clicked approve on their own proof, inline, before
+ *             paying. POST /api/checkout writes proof_approved_url and
+ *             proof_approved_at together, before the Stripe session exists.
+ *   etsy    — the buyer said yes in an Etsy conversation, and the shop
+ *             recorded it (see /review/:token/etsy-approval). Same two
+ *             fields, plus approval_channel and their own words.
+ *
+ * False means nobody has accepted anything yet: either a legacy in-flight
+ * order still owed a look at its own proof, or a marketplace order whose
+ * buyer has not been sent one.
  */
-function hasInlineApproval(order) {
+function hasCustomerApproval(order) {
   return !!(order.proof_approved_url && order.proof_approved_at);
+}
+
+/** Did this order come from a marketplace rather than our own checkout? */
+function isMarketplaceOrder(order) {
+  return !!order.source && order.source !== 'direct';
 }
 
 // Human labels for the Luma order-item options placeOrder() sends on every
@@ -218,12 +232,92 @@ router.get('/review/:token/data', (req, res) => {
     changeRequestNotes: order.change_request_notes || null,
     reviewedAt: order.reviewed_at || null,
     createdAt: order.created_at,
-    // The customer's own inline approval, taken before payment. When present,
-    // approving on this page releases straight to the printer — the review
-    // page can say so instead of promising an email that will not be sent.
-    customerApproval: hasInlineApproval(order)
-      ? { approvedAt: order.proof_approved_at, proofUrl: order.proof_approved_url }
+    // The customer's approval, however it arrived. When present, approving on
+    // this page releases straight to the printer — the review page can say so
+    // instead of promising an email that will not be sent.
+    customerApproval: hasCustomerApproval(order)
+      ? {
+          approvedAt: order.proof_approved_at,
+          proofUrl: order.proof_approved_url,
+          channel: order.approval_channel || 'web',
+          evidence: order.approval_evidence || null,
+        }
       : null,
+    // Marketplace orders take their approval through the marketplace's own
+    // messages, so the page shows a different gate for them.
+    source: order.source || 'direct',
+    marketplace: isMarketplaceOrder(order)
+      ? { source: order.source, receiptId: order.etsy_receipt_id || null }
+      : null,
+  });
+});
+
+/**
+ * POST /api/admin/review/:token/etsy-approval
+ * Body: { evidence } — the buyer's own words from the Etsy conversation.
+ *
+ * The marketplace equivalent of a customer clicking approve. Etsy's API cannot
+ * send or read messages, so the approval arrives as a human reading a reply and
+ * deciding it counts. That judgement is recorded, with the words that prompted
+ * it, against the exact proof the buyer was shown.
+ *
+ * Writing proof_approved_url here is what unlocks the printer, because
+ * fulfillmentSubmitter refuses any order without an approval. So this route is
+ * the single place where a person takes responsibility for a marketplace
+ * order's artwork, and it is deliberately not one click: without their words
+ * pasted in, there is no record of what was agreed.
+ */
+router.post('/review/:token/etsy-approval', express.json(), (req, res) => {
+  const db = req.app.locals.db;
+  const order = findOrderByAdminToken(db, req.params.token);
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+
+  if (!isMarketplaceOrder(order)) {
+    return res.status(400).json({
+      error: 'This is a direct order. Its buyer approves their own proof; nothing to record here.',
+    });
+  }
+  if (hasCustomerApproval(order)) {
+    return res.json({ success: true, message: 'An approval is already on record for this order.' });
+  }
+  if (!order.proof_url) {
+    return res.status(400).json({
+      error: 'There is no proof on this order yet. Save the poem to generate one, send that to the buyer, and record their reply afterwards.',
+    });
+  }
+
+  const evidence = String((req.body && req.body.evidence) || '').trim();
+  if (evidence.length < 2) {
+    return res.status(400).json({ error: 'Paste what the buyer actually said. It is the only record of what they agreed to.' });
+  }
+
+  // Pin the approval to the proof as it stands right now. If the poem is
+  // edited afterwards the proof regenerates and proof_url moves on, which
+  // leaves proof_approved_url pointing at what they really saw — and
+  // releaseApprovedOrder already flags that divergence in the audit trail.
+  db.run(
+    `UPDATE orders SET
+       proof_approved_at = datetime('now'),
+       proof_approved_url = ?,
+       approval_channel = 'etsy',
+       approval_evidence = ?,
+       updated_at = datetime('now')
+     WHERE id = ?`,
+    [order.proof_url, evidence.slice(0, 2000), order.id]
+  );
+  db.run(
+    `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+    [order.id, 'etsy_approval_recorded', JSON.stringify({
+      proofUrl: order.proof_url,
+      evidence: evidence.slice(0, 2000),
+      recordedAt: new Date().toISOString(),
+    })]
+  );
+
+  res.json({
+    success: true,
+    approvedAt: new Date().toISOString(),
+    proofUrl: order.proof_url,
   });
 });
 
@@ -298,8 +392,21 @@ router.post('/review/:token/approve', async (req, res) => {
 
   // The current path: the customer already approved, so approving here is the
   // last gate before the printer.
-  if (hasInlineApproval(order)) {
+  if (hasCustomerApproval(order)) {
     return releaseApprovedOrder(req, res, db, order);
+  }
+
+  // A marketplace order with no approval on record. It must not fall into the
+  // legacy email path below: we hold no email for these buyers, the whole
+  // conversation lives on the marketplace, and the generic "no customer email"
+  // error would say nothing about what is actually missing.
+  if (isMarketplaceOrder(order)) {
+    return res.status(400).json({
+      error: 'This buyer has not approved their proof yet. Send them the proof in Etsy Messages, ' +
+             'then paste their reply into "Record the buyer\'s approval" below. ' +
+             'The printer stays locked until you do.',
+      needsMarketplaceApproval: true,
+    });
   }
 
   // ── Everything below is the LEGACY path, kept only for orders that were

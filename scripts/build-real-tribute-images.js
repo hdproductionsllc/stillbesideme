@@ -26,7 +26,7 @@ const fs = require('fs');
 const https = require('https');
 
 const ROOT = path.join(__dirname, '..');
-const { frameOnWall, WALLS } = require('./generate-frame-mockups');
+const { frameOnWall, FRAMES, WALLS } = require('./generate-frame-mockups');
 
 const arg = (name, fallback) => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -36,6 +36,15 @@ const arg = (name, fallback) => {
 const SRC_DIR = arg('src', null);
 const OUT_DIR = arg('out', path.join(ROOT, 'output', 'real-tributes'));
 const BASE = arg('base', 'https://www.stillbesideme.com');
+
+// Frame finish to render. Defaults to what every real order so far chose.
+// Other finishes exist so a listing can show the same real piece in each
+// colour a buyer can pick, rather than a demo pet standing in for it.
+const FRAME_KEY = arg('frame', 'black');
+if (!FRAMES[FRAME_KEY]) {
+  console.error(`Unknown frame "${FRAME_KEY}". Choose one of: ${Object.keys(FRAMES).join(', ')}`);
+  process.exit(1);
+}
 
 /** Print-ready dimensions tell us the size; the sku is not needed here. */
 const SIZE_BY_LONG_EDGE = { 4200: [11, 14], 6000: [16, 20], 3000: [8, 10] };
@@ -93,7 +102,7 @@ async function main() {
 
     // Alternate wall tone exactly as the demo batch does, so a real piece
     // dropped between two demos does not read as a different wall.
-    const { buffer, piece } = await frameOnWall(print, 'black', WALLS[i % WALLS.length], sizeIn);
+    const { buffer, piece } = await frameOnWall(print, FRAME_KEY, WALLS[i % WALLS.length], sizeIn);
 
     // Down to the same 1100px long edge the committed demo pieces use. The
     // gallery is a three-column masonry, so a piece renders around 370px wide;
@@ -103,7 +112,10 @@ async function main() {
       .jpeg({ quality: 82, mozjpeg: true })
       .toBuffer();
 
-    const file = path.join(OUT_DIR, `${slug}.jpg`);
+    // Black is the gallery contract (/gallery/<slug>.jpg). Any other finish is
+    // a variant image and carries the frame in its name so it cannot overwrite
+    // the one the homepage serves.
+    const file = path.join(OUT_DIR, FRAME_KEY === 'black' ? `${slug}.jpg` : `${slug}-${FRAME_KEY}.jpg`);
     fs.writeFileSync(file, out);
     const dims = await sharp(out).metadata();
     console.log(

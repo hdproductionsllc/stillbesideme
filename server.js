@@ -942,6 +942,10 @@ async function start() {
   // specific paths keep taking precedence.
   app.use('/admin', require('./src/routes/adminDashboard'));
 
+  // Manual intake for marketplace sales (Etsy), behind the same admin gate.
+  // Mounted after the dashboard because it imports requireAdmin from it.
+  app.use('/admin', require('./src/routes/adminIntake'));
+
   // Order status page (token-based deep link from email, plus lookup form)
   app.use('/api/orders', require('./src/routes/orderStatus'));
   app.get('/order', (req, res) => {
