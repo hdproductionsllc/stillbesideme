@@ -989,5 +989,11 @@
        rated review is published, and never counts the unrated legacy quotes. -->
   <script defer src="/js/customer-reviews.js"></script>
   <script src="/js/tribute-lightbox.js"></script>
+  <!-- Real customer pieces, pulled from /api/gallery and inserted ahead of the
+       demonstrations above. Loaded after the lightbox so register() exists by
+       the time the fetch resolves. Held as data rather than committed markup so
+       that a customer asking us to take their tribute down is one database
+       write; see src/db/migrations/014-gallery-pieces.sql. -->
+  <script src="/js/real-gallery.js"></script>
 </body>
 </html>

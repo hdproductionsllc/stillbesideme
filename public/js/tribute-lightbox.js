@@ -135,12 +135,48 @@
 
   function has(obj, k) { return Object.prototype.hasOwnProperty.call(obj, k); }
 
+  /**
+   * Rebuild the sequence from current DOM order.
+   *
+   * Pieces registered at runtime are collected after the committed ones, so
+   * without this a real tribute sitting first in the gallery would announce
+   * itself as "10 of 10" and step backwards into the demos. The invariant this
+   * file is built on is that the sequence matches what the reader sees, so it
+   * has to be restored once late arrivals are in the DOM.
+   *
+   * Skipped while the dialog is open, because `current` is an index into this
+   * array and moving the ground under an open dialog would jump the reader to
+   * a different poem.
+   */
+  function resequence() {
+    if (isOpen) return;
+    var nodes = document.querySelectorAll(TRIGGER_SELECTOR);
+    var seen = {};
+    var next = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var key = (nodes[i].getAttribute('data-tribute') || '').trim().toLowerCase();
+      if (!key || !has(TRIBUTES, key) || has(seen, key)) continue;
+      seen[key] = 1;
+      next.push(key);
+    }
+    // Only ever a reordering. If the two disagree on membership something is
+    // wrong, and keeping the working sequence beats installing a broken one.
+    if (next.length !== order.length) return;
+    order = next;
+    indexOfKey = {};
+    for (var j = 0; j < order.length; j++) indexOfKey[order[j]] = j;
+  }
+
+  // Safe to call again after real pieces are injected from /api/gallery. A node
+  // already wired is skipped outright, so a second pass cannot bind two click
+  // handlers to the same image and open the dialog twice.
   function collect() {
     var nodes = document.querySelectorAll(TRIGGER_SELECTOR);
     for (var i = 0; i < nodes.length; i++) {
       var node = nodes[i];
       var key = (node.getAttribute('data-tribute') || '').trim().toLowerCase();
       if (!key || !has(TRIBUTES, key)) continue;
+      if (node.getAttribute('data-tl-bound') === '1') continue;
 
       if (!has(indexOfKey, key)) {
         indexOfKey[key] = order.length;
@@ -157,6 +193,7 @@
   // each one a button role plus Enter/Space handling.
   function prepareTrigger(node, key) {
     var t = TRIBUTES[key];
+    node.setAttribute('data-tl-bound', '1');
     node.classList.add('tl-trigger');
     node.setAttribute('role', 'button');
     node.setAttribute('tabindex', '0');
@@ -361,13 +398,20 @@
     var key = order[current];
     var t = TRIBUTES[key];
 
-    imgEl.src = '/images/tributes/' + key + '.jpg';
+    // Demo pieces are committed under /images/tributes/. Real customer pieces
+    // are served from the volume and carry their own src, so that taking one
+    // down is a file delete rather than a commit.
+    imgEl.src = t.src || ('/images/tributes/' + key + '.jpg');
     imgEl.alt = altForKey[key] || ('Framed memorial tribute for ' + t.name);
 
     nameEl.textContent = t.name;
 
+    // Demo entries carry birth/pass separately; a real piece arrives with the
+    // dates already formatted exactly as they are printed on it, which may be
+    // "June 2025" rather than a year pair.
     var years = '';
-    if (t.birth && t.pass) years = t.birth + '–' + t.pass;
+    if (t.years) years = t.years;
+    else if (t.birth && t.pass) years = t.birth + '–' + t.pass;
     else if (t.pass) years = t.pass;
     else if (t.birth) years = t.birth;
     yearsEl.textContent = years;
@@ -454,14 +498,40 @@
 
   function init() {
     collect();
-    if (!triggers.length) return;
-    // Exposed for debugging and for any future in-page "read the poem" link.
+    // Exposed unconditionally, NOT behind a triggers.length check. Real pieces
+    // arrive from /api/gallery after this runs, and on a page whose demo
+    // gallery is empty the API is the only thing that would ever register one.
+    // Gating this on the first pass finding something is how that page ends up
+    // with images nobody can open.
     window.SBMTributeLightbox = {
       open: function (key) {
         key = String(key || '').toLowerCase();
         if (has(indexOfKey, key)) open(key, null);
       },
-      close: close
+      close: close,
+      /**
+       * Add tributes discovered at runtime, then wire any matching images.
+       * Each entry needs a key plus { name, poem }, and may carry years and its
+       * own src. Returns how many new keys were added.
+       */
+      register: function (entries) {
+        if (!entries) return 0;
+        var added = 0;
+        for (var key in entries) {
+          if (!has(entries, key)) continue;
+          var e = entries[key];
+          if (!e || !e.name || !e.poem) continue;
+          var k = String(key).toLowerCase();
+          if (has(TRIBUTES, k)) continue;
+          TRIBUTES[k] = e;
+          added++;
+        }
+        if (added) {
+          collect();
+          resequence();
+        }
+        return added;
+      }
     };
   }
 

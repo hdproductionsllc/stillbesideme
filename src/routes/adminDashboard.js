@@ -285,6 +285,85 @@ router.post('/api/reviews/:id/hide', requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
+// ── Gallery pieces ──────────────────────────────────────────────────────
+//
+// Publishing and taking down a real customer tribute HAS to happen in the
+// running app. sql.js holds the whole database in memory and writes the file
+// back on a debounce, so a separate process editing store.db is invisible to
+// the server until it restarts, and is then silently overwritten by the
+// server's next write. A takedown that quietly reverts is worse than no
+// takedown tool at all, which is why this lives behind the same admin gate as
+// everything else that mutates an order rather than in a CLI script.
+//
+// Terms of Service section 5 promises we take a piece down on request, without
+// asking why. That is what the unpublish route is for, and it is deliberately
+// one call with no confirmation step.
+
+/** Slugs become public URLs and DOM attribute values. Keep them boring. */
+const GALLERY_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
+const GALLERY_NOT_A_PURCHASE = ['draft', 'pending_payment', 'cancelled'];
+
+router.post('/api/orders/:id/gallery/publish', requireAdmin, express.json(), (req, res) => {
+  const db = req.app.locals.db;
+  const order = db.get('SELECT id, status, gallery_slug FROM orders WHERE id = ?', [req.params.id]);
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+
+  const slug = String((req.body && req.body.slug) || '').trim().toLowerCase();
+  if (!GALLERY_SLUG_RE.test(slug)) {
+    return res.status(400).json({
+      error: 'Slug must be lowercase letters, digits and hyphens, up to 40 characters.',
+    });
+  }
+  if (GALLERY_NOT_A_PURCHASE.includes(order.status)) {
+    return res.status(400).json({
+      error: `This order has status "${order.status}" and was never a sale. It cannot be shown.`,
+    });
+  }
+
+  const clash = db.get('SELECT id FROM orders WHERE gallery_slug = ? AND id <> ?', [slug, order.id]);
+  if (clash) return res.status(409).json({ error: `Slug "${slug}" already belongs to order ${clash.id}.` });
+
+  db.run(
+    `UPDATE orders SET gallery_slug = ?, gallery_published_at = COALESCE(gallery_published_at, datetime('now'))
+      WHERE id = ?`,
+    [slug, order.id]
+  );
+  db.run(
+    `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+    [order.id, 'gallery_published', JSON.stringify({ slug, publishedAt: new Date().toISOString() })]
+  );
+  res.json({ success: true, slug, url: `/gallery/${slug}.jpg` });
+});
+
+router.post('/api/orders/:id/gallery/unpublish', requireAdmin, (req, res) => {
+  const db = req.app.locals.db;
+  const order = db.get('SELECT id, gallery_slug FROM orders WHERE id = ?', [req.params.id]);
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+  if (!order.gallery_slug) return res.json({ success: true, alreadyDown: true });
+
+  const was = order.gallery_slug;
+  db.run('UPDATE orders SET gallery_slug = NULL, gallery_published_at = NULL WHERE id = ?', [order.id]);
+  db.run(
+    `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+    [order.id, 'gallery_unpublished', JSON.stringify({ slug: was, takenDownAt: new Date().toISOString() })]
+  );
+  // The image file is now unreachable (the slug was its URL) but still on the
+  // volume. The caller is told so it can be deleted too.
+  res.json({ success: true, slug: was, deleteFile: `gallery/${was}.jpg` });
+});
+
+// List what is currently published, so a takedown request can be matched to a
+// piece without opening the database.
+router.get('/api/gallery', requireAdmin, (req, res) => {
+  const db = req.app.locals.db;
+  const rows = db.all(
+    `SELECT id, gallery_slug, gallery_published_at, status
+       FROM orders WHERE gallery_slug IS NOT NULL
+      ORDER BY gallery_published_at DESC`
+  );
+  res.json({ pieces: rows });
+});
+
 // Re-send the transactional emails for a paid order whose original sends
 // failed (e.g. an SMTP outage): customer order confirmation, and — when the
 // order is still waiting on review — the admin review request. Only re-sends;

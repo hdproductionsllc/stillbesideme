@@ -867,6 +867,10 @@ async function start() {
     res.sendFile(path.join(__dirname, 'public', 'review.html'));
   });
 
+  // Real customer pieces published to the homepage gallery. Read-only, and
+  // gated in galleryPieces.published() rather than here.
+  app.use('/api', require('./src/routes/gallery'));
+
   // Digital Keepsake download — same tokenization as /proof/:token (the
   // proof_token doubles as the per-order download key). Serves the rendered
   // 300 DPI file as an attachment. Valid only for delivered digital orders;
@@ -967,6 +971,23 @@ async function start() {
   app.get('/story/:token', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'story.html'));
   });
+
+  // Published gallery pieces: the framed images of real tributes the homepage
+  // shows. Served from the volume rather than the repo so that a takedown is
+  // one file delete and one UPDATE, not a rewrite of public git history (see
+  // migration 014 for why that distinction is load-bearing).
+  //
+  // This mount is the OPPOSITE of /output below. These images are marketing we
+  // have permission to publish, so they are meant to be crawled and indexed,
+  // and they carry no X-Robots-Tag. Everything under /output is a customer's
+  // private artwork that merely has to be fetchable. Do not merge the two.
+  //
+  // Filenames are content-stable, so they cache hard. Republishing a piece
+  // under a changed slug is the way to bust it.
+  app.use('/gallery', express.static(path.join(OUTPUT_DIR, 'gallery'), {
+    maxAge: '30d',
+    fallthrough: true,
+  }));
 
   // Serve proof images, print files, and note cards from the output directory.
   //

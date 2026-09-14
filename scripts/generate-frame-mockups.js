@@ -310,4 +310,13 @@ async function main() {
   console.log(`\nDone — ${targets.length * 2} wall mockups in output/wall-mockups/\n`);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// Only run the demo batch when invoked directly. Required as a module, this
+// file is just the framing logic, which build-real-tribute-images.js reuses so
+// that real customer pieces and demo pieces go through identical geometry. Two
+// copies of frameOnWall would drift, and the gallery would stop looking like
+// one set of photographs.
+if (require.main === module) {
+  main().catch((e) => { console.error(e); process.exit(1); });
+}
+
+module.exports = { frameOnWall, FRAMES, WALLS };
