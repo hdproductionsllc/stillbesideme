@@ -34,11 +34,13 @@
  * so even a truncated token is worth nothing to us and everything to somebody
  * else. Log the receipt id or the shop id instead.
  *
- * Header format note, unresolved at the time of writing: Etsy's own quickstart
- * shows x-api-key as "keystring:shared_secret", while this project's earlier
- * notes say the keystring alone is accepted. We send the keystring alone unless
- * ETSY_SHARED_SECRET is set, in which case we send the pair. ping() exists so a
- * human can settle the question in thirty seconds, before any OAuth exists.
+ * Header format, settled against the live API on 2026-09-14: x-api-key MUST be
+ * "keystring:shared_secret". The keystring on its own comes back 403 with
+ * {"error":"Shared secret is required in x-api-key header."} This file still
+ * sends the keystring alone when ETSY_SHARED_SECRET is unset, because that is
+ * the honest thing to do with a value nobody has provided, and because ping()
+ * then reports Etsy's own sentence back to the admin page. An earlier project
+ * note claimed the keystring alone was enough. It was wrong.
  */
 
 const crypto = require('crypto');
@@ -427,15 +429,74 @@ async function ping() {
  * a shop, not a nine digit number they cannot verify.
  */
 async function discoverShopId(db) {
-  const me = await apiRequest(db, 'GET', '/v3/application/users/me');
-  const shopId = me && me.shop_id;
+  // Deliberately NOT /v3/application/users/me. That endpoint requires the
+  // shops_r scope, which we do not ask for and do not need: reading receipts
+  // and posting tracking are the whole job. Asking a seller to hand over more
+  // permission than the work requires is the wrong trade, and the failure is
+  // ugly anyway, a bare 403 after they have already approved the app, which is
+  // exactly what happened on the first real connect (2026-09-14).
+  //
+  // The user id is already in our hands: Etsy prefixes the access token with
+  // it, and /v3/application/users/{user_id}/shops takes it from the bearer.
+  //
+  // ETSY_SHOP_ID short-circuits all of it. Discovery is the one step here that
+  // depends on an endpoint whose permissions Etsy's own spec describes wrongly,
+  // and the shop id is a number that never changes. If discovery ever fails
+  // again, setting that one variable ends the argument instead of leaving a
+  // connected shop that cannot be read.
+  const override = (process.env.ETSY_SHOP_ID || '').trim();
+  if (override) {
+    let name = null;
+    try {
+      const shop = await apiRequest(db, 'GET', `/v3/application/shops/${override}`);
+      name = (shop && shop.shop_name) || null;
+    } catch (err) {
+      console.warn(`[etsy] ETSY_SHOP_ID ${override} set but the name lookup failed (${err.status || 'no response'})`);
+    }
+    etsySettings.setJson(db, 'etsy.shop', {
+      shopId: override,
+      shopName: name,
+      connectedAt: new Date().toISOString(),
+    });
+    console.log(`[etsy] shop ${override} (${name || 'name unknown'}) taken from ETSY_SHOP_ID`);
+    return { shopId: override, shopName: name };
+  }
+
+  const grant = etsySettings.getJson(db, 'etsy.oauth') || {};
+  const userId = grant.tokenUserId;
+
+  if (!userId) {
+    throw new Error(
+      'The stored Etsy grant carries no user id, so there is nothing to look the shop up by. '
+      + 'Disconnect and connect again.'
+    );
+  }
+
+  const shop = await apiRequest(db, 'GET', `/v3/application/users/${userId}/shops`);
+  // The endpoint answers with a Shop, but has been seen wrapping it in the
+  // usual count/results envelope. Accept either rather than break on a shape.
+  const found = shop && shop.shop_id ? shop
+    : (shop && Array.isArray(shop.results) ? shop.results[0] : null);
+  const shopId = found && found.shop_id;
 
   if (!shopId) {
     throw new Error(
       'Etsy says this account has no shop. The most likely cause is that the authorization was '
       + 'granted by a personal buyer account rather than the account that owns the shop. '
-      + 'Disconnect, sign in to Etsy as the shop owner, and connect again.'
+      + 'Disconnect, sign in to Etsy as the shop owner, and connect again. If the shop is '
+      + 'definitely right, set ETSY_SHOP_ID to the shop number and this step is skipped entirely.'
     );
+  }
+
+  // The name usually arrives with the shop, so skip a second call when it does.
+  if (found.shop_name) {
+    etsySettings.setJson(db, 'etsy.shop', {
+      shopId,
+      shopName: found.shop_name,
+      connectedAt: new Date().toISOString(),
+    });
+    console.log(`[etsy] shop ${shopId} (${found.shop_name}) saved`);
+    return { shopId, shopName: found.shop_name };
   }
 
   let shopName = null;

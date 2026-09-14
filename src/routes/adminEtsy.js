@@ -175,11 +175,19 @@ router.get('/api/etsy/ping', requireAdmin, async (req, res) => {
       sentSharedSecret: withSecret,
     });
   } catch (err) {
-    console.error('[etsy] ping failed:', err.message);
+    // Say what Etsy said. The first version of this guessed at the cause and
+    // offered both directions ("set the secret, or clear it"), which buried the
+    // one useful sentence Etsy had already handed back: "Shared secret is
+    // required in x-api-key header." A vendor that names the problem should be
+    // quoted, not paraphrased.
+    const fromEtsy = err.body && typeof err.body === 'object' && err.body.error
+      ? String(err.body.error)
+      : '';
+    console.error(`[etsy] ping failed (${err.status || 'no status'}): ${fromEtsy || err.message}`);
     res.status(502).json({
       ok: false,
-      error: err.status === 401 || err.status === 403
-        ? 'Etsy rejected the API key. If ETSY_SHARED_SECRET is unset, set it and try again. If it is set, clear it and try again.'
+      error: fromEtsy
+        ? `Etsy says: ${fromEtsy}`
         : `Etsy did not answer the key check: ${err.message}`,
     });
   }
