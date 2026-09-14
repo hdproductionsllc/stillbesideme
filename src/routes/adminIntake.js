@@ -66,10 +66,14 @@ router.post('/api/intake', requireAdmin, upload.array('photos', 3), async (req, 
         petNicknames: b.petNicknames,
         familyName: b.familyName,
       },
+      // address1/address2, not line1/line2. Luma reads shipping.address1 and
+      // the admin detail pane reads the same key, so anything else ships a
+      // parcel with a city and no street and looks correct on screen while it
+      // does. createFromMarketplace rejects the old spelling outright now.
       shipping: b.shipName ? {
         name: b.shipName,
-        line1: b.shipLine1,
-        line2: b.shipLine2 || '',
+        address1: b.shipLine1,
+        address2: b.shipLine2 || '',
         city: b.shipCity,
         state: b.shipState,
         zip: b.shipZip,

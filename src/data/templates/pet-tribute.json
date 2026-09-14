@@ -143,7 +143,7 @@
     { "id": "birthDate", "label": "When were they born?", "sublabel": "Year or full date", "type": "text", "required": false, "maxLength": 20, "placeholder": "2014", "displayOn": "tribute" },
     { "id": "passDate", "label": "When did they cross the rainbow bridge?", "sublabel": "Year or full date", "type": "text", "required": false, "maxLength": 20, "placeholder": "2026", "displayOn": "tribute" },
     { "id": "personality", "label": "What made them special?", "sublabel": "The thing that made them uniquely yours", "type": "textarea", "required": false, "maxLength": 200, "feedsPoem": true },
-    { "id": "favoriteMemory", "label": "A favorite memory", "sublabel": "The one that makes you smile through tears", "type": "textarea", "required": false, "maxLength": 300, "feedsPoem": true },
+    { "id": "favoriteMemory", "label": "A favorite memory", "sublabel": "The one that makes you smile through tears", "type": "textarea", "required": false, "maxLength": 1024, "feedsPoem": true },
     { "id": "favoriteThing", "label": "Their favorite toy or treat?", "sublabel": "The thing they couldn't live without", "type": "text", "required": false, "maxLength": 60, "feedsPoem": true },
     { "id": "familyName", "label": "Who will miss them most?", "sublabel": "Your family name or your name", "type": "text", "required": false, "maxLength": 80, "placeholder": "The Johnson family", "displayOn": "tribute" },
     { "id": "giftNote", "label": "Your note to them", "sublabel": "Printed on cream paper and tucked in the box – so it arrives from you, not from us", "type": "textarea", "required": false, "maxLength": 600, "placeholder": "Sarah, I couldn't stop thinking about you this week…", "showWhen": { "orderType": "gift" } },

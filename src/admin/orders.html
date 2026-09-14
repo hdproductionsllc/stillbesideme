@@ -57,6 +57,8 @@
   <h1>Still Beside Me — Orders</h1>
   <span class="spacer"></span>
   <button id="viewToggle">Reviews</button>
+  <a class="btn" href="/admin/intake">Enter an Etsy order</a>
+  <a class="btn" href="/admin/etsy">Etsy connection</a>
   <a class="btn" href="/admin/api/backup">Download DB backup</a>
   <form method="POST" action="/admin/logout" style="margin:0"><button type="submit">Sign out</button></form>
 </header>
@@ -115,7 +117,7 @@
     const tb = document.getElementById('rows');
     tb.innerHTML = data.orders.map(o => `
       <tr class="row${o.id===selId?' sel':''}" data-id="${o.id}">
-        <td><strong>${o.shortId}</strong>${o.hasNotes?' <span class="note-dot" title="Has support notes">●</span>':''}<br><span class="muted">${esc(o.petName||'')}</span></td>
+        <td><strong>${o.shortId}</strong>${o.source==='etsy'?' <span class="pill" title="Came in from Etsy">Etsy</span>':''}${o.hasNotes?' <span class="note-dot" title="Has support notes">●</span>':''}<br><span class="muted">${esc(o.petName||'')}</span></td>
         <td>${esc(o.customerName||'')}<br><span class="muted">${esc(o.email)}</span></td>
         <td><span class="pill">${o.status.replace(/_/g,' ')}</span></td>
         <td>${money(o.totalCents)}</td>
@@ -136,6 +138,10 @@
     const links = [];
     if (o.adminToken) links.push(`<a href="/admin/review/${o.adminToken}" target="_blank">Review page</a>`, `<a href="/admin/order/${o.adminToken}" target="_blank">Fulfillment page</a>`);
     if (o.proofToken) links.push(`<a href="/order/${o.proofToken}" target="_blank">Customer status</a>`);
+    // The proof image itself. For an Etsy order there is no email thread to
+    // approve in, so this is the link that gets pasted into an Etsy message.
+    if (o.proofUrl) links.push(`<a href="${esc(o.proofUrl)}" target="_blank">Proof image</a>`);
+    if (o.source === 'etsy' && o.etsyReceiptId) links.push(`<a href="https://www.etsy.com/your/orders/sold?order_id=${encodeURIComponent(o.etsyReceiptId)}" target="_blank">Etsy receipt</a>`);
     document.getElementById('detail').innerHTML = `
       <h2>${o.shortId} <span class="pill">${o.status.replace(/_/g,' ')}</span></h2>
       <div class="links">${links.join('')}</div>
@@ -143,6 +149,7 @@
         <span class="k">Customer</span><span>${esc(o.customerName||'—')} &nbsp; <span class="muted">${esc(o.email||'')}</span></span>
         <span class="k">Pet</span><span>${esc(o.petName||'—')}</span>
         <span class="k">Product</span><span>${esc(o.sku)} · ${money(o.totalCents)}</span>
+        <span class="k">Source</span><span>${esc(o.source||'direct')}${o.etsyReceiptId ? ', receipt ' + esc(o.etsyReceiptId) : ''}</span>
         <span class="k">Ship to</span><span>${shipStr}</span>
         <span class="k">Tracking</span><span>${o.tracking ? esc(o.tracking.carrier||'')+' '+(o.tracking.url?`<a href="${esc(o.tracking.url)}" target="_blank">${esc(o.tracking.number)}</a>`:esc(o.tracking.number)) : '<span class="muted">—</span>'}</span>
         <span class="k">Fulfillment</span><span>${esc(o.fulfillmentProvider||'—')}</span>

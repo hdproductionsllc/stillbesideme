@@ -104,6 +104,12 @@ router.get('/api/orders', requireAdmin, (req, res) => {
       sku: o.product_sku || '',
       totalCents: o.total_cents,
       status: o.status,
+      // Where the order came from. Orders predating the source column, and every
+      // order placed on the site itself, read as 'direct'. Etsy orders are typed
+      // in by hand at /admin/intake and carry the receipt id so the row can be
+      // matched back to the sale on Etsy.
+      source: o.source || 'direct',
+      etsyReceiptId: o.etsy_receipt_id || null,
       adminToken: o.admin_token || null,
       proofToken: o.proof_token || null,
       hasNotes: !!(o.admin_notes && o.admin_notes.trim()),
@@ -141,12 +147,24 @@ router.get('/api/orders/:id', requireAdmin, (req, res) => {
   const { customerName, petName } = summarize(o);
   let shipping = null;
   try { shipping = o.shipping_json ? JSON.parse(o.shipping_json) : null; } catch (e) { /* ignore */ }
+  // The canonical stored shape is { name, address1, address2, city, state, zip,
+  // country }, written by the Stripe webhook. Early hand-entered orders from
+  // /admin/intake wrote the street as line1 / line2 instead. The writer has been
+  // fixed, but those rows are already on disk and are never rewritten, so read
+  // both spellings here and hand the page one shape. Without this the address
+  // silently renders as a name and a city with no street.
+  if (shipping && typeof shipping === 'object') {
+    if (!shipping.address1 && shipping.line1) shipping.address1 = shipping.line1;
+    if (!shipping.address2 && shipping.line2) shipping.address2 = shipping.line2;
+  }
 
   res.json({
     order: {
       id: o.id,
       shortId: o.id.substring(0, 8).toUpperCase(),
       status: o.status,
+      source: o.source || 'direct',
+      etsyReceiptId: o.etsy_receipt_id || null,
       email: o.email || '',
       customerName,
       petName,

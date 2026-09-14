@@ -77,7 +77,7 @@ function downloadFilename(order) {
  * needing the admin dashboard (which itself needs configuration). Presence
  * only: no secret is ever printed.
  */
-function logReadiness() {
+function logReadiness(db) {
   const has = (name) => {
     const v = process.env[name];
     return !!(v && String(v).trim() && !/^(your-|sk-ant-placeholder|change-me|pk_test_placeholder|sk_test_placeholder|whsec_placeholder)/.test(String(v).trim()));
@@ -89,6 +89,13 @@ function logReadiness() {
   // which on Railway is ephemeral — the classic silent data-loss setup.
   const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
   const persistent = !!process.env.DATA_DIR && !dataDir.startsWith(__dirname);
+
+  // The Etsy grant lives in the database, not in env, because Etsy hands back a
+  // new refresh token every time one is used. So a keystring on its own proves
+  // nothing: the shop can be "configured" and still unable to read one order,
+  // which is exactly the quiet failure this block exists to catch.
+  let etsyGrant = false;
+  try { etsyGrant = !!(db && require('./src/services/etsySettings').getJson(db, 'etsy.oauth')); } catch (e) { /* no app_settings table yet */ }
 
   const emailOk = has('SMTP_HOST') || has('RESEND_API_KEY');
   const blocking = [
@@ -108,6 +115,8 @@ function logReadiness() {
     [has('LUMA_API_KEY') && has('LUMA_API_SECRET'), 'Fulfilment',
       'LUMA_API_KEY / LUMA_API_SECRET — approved orders cannot be sent to the printer'],
     [has('LUMA_STORE_ID'), 'Luma store id', 'LUMA_STORE_ID — run GET /api/luma/setup once'],
+    [has('ETSY_KEYSTRING'), 'Etsy API', 'ETSY_KEYSTRING - Etsy sales must be typed in by hand at /admin/intake'],
+    [etsyGrant, 'Etsy shop connected', 'no Etsy grant stored - reconnect the shop at /admin/etsy (a grant expires 90 days after its last use)'],
   ];
 
   const failed = blocking.filter(([ok]) => !ok);
@@ -946,6 +955,9 @@ async function start() {
   // Mounted after the dashboard because it imports requireAdmin from it.
   app.use('/admin', require('./src/routes/adminIntake'));
 
+  // Etsy connection + receipt pull. Same reason for the position: requireAdmin.
+  app.use('/admin', require('./src/routes/adminEtsy'));
+
   // Order status page (token-based deep link from email, plus lookup form)
   app.use('/api/orders', require('./src/routes/orderStatus'));
   app.get('/order', (req, res) => {
@@ -1127,12 +1139,16 @@ async function start() {
     console.log(`\n  Still Beside Me – Memorial Art Store`);
     console.log(`  http://localhost:${PORT}`);
     console.log(`  http://localhost:${PORT}/customize\n`);
-    logReadiness();
+    logReadiness(db);
   });
 
   // Railway sends SIGTERM when a redeploy replaces this container. Exit 0 so
   // routine shutdowns aren't classified (and emailed) as crashes.
   const shutdown = () => {
+    // Flush before exiting. Writes are debounced by 100ms, so without this a
+    // redeploy can drop whatever was written in the last moment, including a
+    // rotated Etsy refresh token that Etsy has already retired.
+    try { require('./src/db/database').flush(); } catch (e) { console.error('Shutdown flush failed:', e.message); }
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 8000).unref();
   };

@@ -37,6 +37,38 @@ function save() {
   }, 100);
 }
 
+/**
+ * Write the database to disk right now, synchronously.
+ *
+ * The debounce above is the right trade for ordinary writes: a burst of order
+ * updates costs one disk write instead of twenty. But a debounce always leaves
+ * a window where a fact exists only in memory, and for one class of write that
+ * window is unrecoverable.
+ *
+ * Etsy rotates its refresh token on every use. The moment we spend the old one
+ * Etsy retires it, so if this process dies before the new one reaches the
+ * volume (Railway sends SIGTERM for a redeploy, and 100ms is a long time), the
+ * file still holds a credential Etsy will never accept again. The shop is then
+ * locked out until a human reconnects by hand, and nothing in the logs says
+ * why.
+ *
+ * So anything that spends a single-use credential calls this instead of
+ * trusting the debounce, and shutdown() calls it so every other pending write
+ * survives a redeploy too.
+ */
+function flush() {
+  if (!db) return;
+  if (_saveTimer) {
+    clearTimeout(_saveTimer);
+    _saveTimer = null;
+  }
+  try {
+    fs.writeFileSync(DB_PATH, Buffer.from(db.export()));
+  } catch (err) {
+    console.error('Database flush error:', err);
+  }
+}
+
 /** Thin wrapper that provides a clean API and auto-saves on writes */
 class Database {
   constructor(sqlDb) {
@@ -156,4 +188,4 @@ function backupNow(stamp, keep = 14) {
   return dest;
 }
 
-module.exports = { init, backupNow, DB_PATH };
+module.exports = { init, backupNow, flush, DB_PATH };

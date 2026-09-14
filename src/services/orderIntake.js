@@ -142,7 +142,10 @@ async function storePhoto(buffer, originalName, sku) {
  *                                        personality, favoriteMemory, ...
  * @param {Array}  input.photos           [{ buffer, originalName }]
  * @param {string} [input.ownPoem]        the buyer's own words, if they sent any
- * @param {object} [input.shipping]       { name, line1, city, state, zip, country }
+ * @param {object} [input.shipping]       the canonical address shape, and the
+ *                                        only one anything downstream reads:
+ *                                        { name, address1, address2, city,
+ *                                          state, zip, country }. Stored raw.
  * @param {number} [input.totalCents]     what the marketplace collected
  * @param {string} [input.notes]          anything the shop wants on the record
  *
@@ -167,6 +170,21 @@ async function createFromMarketplace(db, input) {
   }
   if (!Array.isArray(input.photos) || !input.photos.length) {
     throw new Error('At least one photo is required — there is nothing to print without it');
+  }
+
+  // The shipping object is stored by a blind JSON.stringify, so a wrong key
+  // name here is invisible: the row saves, the admin pane shows a blank street
+  // line without complaining, and the parcel reaches Luma with a city, a state,
+  // a zip and nowhere to go. Every consumer reads address1/address2. Refuse the
+  // old spelling loudly instead of shipping it, so no future caller (the Etsy
+  // receipt mapper included) can make this mistake quietly.
+  if (input.shipping && typeof input.shipping === 'object') {
+    if ('line1' in input.shipping || 'line2' in input.shipping) {
+      throw new Error(
+        'Shipping address uses the wrong keys: write address1/address2, not line1/line2. ' +
+        'Luma and the admin order pane both read address1, so a line1 address would ship with no street.'
+      );
+    }
   }
 
   // One tribute per marketplace sale, whatever happens upstream. A

@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Etsy connection - Admin</title>
+<style>
+  :root { --bg:#1a1714; --panel:#26211c; --line:#3a332c; --text:#f4f1ea; --muted:#a89e90; --accent:#C4A882; --warn:#e5a3a3; --ok:#8B9D83; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:1rem; margin:0; font-weight:600; }
+  header .spacer { flex:1; }
+  header a { color:var(--accent); text-decoration:none; font-size:.85rem; }
+  .wrap { max-width:760px; margin:0 auto; padding:24px 20px 80px; }
+  .lede { color:var(--muted); font-size:.9rem; line-height:1.55; margin:0 0 24px; }
+  .lede strong { color:var(--text); font-weight:600; }
+  fieldset { border:1px solid var(--line); border-radius:10px; padding:16px 18px 20px; margin:0 0 18px; }
+  legend { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding:0 6px; }
+  p.hint { color:var(--muted); font-size:.75rem; margin:4px 0 0; line-height:1.45; }
+  p.body { font-size:.85rem; color:var(--muted); line-height:1.55; margin:0 0 12px; }
+  p.body strong { color:var(--text); font-weight:600; }
+  code { background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:3px 7px; font-size:.78rem; color:var(--text); word-break:break-all; }
+  .uri { display:block; padding:9px 11px; margin:6px 0 0; }
+  .actions { display:flex; align-items:center; gap:14px; margin-top:14px; flex-wrap:wrap; }
+  button, a.button {
+    background:var(--accent); color:#1a1714; border:0; border-radius:8px; padding:11px 20px;
+    font-size:.9rem; font-weight:600; cursor:pointer; text-decoration:none; display:inline-block;
+  }
+  button.quiet { background:transparent; color:var(--muted); border:1px solid var(--line); }
+  button:disabled { opacity:.5; cursor:default; }
+  .msg { font-size:.85rem; line-height:1.5; }
+  .msg.err { color:var(--warn); }
+  .msg.ok { color:var(--ok); }
+  .status { font-size:.85rem; line-height:1.6; margin:0; }
+  .status .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:8px; background:var(--muted); }
+  .status .dot.on { background:var(--ok); }
+  .status .dot.off { background:var(--warn); }
+  .meta { color:var(--muted); font-size:.78rem; margin:8px 0 0; line-height:1.55; }
+  .tally { font-size:.85rem; color:var(--muted); margin:16px 0 0; }
+  ul.results { list-style:none; margin:10px 0 0; padding:0; }
+  ul.results li { border:1px solid var(--line); border-left-width:3px; border-radius:8px; padding:11px 13px; margin:0 0 8px; font-size:.83rem; line-height:1.5; }
+  ul.results li.created { border-left-color:var(--ok); }
+  ul.results li.duplicate { border-left-color:var(--line); }
+  ul.results li.refused { border-left-color:var(--accent); }
+  ul.results li.error { border-left-color:var(--warn); }
+  ul.results .rid { font-weight:600; }
+  ul.results .outcome { color:var(--muted); text-transform:uppercase; letter-spacing:.05em; font-size:.68rem; margin-left:8px; }
+  ul.results .reason { color:var(--muted); display:block; margin-top:3px; }
+  ul.results .warn { color:var(--accent); display:block; margin-top:4px; font-size:.78rem; }
+  ul.results a { color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Etsy connection</h1>
+  <div class="spacer"></div>
+  <a href="/admin/intake">Enter one by hand</a>
+  <a href="/admin/orders">All orders</a>
+</header>
+
+<div class="wrap">
+  <p class="lede">
+    Connect the Etsy shop once, then press a button whenever you want to bring
+    new sales in. Pulling reads the paid orders Etsy is holding, takes the
+    answers the buyer gave at checkout along with their photo, and creates an
+    order sitting in <strong>awaiting review</strong>. It writes no poem, makes
+    no proof, and sends nothing to the printer. That is still your review page,
+    and <strong>nothing is printed until you record the buyer approving their
+    proof</strong>. An order this cannot read cleanly is refused and left alone
+    rather than guessed at, and you can always enter that one by hand.
+  </p>
+
+  <fieldset>
+    <legend>The connection</legend>
+    <p class="status" id="status"><span class="dot"></span>Checking…</p>
+    <p class="meta" id="statusMeta"></p>
+
+    <div id="notConnected" style="display:none">
+      <p class="body" style="margin-top:14px">
+        Before this will work, this address has to be registered as a callback
+        URL in the Etsy developer portal, exactly as it reads here:
+      </p>
+      <code class="uri" id="redirectUri"></code>
+      <p class="hint">
+        Register both this one and the local one you develop against
+        (<code>http://localhost:3001/admin/etsy/callback</code>). Etsy compares
+        the string character for character, so a missing slash or an http where
+        there should be an https is enough to fail the exchange.
+      </p>
+      <div class="actions">
+        <a class="button" href="/admin/etsy/connect" id="connect">Connect the shop</a>
+        <button type="button" class="quiet" id="ping">Test the API key</button>
+        <span class="msg" id="connectMsg"></span>
+      </div>
+      <p class="hint">
+        Test the key first if this is the first time. It asks Etsy whether it
+        recognises the key at all, which is the one thing worth knowing before
+        approving the app, and it takes a second.
+      </p>
+    </div>
+
+    <div id="connected" style="display:none">
+      <div class="actions">
+        <button type="button" class="quiet" id="disconnect">Disconnect</button>
+        <span class="msg" id="disconnectMsg"></span>
+      </div>
+      <p class="hint">
+        Disconnecting only forgets the permission. Orders already pulled in stay
+        exactly where they are.
+      </p>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Orders</legend>
+    <p class="body">
+      <strong>Check for orders</strong> reads what Etsy has and tells you what it
+      would do, without creating anything. <strong>Pull orders in</strong> does
+      it for real. Either way an order already in the system is left alone, so
+      pressing the button twice is safe.
+    </p>
+    <div class="actions">
+      <button type="button" id="check">Check for orders</button>
+      <button type="button" class="quiet" id="pull">Pull orders in</button>
+      <span class="msg" id="pullMsg"></span>
+    </div>
+    <p class="tally" id="tally"></p>
+    <ul class="results" id="results"></ul>
+  </fieldset>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var els = {
+    status: document.getElementById('status'),
+    statusMeta: document.getElementById('statusMeta'),
+    notConnected: document.getElementById('notConnected'),
+    connected: document.getElementById('connected'),
+    redirectUri: document.getElementById('redirectUri'),
+    disconnect: document.getElementById('disconnect'),
+    ping: document.getElementById('ping'),
+    connectMsg: document.getElementById('connectMsg'),
+    disconnectMsg: document.getElementById('disconnectMsg'),
+    check: document.getElementById('check'),
+    pull: document.getElementById('pull'),
+    pullMsg: document.getElementById('pullMsg'),
+    tally: document.getElementById('tally'),
+    results: document.getElementById('results')
+  };
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function when(iso) {
+    if (!iso) return 'never';
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? String(iso) : d.toLocaleString();
+  }
+
+  function loadStatus() {
+    return fetch('/admin/api/etsy/status', { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (s) {
+        if (s.error) throw new Error(s.error);
+        els.redirectUri.textContent = s.redirectUri || '';
+
+        var dot = 'dot', line;
+        if (!s.configured) {
+          dot += ' off';
+          line = 'No API key is set. Add ETSY_KEYSTRING to the environment and restart.';
+        } else if (!s.connected) {
+          dot += ' off';
+          line = 'Not connected yet.';
+        } else if (s.reauthRequired) {
+          dot += ' off';
+          line = 'Connected to ' + esc(s.shopName || ('shop ' + s.shopId)) +
+            ', but the permission is past its ninety days. Connect again before pulling.';
+        } else {
+          dot += ' on';
+          line = 'Connected to ' + esc(s.shopName || ('shop ' + s.shopId)) + '.';
+        }
+        els.status.innerHTML = '<span class="' + dot + '"></span>' + line;
+
+        var meta = [];
+        if (s.shopId) meta.push('Shop ' + esc(s.shopId));
+        if (s.connectedAt) meta.push('connected ' + esc(when(s.connectedAt)));
+        if (s.tokenRotatedAt) meta.push('permission last renewed ' + esc(when(s.tokenRotatedAt)));
+        meta.push('last pull ' + esc(when(s.lastPullAt)));
+        els.statusMeta.textContent = meta.join('. ') + '.';
+
+        var canConnect = s.configured && (!s.connected || s.reauthRequired);
+        els.notConnected.style.display = canConnect ? 'block' : 'none';
+        els.connected.style.display = s.connected ? 'block' : 'none';
+        els.check.disabled = !s.connected;
+        els.pull.disabled = !s.connected;
+        return s;
+      })
+      .catch(function (err) {
+        els.status.innerHTML = '<span class="dot off"></span>Could not read the connection state.';
+        els.statusMeta.textContent = err.message || '';
+      });
+  }
+
+  function label(outcome) {
+    if (outcome === 'created') return 'created';
+    if (outcome === 'would-create') return 'would be created';
+    if (outcome === 'duplicate') return 'already here';
+    if (outcome === 'refused') return 'left for you';
+    return 'failed';
+  }
+
+  function cls(outcome) {
+    if (outcome === 'created' || outcome === 'would-create') return 'created';
+    if (outcome === 'duplicate') return 'duplicate';
+    if (outcome === 'refused') return 'refused';
+    return 'error';
+  }
+
+  function render(data) {
+    var parts = [
+      'Read ' + data.checked + ' ' + (data.checked === 1 ? 'order' : 'orders'),
+      (data.dryRun ? data.created + ' would be created' : data.created + ' created'),
+      data.skipped + ' already here',
+      data.refused + ' left for you',
+      data.errored + ' failed'
+    ];
+    els.tally.textContent = parts.join(', ') + '.';
+
+    els.results.innerHTML = (data.results || []).map(function (r) {
+      var warnings = (r.warnings || []).map(function (w) {
+        return '<span class="warn">' + esc(w) + '</span>';
+      }).join('');
+      // Etsy hosts the buyer's photo on etsystatic.com, which our own content
+      // policy does not allow this page to load. The order is the place to
+      // look at it.
+      var link = r.reviewUrl
+        ? ' <a href="' + esc(r.reviewUrl) + '">Open the review page</a>'
+        : '';
+      return '<li class="' + cls(r.outcome) + '">' +
+        '<span class="rid">Etsy order ' + esc(r.receiptId) + '</span>' +
+        '<span class="outcome">' + esc(label(r.outcome)) + '</span>' +
+        (r.reason ? '<span class="reason">' + esc(r.reason) + link + '</span>'
+                  : (link ? '<span class="reason">' + link + '</span>' : '')) +
+        warnings +
+        '</li>';
+    }).join('');
+  }
+
+  function doPull(dryRun) {
+    els.check.disabled = true;
+    els.pull.disabled = true;
+    els.pullMsg.className = 'msg';
+    els.pullMsg.textContent = dryRun ? 'Checking…' : 'Pulling…';
+    els.tally.textContent = '';
+    els.results.innerHTML = '';
+
+    fetch('/admin/api/etsy/pull', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dryRun: !!dryRun })
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        els.check.disabled = false;
+        els.pull.disabled = false;
+        if (!res.ok) {
+          els.pullMsg.className = 'msg err';
+          els.pullMsg.textContent = res.d.error || 'That did not work.';
+          // A permission Etsy has stopped accepting still has a row in the
+          // database, so the status check alone would keep saying Connected
+          // and leave no button to press. Show the Connect panel on the spot.
+          if (res.d.reauthRequired) {
+            els.notConnected.style.display = 'block';
+            els.status.innerHTML = '<span class="dot off"></span>The permission is no longer valid. Connect the shop again.';
+          }
+          return;
+        }
+        els.pullMsg.className = 'msg ok';
+        els.pullMsg.textContent = res.d.checked ? '' : 'Nothing new on Etsy.';
+        render(res.d);
+        loadStatus();
+      })
+      .catch(function () {
+        els.check.disabled = false;
+        els.pull.disabled = false;
+        els.pullMsg.className = 'msg err';
+        els.pullMsg.textContent = 'Something went wrong. Check All orders before pressing it again.';
+      });
+  }
+
+  els.ping.addEventListener('click', function () {
+    els.ping.disabled = true;
+    els.connectMsg.className = 'msg';
+    els.connectMsg.textContent = 'Asking Etsy…';
+    fetch('/admin/api/etsy/ping')
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        els.ping.disabled = false;
+        if (!res.ok || !res.d.ok) {
+          els.connectMsg.className = 'msg err';
+          els.connectMsg.textContent = res.d.error || 'Etsy did not recognise the key.';
+          return;
+        }
+        els.connectMsg.className = 'msg ok';
+        els.connectMsg.textContent = 'Etsy recognises the key (app ' + esc(res.d.applicationId) + ').' +
+          (res.d.sentSharedSecret ? ' Sent with the shared secret.' : ' Sent with the keystring alone.');
+      })
+      .catch(function () {
+        els.ping.disabled = false;
+        els.connectMsg.className = 'msg err';
+        els.connectMsg.textContent = 'Could not reach the server.';
+      });
+  });
+
+  els.check.addEventListener('click', function () { doPull(true); });
+  els.pull.addEventListener('click', function () { doPull(false); });
+
+  els.disconnect.addEventListener('click', function () {
+    if (!window.confirm('Forget the Etsy permission? Orders already pulled in are not affected.')) return;
+    els.disconnect.disabled = true;
+    els.disconnectMsg.className = 'msg';
+    els.disconnectMsg.textContent = 'Working…';
+
+    fetch('/admin/api/etsy/disconnect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        els.disconnect.disabled = false;
+        els.disconnectMsg.className = res.ok ? 'msg ok' : 'msg err';
+        els.disconnectMsg.textContent = res.ok ? 'Disconnected.' : (res.d.error || 'Could not clear it.');
+        loadStatus();
+      })
+      .catch(function () {
+        els.disconnect.disabled = false;
+        els.disconnectMsg.className = 'msg err';
+        els.disconnectMsg.textContent = 'Something went wrong.';
+      });
+  });
+
+  loadStatus();
+})();
+</script>
+</body>
+</html>
