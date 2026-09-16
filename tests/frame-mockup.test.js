@@ -103,6 +103,21 @@ check('.proof-moulding is a block, so its padding applies on all four sides', ()
   assert.ok(/display\s*:\s*block/.test(body), `.proof-moulding must be display:block, got: ${body.trim()}`);
 });
 
+check('no breakpoint redefines the band at some screen size', () => {
+  // The whole failure was a frame that changed width with the viewport. A
+  // media query resizing the moulding would reintroduce exactly that, and the
+  // measurements above would still pass at the width they happened to run at.
+  const blocks = css.text.match(/@media[^{]*\{(?:[^{}]|\{[^{}]*\})*\}/gs) || [];
+  const offenders = blocks
+    .filter(b => /\.proof-(framed|moulding)\s*\{[^}]*padding/.test(b))
+    .map(b => b.slice(0, b.indexOf('{')).trim());
+  assert.deepStrictEqual(
+    offenders, [],
+    `these breakpoints change the frame's padding, so the moulding is not one `
+    + `fixed proportion any more: ${offenders.join(' / ')}`
+  );
+});
+
 check('the proof image is wrapped in the moulding', () => {
   assert.ok(
     /class=\\?"proof-moulding\\?"/.test(markup.text),
