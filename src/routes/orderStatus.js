@@ -110,8 +110,35 @@ function trackingForOrder(db, order) {
 }
 
 /**
- * Build a customer-friendly timeline from the order_events audit log.
- * Returns an ordered list of milestones with their state (done | current | pending).
+ * Milestone state from two plain booleans, so each path below reads as a table.
+ */
+function stateOf(reached, current) {
+  if (current) return 'current';
+  return reached ? 'done' : 'pending';
+}
+
+/**
+ * Build a customer-friendly timeline.
+ *
+ * A milestone's state comes from where the ORDER is, never from whether some
+ * audit event happens to exist. That distinction is the whole of this fix.
+ * order_events is an append-only log written by whichever route handled the
+ * order, and the two approval paths do not write the same rows: the legacy
+ * email round-trip (adminReview.js) logs proof_sent, while the inline flow
+ * that every current order takes (productionRelease.js) never does. Reading
+ * "did this happen?" off proof_sent therefore reported the proof step as
+ * not-yet-reached on every inline order, drawing an unlit rung in the middle
+ * of a ladder whose later rungs were lit. A customer reads that as an order
+ * that stalled, and one of them wrote in to say precisely that.
+ *
+ * Events still supply the timestamps. They are good at that. They are simply
+ * not the record of which stage an order has reached; order.status is.
+ *
+ * The two paths also run in different orders, which one fixed shape could not
+ * express. Inline customers approve their design BEFORE they pay, so their
+ * approval is stamped minutes earlier than their payment, and listing approval
+ * as the later step printed those two dates backwards. Each path now gets the
+ * shape it actually follows.
  */
 function buildTimeline(order, events) {
   const byType = {};
@@ -119,63 +146,32 @@ function buildTimeline(order, events) {
     if (!byType[e.event_type]) byType[e.event_type] = e;
   }
 
-  const orderPlacedAt = byType.order_created?.created_at || order.created_at;
-  const paymentAt = byType.payment_confirmed?.created_at;
-  const proofSentAt = byType.proof_sent?.created_at;
-  const proofApprovedAt = byType.proof_approved?.created_at || order.proof_approved_at;
-  const shippedAt = byType.partner_shipped?.created_at || byType.luma_shipped?.created_at || byType.whcc_shipped?.created_at;
-
-  const isPast = (status) => {
-    const flow = ['draft', 'pending_payment', 'awaiting_review', 'proof_ready', 'change_requested', 'proof_approved', 'in_production', 'shipped', 'delivered'];
-    return flow.indexOf(order.status) > flow.indexOf(status);
+  const at = {
+    placed: byType.order_created?.created_at || order.created_at,
+    paid: byType.payment_confirmed?.created_at,
+    proofSent: byType.proof_sent?.created_at,
+    // Inline approval logs its own event type. Falling back to the column
+    // keeps orders that predate that event readable.
+    approved: byType.proof_approved_inline?.created_at
+      || byType.proof_approved?.created_at
+      || order.proof_approved_at,
+    // When the file actually reached the printer, a different and later
+    // moment than the customer approving it.
+    sentToPrinter: byType.luma_submitted?.created_at
+      || byType.whcc_submitted?.created_at
+      || byType.partner_order_sent?.created_at,
+    shipped: byType.partner_shipped?.created_at
+      || byType.luma_shipped?.created_at
+      || byType.whcc_shipped?.created_at,
   };
 
-  const milestones = [
-    {
-      key: 'placed',
-      label: 'Order placed',
-      detail: 'Your order was created.',
-      at: orderPlacedAt,
-      state: 'done',
-    },
-    {
-      key: 'paid',
-      label: 'Payment received',
-      detail: paymentAt ? 'Thank you. We\'ve started designing your proof.' : 'Waiting for payment to confirm.',
-      at: paymentAt,
-      state: paymentAt ? 'done' : (order.status === 'pending_payment' ? 'current' : 'pending'),
-    },
-    {
-      key: 'proof',
-      label: 'Design proof ready for review',
-      detail: order.status === 'awaiting_review' ? 'Our team is preparing and reviewing your design by hand. Your proof will arrive by email soon.'
-            : order.status === 'proof_ready' ? 'Please review and approve your proof.'
-            : order.status === 'change_requested' ? 'You requested changes – we\'re working on a revised proof.'
-            : proofSentAt ? 'Proof was sent for your review.'
-            : 'We\'re creating your design proof now.',
-      at: proofSentAt,
-      state: order.status === 'awaiting_review' ? 'current'
-           : order.status === 'proof_ready' ? 'current'
-           : order.status === 'change_requested' ? 'current'
-           : proofSentAt ? 'done' : 'pending',
-    },
-    {
-      key: 'approved',
-      label: 'Approved & sent to printer',
-      detail: proofApprovedAt ? 'Your proof was approved. The frame is being printed and assembled.' : 'Pending your approval.',
-      at: proofApprovedAt,
-      state: proofApprovedAt ? (order.status === 'shipped' || order.status === 'delivered' ? 'done' : 'current') : 'pending',
-    },
-    {
-      key: 'shipped',
-      label: 'Shipped',
-      detail: shippedAt ? 'Your tribute is on its way.' : 'You\'ll see tracking info here as soon as it ships.',
-      at: shippedAt,
-      state: order.status === 'shipped' || order.status === 'delivered' ? 'done' : 'pending',
-    },
-  ];
+  // proof_sent is the legacy round-trip's fingerprint: it is the only path
+  // that mails a proof out and then waits. Everything else was approved
+  // inline, in the builder, before payment.
+  const milestones = at.proofSent
+    ? legacyMilestones(order, at)
+    : inlineMilestones(order, at);
 
-  // If order is cancelled, mark everything after order_placed as cancelled
   if (order.status === 'cancelled') {
     for (let i = 1; i < milestones.length; i++) {
       milestones[i].state = 'cancelled';
@@ -184,6 +180,135 @@ function buildTimeline(order, events) {
   }
 
   return milestones;
+}
+
+/**
+ * The path every current order takes: the customer approves their design in
+ * the builder, pays, a person checks it by hand, then it goes to the printer.
+ */
+function inlineMilestones(order, at) {
+  const s = order.status;
+  const paid = s !== 'draft' && s !== 'pending_payment';
+  const inReview = s === 'awaiting_review' || s === 'change_requested';
+  const withPrinter = s === 'proof_approved' || s === 'in_production';
+  const shipped = s === 'shipped' || s === 'delivered';
+
+  return [
+    {
+      key: 'placed',
+      label: 'Order placed',
+      detail: 'Your order was created.',
+      at: at.placed,
+      state: 'done',
+    },
+    {
+      key: 'approved',
+      label: 'You approved your design',
+      detail: 'You signed off on the poem and the layout before anything went to print.',
+      at: at.approved,
+      state: stateOf(!!at.approved, false),
+    },
+    {
+      key: 'paid',
+      label: 'Payment received',
+      detail: paid
+        ? 'Thank you. Your tribute went into the queue for its final check.'
+        : 'Waiting for payment to confirm.',
+      at: at.paid,
+      state: stateOf(paid, s === 'pending_payment'),
+    },
+    {
+      key: 'production',
+      // Naming this step "Printing and framing" while a person is still
+      // checking the file would claim work that has not started. The label
+      // follows the order rather than the other way round.
+      label: inReview ? 'Final check by our team' : 'Printing and framing',
+      detail: inReview
+        ? 'A real person is going over your design by hand before it goes to print.'
+        : withPrinter
+          // Our status flips when the file reaches the printer, which is not
+          // the same as ink being on paper: it can sit in their queue first.
+          // "With our printer" is true either way. "Being printed" is not.
+          ? 'Your tribute is with our printer now, to be printed on archival paper and framed.'
+          : shipped
+            ? 'Printed on archival paper and framed by hand.'
+            : 'Printing starts once the final check is done.',
+      at: at.sentToPrinter,
+      state: stateOf(shipped, inReview || withPrinter),
+    },
+    {
+      key: 'shipped',
+      label: 'Shipped',
+      detail: at.shipped
+        ? 'Your tribute is on its way.'
+        : 'Tracking will appear here, and in your inbox, as soon as it ships.',
+      at: at.shipped,
+      state: stateOf(shipped, false),
+    },
+  ];
+}
+
+/**
+ * The legacy email round-trip, kept for the orders still in it: we mail a
+ * proof out after payment and wait for the customer to approve it.
+ */
+function legacyMilestones(order, at) {
+  const s = order.status;
+  const paid = s !== 'draft' && s !== 'pending_payment';
+  const preparing = s === 'awaiting_review';
+  const awaitingCustomer = s === 'proof_ready' || s === 'change_requested';
+  const withPrinter = s === 'proof_approved' || s === 'in_production';
+  const shipped = s === 'shipped' || s === 'delivered';
+
+  return [
+    {
+      key: 'placed',
+      label: 'Order placed',
+      detail: 'Your order was created.',
+      at: at.placed,
+      state: 'done',
+    },
+    {
+      key: 'paid',
+      label: 'Payment received',
+      detail: paid
+        ? 'Thank you. We have started designing your proof.'
+        : 'Waiting for payment to confirm.',
+      at: at.paid,
+      state: stateOf(paid, s === 'pending_payment'),
+    },
+    {
+      key: 'proof',
+      label: 'Design proof ready for review',
+      detail: preparing
+        ? 'Our team is preparing and reviewing your design by hand. Your proof will arrive by email soon.'
+        : s === 'change_requested'
+          ? 'You asked for changes, and we are working on a revised proof.'
+          : s === 'proof_ready'
+            ? 'Please review and approve your proof.'
+            : 'Your proof was sent for your review.',
+      at: at.proofSent,
+      state: stateOf(!!at.proofSent || withPrinter || shipped, preparing || awaitingCustomer),
+    },
+    {
+      key: 'approved',
+      label: 'Approved and sent to printer',
+      detail: at.approved
+        ? 'Your proof was approved and the piece is with our printer.'
+        : 'Pending your approval.',
+      at: at.sentToPrinter || at.approved,
+      state: stateOf(shipped, withPrinter),
+    },
+    {
+      key: 'shipped',
+      label: 'Shipped',
+      detail: at.shipped
+        ? 'Your tribute is on its way.'
+        : 'Tracking will appear here, and in your inbox, as soon as it ships.',
+      at: at.shipped,
+      state: stateOf(shipped, false),
+    },
+  ];
 }
 
 /**
@@ -347,11 +472,11 @@ function humanStatus(status, digital) {
     draft: 'Draft',
     pending_payment: 'Awaiting payment',
     submitted: 'Submitted',
-    awaiting_review: 'Design in progress',
+    awaiting_review: 'Final check before printing',
     proof_ready: 'Proof ready for your review',
     change_requested: 'Working on revised proof',
-    proof_approved: 'Being printed',
-    in_production: 'Being printed',
+    proof_approved: 'Approved, heading to the printer',
+    in_production: 'At the printer',
     shipped: 'Shipped',
     delivered: 'Delivered',
     cancelled: 'Cancelled',
@@ -382,3 +507,8 @@ module.exports = router;
 // customer recognises their own product on the page, and that deserves to be
 // asserted rather than eyeballed.
 module.exports.frameForOrder = frameForOrder;
+
+// Exposed for tests: a milestone reported as not-yet-reached on an order that
+// has plainly passed it is what made a paying customer write in to ask whether
+// anything was happening at all. That deserves assertions, not eyeballing.
+module.exports.buildTimeline = buildTimeline;
