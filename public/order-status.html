@@ -99,7 +99,6 @@
       display: block;
       max-width: 320px;
       margin: var(--space-md) auto 0;
-      padding: 5.5%;
       border-radius: 3px;
       background: var(--frame-colour, #1c1c1c);
       background-image: linear-gradient(145deg,
@@ -112,6 +111,21 @@
         0 3px 10px rgba(0, 0, 0, 0.22),
         inset 0 1px 0 rgba(255, 255, 255, 0.16),
         inset 0 -1px 0 rgba(0, 0, 0, 0.34);
+    }
+
+    /* The moulding itself, and the reason it is not padding on .proof-framed:
+       a percentage padding resolves against the CONTAINING BLOCK, never against
+       the element carrying it. On the status card that is the card, not the
+       frame, so the band grew with the viewport: 6% of the artwork on a phone,
+       21% on a wide desktop, on a frame that is 0.875in of timber against a
+       14in print and therefore a fixed 6.25% everywhere. Here the containing
+       block IS .proof-framed, so the figure means what it says.
+
+       5.556% of the frame leaves the artwork at 88.9% of it, and 5.556/88.9
+       is 6.25%: the frame Luma actually ships. */
+    .proof-moulding {
+      display: block;
+      padding: 5.556%;
     }
 
     .proof-framed img {
@@ -417,8 +431,8 @@
           + ' onerror="this.style.display=\'none\'" />';
         if (data.frame && data.frame.swatch) {
           proofThumbHtml =
-            '<div class="proof-framed" style="--frame-colour:' + escapeHtml(data.frame.swatch) + '">'
-            + proofImg + '</div>'
+            '<div class="proof-framed" style="--frame-colour:' + escapeHtml(data.frame.swatch) + '"><span class="proof-moulding">'
+            + proofImg + '</span></div>'
             + '<span class="proof-frame-label">' + escapeHtml(data.frame.label) + ' frame</span>';
         } else {
           proofThumbHtml = '<img src="' + escapeHtml(data.proofUrl) + '" alt="Your tribute"'
