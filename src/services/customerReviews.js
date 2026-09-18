@@ -84,7 +84,7 @@ function summary(db) {
  */
 function published(db, limit = 50) {
   return db.all(
-    `SELECT id, rating, body, author_display, incentivised, published_at
+    `SELECT id, rating, body, author_display, incentivised, published_at, photo_path
        FROM customer_reviews
       WHERE ${PUBLISHED_WHERE}
       ORDER BY published_at DESC, id DESC
@@ -97,6 +97,9 @@ function published(db, limit = 50) {
     author: r.author_display || 'A customer',
     incentivised: Number(r.incentivised) === 1,
     publishedAt: r.published_at || null,
+    // A URL, never the path: the file lives on the uploads volume and is
+    // handed out only by the gated route, which re-checks published + consent.
+    photoUrl: r.photo_path ? `/api/reviews/${r.id}/photo` : null,
   }));
 }
 

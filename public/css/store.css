@@ -2839,12 +2839,21 @@ body.tl-open { overflow: hidden; }
 .cr-stars { color: var(--color-warm); letter-spacing: 2px; }
 .cr-score { font-weight: 600; color: var(--color-primary); }
 .cr-count { color: var(--color-muted); font-size: 0.9rem; }
+.cr-new { max-width: 720px; margin: 0 auto var(--space-xl); }
 .cr-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-lg); }
 .cr-item {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   padding: var(--space-lg);
+}
+.cr-photo {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  margin: var(--space-sm) 0;
 }
 .cr-body { margin: var(--space-xs) 0 var(--space-sm); line-height: 1.7; }
 .cr-attrib { margin: 0; font-size: 0.9rem; color: var(--color-muted); }

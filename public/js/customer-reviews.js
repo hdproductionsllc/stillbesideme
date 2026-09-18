@@ -83,17 +83,26 @@
   }
 
   function renderInto(el, data) {
-    var header = '<div class="cr-summary">'
-      + '<span class="cr-stars" aria-hidden="true">' + starsFor(data.mean) + '</span> '
-      + '<span class="cr-score">' + esc(data.ratingValue) + ' out of 5</span> '
-      + '<span class="cr-count">from ' + data.count + ' review'
-      + (data.count === 1 ? '' : 's') + '</span>'
-      + '</div>';
+    // Every page that carries a reviews slot also carries the rating figure
+    // just above it, so repeating the figure here would show it twice. The
+    // summary is kept only for a slot that stands alone.
+    var header = document.querySelector('[data-customer-rating]')
+      ? ''
+      : '<div class="cr-summary">'
+        + '<span class="cr-stars" aria-hidden="true">' + starsFor(data.mean) + '</span> '
+        + '<span class="cr-score">' + esc(data.ratingValue) + ' out of 5</span> '
+        + '<span class="cr-count">from ' + data.count + ' review'
+        + (data.count === 1 ? '' : 's') + '</span>'
+        + '</div>';
 
     var items = data.reviews.map(function (r) {
       return '<li class="cr-item">'
         + '<span class="cr-stars" aria-hidden="true">' + starsFor(r.rating) + '</span>'
         + '<span class="cr-sr">' + r.rating + ' out of 5</span>'
+        + (r.photoUrl
+            ? '<img class="cr-photo" src="' + esc(r.photoUrl) + '" loading="lazy" alt="'
+              + esc(r.author) + '\'s piece, photographed at home">'
+            : '')
         + '<p class="cr-body">' + esc(r.body) + '</p>'
         + '<p class="cr-attrib">' + esc(r.author)
         + (r.incentivised

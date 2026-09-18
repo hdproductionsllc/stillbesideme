@@ -833,24 +833,31 @@ async function sendReviewInvite(to, orderData, reviewUrl) {
         so by now it should be somewhere you can see it.
       </p>
 
+      <p style="color:#2C2C2C;line-height:1.6;margin-bottom:16px;">
+        Would you leave us a review? There are two things we would like to know: how the whole
+        thing went, from ordering it to hanging it up, and what you thought when you opened it.
+      </p>
+
       <p style="color:#2C2C2C;line-height:1.6;margin-bottom:24px;">
-        There are two things we would like to know, if you have a moment. How the whole thing went,
-        from ordering it to hanging it up, and what you thought when you opened it.
+        And one favour, which matters to us more than the stars. If you can, take a photo of it
+        where it hangs and send it with your review. The next family deciding whether to trust us
+        with their own animal will believe a real frame on a real wall long before they believe
+        anything we say about ourselves.
       </p>
 
       <div style="text-align:center;margin-bottom:24px;">
         <a href="${reviewUrl}"
            style="display:inline-block;background:#8B9D83;color:#fff;text-decoration:none;padding:14px 40px;border-radius:8px;font-weight:600;font-size:1rem;">
-          Tell us how it turned out
+          Leave a review
         </a>
       </div>
 
       <div style="background:#FAF7F2;border:1px solid #E8E4DF;border-radius:8px;padding:20px;">
         <p style="color:#2C2C2C;line-height:1.7;margin:0;">
-          It takes a minute. We are not asking you to grade the poem, only the order around it:
-          the print, the frame, and how we were to deal with. Nothing you write goes on our website
-          unless you tell us it may. If something is not right, that link reaches us, and so does a
-          plain reply to this email.
+          It takes a minute or two. We are not asking you to grade the poem, only the order around
+          it: the print, the frame, and how we were to deal with. Nothing you write or send goes on
+          our website unless you tick the box that says it may. If something is not right, that
+          link reaches us, and so does a plain reply to this email.
         </p>
       </div>
     </div>

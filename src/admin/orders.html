@@ -47,6 +47,7 @@
   .rev .stars { color:var(--accent); letter-spacing:2px; font-size:1rem; }
   .rev .body { white-space:pre-wrap; font-size:.9rem; line-height:1.6; margin:8px 0; }
   .rev .meta { font-size:.78rem; color:var(--muted); }
+  .rev .photo { display:block; max-width:260px; max-height:200px; border-radius:6px; border:1px solid var(--line); margin:8px 0; }
   .rev .actions { display:flex; gap:10px; align-items:center; margin-top:10px; flex-wrap:wrap; }
   .rev label.inc { font-size:.78rem; color:var(--muted); display:flex; gap:5px; align-items:center; cursor:pointer; }
   .warn { color:#e5a3a3; font-size:.78rem; }
@@ -245,6 +246,7 @@
       <div class="rev" data-id="${v.id}">
         <div class="stars">${stars(v.rating)}</div>
         <div class="body">${esc(v.body) || '<span class="muted">No words, rating only.</span>'}</div>
+        ${v.photoUrl ? `<a href="${esc(v.photoUrl)}" target="_blank" rel="noopener"><img class="photo" src="${esc(v.photoUrl)}" alt="Photo the customer sent of the piece"></a>` : ''}
         <div class="meta">
           ${esc(v.authorDisplay) || '<span class="muted">no display name given</span>'}
           · order ${esc(v.shortId)}${v.petName ? ' · ' + esc(v.petName) : ''}

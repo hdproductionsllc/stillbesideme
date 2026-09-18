@@ -246,11 +246,28 @@ router.get('/api/reviews', requireAdmin, (req, res) => {
       publishedAt: r.published_at,
       email: r.order_email || '',
       petName,
+      // Admin sees the photo at any status; the public route below in
+      // customerReview.js only serves it once published with consent.
+      photoUrl: r.photo_path ? `/admin/api/reviews/${r.id}/photo` : null,
     };
   });
 
   const customerReviews = require('../services/customerReviews');
   res.json({ reviews: rows, summary: customerReviews.summary(db) });
+});
+
+// The photo a customer sent, whatever the review's status. This is how the
+// owner sees it before deciding whether to publish.
+router.get('/api/reviews/:id/photo', requireAdmin, (req, res) => {
+  const db = req.app.locals.db;
+  const r = db.get('SELECT photo_path FROM customer_reviews WHERE id = ?', [req.params.id]);
+  const abs = r && require('../services/reviewPhotos').absolutePath(r.photo_path);
+  if (!abs) return res.status(404).end();
+  res.set('Cache-Control', 'private, no-store');
+  res.type('image/jpeg');
+  res.sendFile(abs, (err) => {
+    if (err && !res.headersSent) res.status(404).end();
+  });
 });
 
 // Publish a review. Refused without consent, whatever the UI sent.

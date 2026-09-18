@@ -92,6 +92,25 @@
       border-radius: var(--radius);
       padding: var(--space-md);
     }
+    .photo-drop {
+      display: block;
+      border: 1px dashed var(--color-border);
+      border-radius: var(--radius);
+      padding: var(--space-lg);
+      text-align: center;
+      cursor: pointer;
+      background: var(--color-surface);
+      transition: border-color 0.15s;
+    }
+    .photo-drop:hover, .photo-drop:focus-within { border-color: var(--color-warm); }
+    .photo-drop input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+    .photo-drop .photo-cta { font-weight: 600; color: var(--color-primary); }
+    .photo-drop .photo-sub { font-size: 0.9rem; color: var(--color-muted); margin-top: 0.25rem; }
+    .photo-preview { display: none; margin-top: var(--space-sm); }
+    .photo-preview.is-set { display: block; }
+    .photo-preview img { display: block; width: 100%; max-height: 360px; object-fit: contain; border-radius: var(--radius); background: var(--color-surface); }
+    .photo-preview .photo-actions { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; color: var(--color-muted); margin-top: 0.5rem; }
+    .photo-preview button { background: none; border: none; color: var(--color-warm); cursor: pointer; font: inherit; padding: 0; text-decoration: underline; }
     .consent-row input[type="checkbox"] { margin-top: 0.25rem; flex-shrink: 0; }
     .consent-row label { font-size: 0.95rem; line-height: 1.6; }
     .review-submit { width: 100%; justify-content: center; }
@@ -175,7 +194,7 @@
         container.innerHTML = `
           <div class="review-header">
             <h1>${safePet ? `${safePet}'s piece` : 'Your piece'}</h1>
-            <p class="subtitle">If you have a moment, we would like to know how it turned out. Two questions, and the second one is the one that matters.</p>
+            <p class="subtitle">If you have a moment, we would like to know how it turned out. Two questions and one favour, and the favour is the one that matters most.</p>
           </div>
 
           <div class="review-card">
@@ -208,6 +227,27 @@
                 <textarea id="reviewBody" maxlength="2000" placeholder="A few lines is plenty."></textarea>
               </div>
 
+              <!-- The favour. A frame on a real wall does more for the next
+                   family deciding than anything we could write ourselves, and
+                   it is the one thing we cannot make. On a phone this opens
+                   the camera directly. -->
+              <div class="review-field">
+                <label class="field-label" for="photo">Would you send us a photo of it where it hangs?</label>
+                <p class="field-hint">This is the favour. A quick snap on your phone is perfect, and it does not need to be tidy. If you tick the box below, we may show it alongside your words so that the next family can see a real one in a real home.</p>
+                <label class="photo-drop" id="photoDrop">
+                  <input type="file" id="photo" name="photo" accept="image/*">
+                  <div class="photo-cta">Take or choose a photo</div>
+                  <div class="photo-sub">JPEG, PNG or HEIC, up to 15MB</div>
+                </label>
+                <div class="photo-preview" id="photoPreview">
+                  <img id="photoPreviewImg" alt="The photo you chose">
+                  <div class="photo-actions">
+                    <span id="photoName"></span>
+                    <button type="button" id="photoRemove">Remove photo</button>
+                  </div>
+                </div>
+              </div>
+
               <div class="review-field">
                 <label class="field-label" for="authorDisplay">How should we sign it, if we share it?</label>
                 <p class="field-hint">A first name and a last initial is what most people choose, for example Keith L. Leave it blank and we will not put a name to it.</p>
@@ -217,7 +257,7 @@
               <div class="review-field">
                 <div class="consent-row">
                   <input type="checkbox" id="consent">
-                  <label for="consent">You may show what I have written on your website. If this box is unticked, your words stay between us and are never published.</label>
+                  <label for="consent">You may show what I have written, and the photo if I sent one, on your website. If this box is unticked, everything here stays between us and is never published.</label>
                 </div>
               </div>
 
@@ -240,6 +280,47 @@
           });
         });
 
+        // Photo: show what they picked so the wrong photo is caught here and
+        // not in our inbox. Browsers cannot draw a HEIC, so for those the name
+        // stands in for the picture and the upload still goes through.
+        const photoInput = document.getElementById('photo');
+        const preview = document.getElementById('photoPreview');
+        const previewImg = document.getElementById('photoPreviewImg');
+        const photoName = document.getElementById('photoName');
+        const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
+
+        function clearPhoto() {
+          photoInput.value = '';
+          preview.classList.remove('is-set');
+          if (previewImg.src) URL.revokeObjectURL(previewImg.src);
+          previewImg.removeAttribute('src');
+          previewImg.style.display = '';
+          photoName.textContent = '';
+        }
+
+        photoInput.addEventListener('change', () => {
+          const errBox = document.getElementById('formError');
+          errBox.textContent = '';
+          const file = photoInput.files && photoInput.files[0];
+          if (!file) { clearPhoto(); return; }
+          if (file.size > MAX_PHOTO_BYTES) {
+            clearPhoto();
+            errBox.textContent = 'That photo is too large to send. Anything under 15MB is fine.';
+            return;
+          }
+          photoName.textContent = file.name;
+          if (previewImg.src) URL.revokeObjectURL(previewImg.src);
+          if (/^image\/(jpeg|png|webp|gif)$/i.test(file.type)) {
+            previewImg.src = URL.createObjectURL(file);
+            previewImg.style.display = '';
+          } else {
+            previewImg.removeAttribute('src');
+            previewImg.style.display = 'none';
+          }
+          preview.classList.add('is-set');
+        });
+        document.getElementById('photoRemove').addEventListener('click', clearPhoto);
+
         document.getElementById('reviewForm').addEventListener('submit', async (ev) => {
           ev.preventDefault();
           const btn = document.getElementById('submitBtn');
@@ -257,19 +338,25 @@
           btn.textContent = 'Sending...';
 
           try {
+            // Multipart because of the photo; the fields are the same ones the
+            // JSON contract carried, and the server reads either shape.
+            const form = new FormData();
+            form.append('rating', String(Number(checked.value)));
+            form.append('body', document.getElementById('reviewBody').value);
+            form.append('authorDisplay', document.getElementById('authorDisplay').value);
+            form.append('consentToPublish', document.getElementById('consent').checked ? 'true' : 'false');
+            const file = photoInput.files && photoInput.files[0];
+            if (file) form.append('photo', file, file.name);
+
             const r = await fetch(`/api/review/${encodeURIComponent(token)}`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                rating: Number(checked.value),
-                body: document.getElementById('reviewBody').value,
-                authorDisplay: document.getElementById('authorDisplay').value,
-                consentToPublish: document.getElementById('consent').checked,
-              }),
+              body: form,
             });
             const out = await r.json().catch(() => ({}));
             if (r.ok) {
-              thanks('This goes straight to us, and we read every one.');
+              thanks(out.hasPhoto
+                ? 'This goes straight to us, photo and all, and we read every one.'
+                : 'This goes straight to us, and we read every one.');
               return;
             }
             if (out.alreadySubmitted) {
