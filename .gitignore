@@ -32,3 +32,6 @@ run_qa.js
 *.png
 !public/**/*.png
 !src/**/*.png
+
+# Playwright MCP session scratch (screenshots, console logs) - never commit
+.playwright-mcp/

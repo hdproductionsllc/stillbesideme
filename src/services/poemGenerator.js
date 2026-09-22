@@ -23,7 +23,12 @@ const Anthropic = require('@anthropic-ai/sdk');
 
 const MODEL = 'claude-sonnet-5';
 const FALLBACK_MODEL = 'claude-haiku-4-5';
-const MAX_TOKENS = 1024;
+// Sonnet 5 runs adaptive thinking by default and the thinking shares this
+// budget with the poem. At 1024 the thinking alone used it up and every
+// request came back with stop_reason 'max_tokens' and no text, which pushed
+// production onto the template stub. A poem is a few hundred tokens; this
+// cap is only a ceiling.
+const MAX_TOKENS = 8192;
 
 const SYSTEM_PROMPT = `You are a master elegist who writes brief, luminous memorial verse and letters. Your work is printed beside their photo in a framed archival print that will hang on a family's wall for decades, so every word must earn its place.
 
@@ -139,16 +144,37 @@ function stripMarkdown(text) {
 /**
  * Call one model and return the text, throwing on refusal or empty content.
  */
-async function callModel(api, model, prompt) {
-  const response = await api.messages.create({
+/**
+ * The request for one model. Pure, so it can be inspected in tests.
+ *
+ * output_config.effort is a Sonnet 5 feature. Haiku 4.5 rejects it with a 400
+ * ("This model does not support the effort parameter"), which is how the
+ * fallback used to fail in lockstep with the primary and land on the stub.
+ */
+function requestParams(model, prompt) {
+  const params = {
     model,
     max_tokens: MAX_TOKENS,
     system: SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: prompt }],
+  };
+  if (model === MODEL) {
     // A short poem doesn't need deep reasoning; medium effort keeps it quick
     // and inexpensive while still polished.
-    output_config: { effort: 'medium' },
-    messages: [{ role: 'user', content: prompt }],
-  });
+    params.output_config = { effort: 'medium' };
+  }
+  return params;
+}
+
+async function callModel(api, model, prompt) {
+  const response = await api.messages.create(requestParams(model, prompt));
+
+  // One line per call so the Railway log shows fallback rate and thinking cost.
+  const usage = response.usage || {};
+  console.log(
+    `Poem generation (${model}): stop=${response.stop_reason} `
+    + `input=${usage.input_tokens} output=${usage.output_tokens}`
+  );
 
   // Fable 5 safety classifiers can decline with stop_reason 'refusal' and an
   // empty content array. Its always-on thinking also means content[0] is a
