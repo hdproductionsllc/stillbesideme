@@ -312,7 +312,7 @@
   }
 
   async function loadFonts() {
-    const families = ['Cormorant Garamond', 'Source Sans 3', 'Playfair Display'];
+    const families = ['Cormorant Garamond', 'Source Sans 3'];
     const weights = ['300', '400', '500', '600', '700'];
     try {
       const loads = [];
