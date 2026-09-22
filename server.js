@@ -462,7 +462,7 @@ async function start() {
   // have no clean-URL equivalent and would redirect into a 404.
   const CLEAN_URL_PAGES = [
     'index', 'the-writing', 'pet-memorial-gifts', 'sympathy-gifts', 'memorial-gifts',
-    'dog-memorial-gifts', 'cat-memorial-gifts', 'sympathy-message-helper',
+    'dog-memorial-gifts', 'cat-memorial-gifts', 'horse-memorial-gifts', 'sympathy-message-helper',
     'pet-memorial-poem-generator', 'rainbow-bridge-poem-for-dogs', 'rainbow-bridge-poem-for-cats',
     'privacy-policy', 'terms', 'refund-policy', 'shipping-policy', 'contact', 'about',
   ];
@@ -566,6 +566,9 @@ async function start() {
   });
   app.get('/cat-memorial-gifts', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'cat-memorial-gifts.html'));
+  });
+  app.get('/horse-memorial-gifts', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'horse-memorial-gifts.html'));
   });
   // (The Letter From Heaven / human-loss clean-URL handlers were removed —
   // the 302 redirect block above owns those paths while LFH is off sale.
@@ -753,6 +756,11 @@ async function start() {
   </url>
   <url>
     <loc>${baseUrl}/cat-memorial-gifts</loc>${lastmod('cat-memorial-gifts.html')}
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/horse-memorial-gifts</loc>${lastmod('horse-memorial-gifts.html')}
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
