@@ -10,7 +10,7 @@
   --color-warm: #C4A882;
   --color-bg: #FAF8F5;
   --color-surface: #FFFFFF;
-  --color-muted: #9B9590;
+  --color-muted: #6F6963; /* 4.9:1 on the cream page; the old #9B9590 was 2.6:1 */
   --color-border: #E8E4DF;
   --color-error: #C47070;
   --color-success: #6B7D63;
@@ -144,13 +144,15 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
   color: #fff;
 }
 
+/* Dark ink on the gold, not white. White on #C4A882 is 2.3:1, well under the
+   4.5:1 minimum, and this is the main Create a Tribute button on every page. */
 .btn-warm {
   background: var(--color-warm);
-  color: #fff;
+  color: var(--color-primary);
 }
 .btn-warm:hover {
   background: #b89a74;
-  color: #fff;
+  color: var(--color-primary);
 }
 
 .btn-outline {

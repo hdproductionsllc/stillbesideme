@@ -5,6 +5,7 @@ const fs = require('fs');
 const session = require('express-session');
 const FileStore = require('session-file-store')(session);
 const helmet = require('helmet');
+const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const Sentry = require('@sentry/node');
 
@@ -136,6 +137,15 @@ function logReadiness(db) {
 async function start() {
   const db = await require('./src/db/database').init();
 
+  // Compress everything text. Unlike the sibling brand, this site is served
+  // straight from Railway with no CDN in front of it, so nothing else was
+  // compressing the response: the homepage went out as 65KB of HTML and the
+  // stylesheet as 72KB, roughly five times what they need to be, on every
+  // single request. Mounted first so it wraps every later handler, including
+  // express.static. It skips anything already encoded and anything too small
+  // to be worth it, and honours a `x-no-compression` request header.
+  app.use(compression());
+
   // Webhooks need raw body for signature verification (must be before express.json)
   app.use('/api/whcc-webhooks', express.raw({ type: '*/*' }));
   app.use('/api/luma-webhooks', express.raw({ type: 'application/json' }));
@@ -182,6 +192,7 @@ async function start() {
           "https://www.googleadservices.com",
           "https://googleads.g.doubleclick.net",
           "https://ad.doubleclick.net",
+          "https://stats.g.doubleclick.net",
         ],
         connectSrc: [
           "'self'",
@@ -194,6 +205,10 @@ async function start() {
           "https://www.googleadservices.com",
           "https://googleads.g.doubleclick.net",
           "https://ad.doubleclick.net",
+          // GA4's Google Signals beacon. Missing here, it was blocked on every
+          // page load, which cost the remarketing and demographics signal and
+          // logged a console error on every visit.
+          "https://stats.g.doubleclick.net",
         ],
         frameSrc: [
           "'self'", "https://js.stripe.com",
