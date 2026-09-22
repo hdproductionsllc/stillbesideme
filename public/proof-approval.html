@@ -251,7 +251,7 @@
               <div class="result-icon">&#10003;</div>
               <h2>Your tribute is being printed</h2>
               <p>This proof was approved and your order is in production. You'll receive tracking info by email once it ships.</p>
-              <p style="margin-top:var(--space-lg)"><a href="/" class="btn btn-warm">Return to Store</a></p>
+              <p style="margin-top:var(--space-lg)"><a href="/" class="btn btn-warm">Back to Still Beside Me</a></p>
             </div>`;
           return;
         }
@@ -274,7 +274,7 @@
         container.innerHTML = `
           <div class="proof-header">
             <h1>Review your design proof</h1>
-            <p class="subtitle">Please review carefully before approving — this is exactly how your tribute will be printed.</p>
+            <p class="subtitle">Please review carefully before approving. This is exactly how your tribute will be printed.</p>
           </div>
 
           <div class="proof-image-wrap${data.frame && data.frame.molding ? ' has-frame' : ''}">
@@ -327,7 +327,7 @@
                 '<h2>Your tribute is being printed!</h2>' +
                 '<p>Your proof has been approved. We\'re printing your tribute on archival paper and professionally framing it now.</p>' +
                 '<p style="color:var(--color-muted);margin-top:var(--space-md);">Estimated delivery: 8\u201312 business days. You\'ll receive tracking info by email.</p>' +
-                '<p style="margin-top:var(--space-lg)"><a href="/" class="btn btn-warm">Return to Store</a></p>' +
+                '<p style="margin-top:var(--space-lg)"><a href="/" class="btn btn-warm">Back to Still Beside Me</a></p>' +
                 '</div>';
             })
             .catch(() => {
@@ -360,7 +360,7 @@
                 '<div class="result-icon">&#9998;</div>' +
                 '<h2>Change request sent</h2>' +
                 '<p>We\'ve received your feedback and will update your proof. You\'ll get an email when your revised proof is ready to review.</p>' +
-                '<p style="margin-top:var(--space-lg)"><a href="/" class="btn btn-warm">Return to Store</a></p>' +
+                '<p style="margin-top:var(--space-lg)"><a href="/" class="btn btn-warm">Back to Still Beside Me</a></p>' +
                 '</div>';
             })
             .catch(() => {
@@ -371,7 +371,7 @@
         });
       })
       .catch(err => {
-        container.innerHTML = '<div class="error-state">' + (err.message || 'Proof not found') + '. <a href="/">Return to store</a></div>';
+        container.innerHTML = '<div class="error-state">' + (err.message || 'Proof not found') + '. <a href="/">back to Still Beside Me</a></div>';
       });
   })();
   </script>

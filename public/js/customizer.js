@@ -384,7 +384,7 @@
     if (template.giftLabels) {
       const toggleWrap = document.createElement('div');
       toggleWrap.innerHTML = `
-        <div class="form-intro">Who is this tribute for?<span>This helps us personalize the experience</span></div>
+        <div class="form-intro">Who is this for?</div>
         <div class="order-type-toggle" id="order-type-toggle">
           <button class="order-type-option${orderType === 'self' ? ' active' : ''}" data-type="self">My pet</button>
           <button class="order-type-option${orderType === 'gift' ? ' active' : ''}" data-type="gift">Someone else's pet</button>
@@ -467,7 +467,7 @@
     cartSection.id = 'cart-section';
     cartSection.innerHTML = `
       <button class="btn btn-warm btn-lg" id="purchase-btn">
-        Continue to Checkout
+        See your proof
       </button>
       <p class="proof-note" id="proof-note" role="status" aria-live="polite" hidden></p>
       <ul class="checkout-reassurance">
@@ -2657,7 +2657,9 @@
       // charges 0 for print-only/digital, so the button must agree.
       const upcharge = isFramedSku(product.sku) ? frameUpchargeCents() : 0;
       const total = product.price + upcharge;
-      btn.textContent = `Continue to Checkout \u2013 $${(total / 100).toFixed(2)}`;
+      // Named for what the click actually does: it renders the proof and opens
+      // the approval dialog. Payment only happens after they approve.
+      btn.textContent = `See your proof \u2013 $${total % 100 === 0 ? total / 100 : (total / 100).toFixed(2)}`;
     }
   }
 
@@ -2893,7 +2895,7 @@
       btn.disabled = false;
       btn.removeAttribute('aria-busy');
       btn.classList.remove('is-preparing');
-      btn.textContent = 'Continue to Checkout';
+      btn.textContent = 'See your proof';
       updatePurchaseButton();
     }
   }
@@ -2964,12 +2966,12 @@
             <input type="checkbox" id="pf-agree">
             <span class="pf-check-text" id="pf-agree-text"></span>
           </label>
-          <p class="pf-final" id="pf-final">This is the final version. Once you tick the box and continue, it goes to print exactly as you see it here — the words, the photo and the layout stay as they are. If anything isn’t right, keep editing and we’ll make you a new proof.</p>
+          <p class="pf-final" id="pf-final">This is the final version. Once you check the box and continue, it goes to print exactly as you see it here — the words, the photo and the layout stay as they are. If anything isn’t right, keep editing and we’ll make you a new proof.</p>
         </div>
         <div class="pf-actions">
           <button type="button" class="pf-confirm" id="pf-confirm" aria-describedby="pf-final" disabled></button>
           <button type="button" class="pf-back" id="pf-back">Keep editing</button>
-          <p class="pf-nudge" id="pf-nudge">Tick the box above when you’re ready.</p>
+          <p class="pf-nudge" id="pf-nudge">Check the box above when you’re ready.</p>
         </div>
       </div>
       <p class="pf-status" id="pf-status" role="status" aria-live="polite"></p>
@@ -3019,7 +3021,7 @@
       els.loading.hidden = true;
       els.agree.disabled = true;
       els.confirm.disabled = true;
-      setProofStatus('Your proof didn’t come through. Keep editing and tap Continue to Checkout again — nothing has been charged.', 'error');
+      setProofStatus('Your proof did not come through. Keep editing and tap See your proof again. Nothing has been charged.', 'error');
     });
 
     // Backdrop click closes, but only when the press starts AND ends on the

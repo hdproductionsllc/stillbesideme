@@ -284,7 +284,7 @@
         host.appendChild(el('p', { class: 'rc-sub',
           text: editing
             ? 'These are the days we’ll reach out on. Add or adjust them whenever you like.'
-            : 'Grief keeps its own calendar. If you’d like, we’ll send a quiet note on the days that meant something — and nothing else.' }));
+            : 'Grief keeps its own calendar. If you’d like, we’ll send a quiet note on the days that meant something, and nothing else.' }));
 
         var form = el('form', { class: 'rc-form', novalidate: 'novalidate' });
         form.appendChild(buildDateRow('rc-birthday', 'Birthday', dates.birthday, null, false));
@@ -412,7 +412,7 @@
     }
 
     if (!sessionId) {
-      container.innerHTML = '<div class="error-state">No order found. <a href="/">Return to store</a></div>';
+      container.innerHTML = '<div class="error-state">No order found. <a href="/">back to Still Beside Me</a></div>';
       return;
     }
 
@@ -425,7 +425,7 @@
             <h1>Thank you for your order!</h1>
             <p class="subtitle">Your payment was received. We're preparing your tribute now.</p>
             <p style="color:var(--color-muted)">If you have questions, use our contact form</p>
-            <p style="margin-top:var(--space-xl)"><a href="/" class="btn btn-warm">Return to Store</a></p>
+            <p style="margin-top:var(--space-xl)"><a href="/" class="btn btn-warm">Back to Still Beside Me</a></p>
           `;
           return;
         }
@@ -471,7 +471,7 @@
               <li>Shipped ready to hang, straight to the address you entered at checkout (8&ndash;12 business days)</li>
             </ol>
             <p style="color:var(--color-muted);font-size:0.9rem;line-height:1.7;margin-top:var(--space-md)">
-              If you ordered this as a gift, your confirmation email also includes a private tribute link that's yours to send &mdash; text it to them whenever it feels right, long before the frame arrives.
+              If you ordered this as a gift, your confirmation email also includes a private tribute link that's yours to send. Text it to them whenever it feels right, long before the frame arrives.
             </p>
           </div>
 
@@ -479,7 +479,7 @@
             ${order.proofToken
               ? `<a href="/order/${order.proofToken}" class="btn btn-warm">Track your order</a>`
               : `<a href="/order" class="btn btn-warm">Track your order</a>`}
-            <a href="/" class="btn btn-link">Return to Store</a>
+            <a href="/" class="btn btn-link">Back to Still Beside Me</a>
           </p>
 
           <section id="remember-card"></section>
@@ -505,7 +505,7 @@
           <div class="confirmation-icon">&#10003;</div>
           <h1>Thank you for your order!</h1>
           <p class="subtitle">Your payment was received. We're preparing your tribute now.</p>
-          <p style="margin-top:var(--space-xl)"><a href="/" class="btn btn-warm">Return to Store</a></p>
+          <p style="margin-top:var(--space-xl)"><a href="/" class="btn btn-warm">Back to Still Beside Me</a></p>
         `;
       });
   })();

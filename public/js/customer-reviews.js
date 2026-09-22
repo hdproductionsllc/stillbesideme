@@ -76,8 +76,11 @@
 
   /** The visible figure, kept identical in wording to the static baseline. */
   function renderRating(el, data) {
-    el.innerHTML = '<span class="cr-stars" aria-hidden="true">' + starsFor(data.mean) + '</span>'
-      + '<span class="cr-score">' + esc(data.ratingValue) + ' out of 5</span>'
+    // The spaces between the spans are load-bearing: the static baseline in
+    // the HTML gets them from the newlines between its tags, and without them
+    // here the line reads "4.9 out of 5from 30 reviews" the moment this runs.
+    el.innerHTML = '<span class="cr-stars" aria-hidden="true">' + starsFor(data.mean) + '</span> '
+      + '<span class="cr-score">' + esc(data.ratingValue) + ' out of 5</span> '
       + '<span class="cr-count">from ' + data.count + ' review'
       + (data.count === 1 ? '' : 's') + '</span>';
   }

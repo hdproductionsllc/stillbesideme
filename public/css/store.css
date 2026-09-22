@@ -196,11 +196,19 @@ h3 { font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
 
 .site-logo {
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  /* Shrinks with the viewport rather than wrapping. At 390px the old fixed
+     1.5rem broke the name into three stacked words beside a button doing the
+     same thing, in a header that is sticky on every page. */
+  font-size: clamp(1.15rem, 4.2vw, 1.5rem);
   font-weight: 300;
   color: var(--color-primary);
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
+
+/* The header is one row: a name that may shrink, and a button that may not. */
+.site-header .container > .site-logo { flex: 0 1 auto; min-width: 0; }
+.site-header .site-nav .btn { white-space: nowrap; flex-shrink: 0; }
 
 .site-nav {
   display: flex;
