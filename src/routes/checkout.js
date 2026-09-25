@@ -511,9 +511,17 @@ router.post('/checkout', async (req, res) => {
     // exists — and it would charge that old price. Close it first. Best-effort:
     // an already-expired or already-completed session throws, and neither is a
     // reason to block this payment.
+    //
+    // The pointer is cleared BEFORE the expire call, not after. Expiring a
+    // session makes Stripe send checkout.session.expired straight away, and
+    // if that webhook arrives while the row still points at the old session
+    // the expiry handler would cancel this order and email the customer an
+    // abandoned-checkout note, moments before they pay for it.
     if (order.stripe_session_id) {
+      const staleSessionId = order.stripe_session_id;
+      db.run(`UPDATE orders SET stripe_session_id = NULL WHERE id = ?`, [orderId]);
       try {
-        await stripe.checkout.sessions.expire(order.stripe_session_id);
+        await stripe.checkout.sessions.expire(staleSessionId);
       } catch (err) {
         console.log(`Order ${orderId}: previous Stripe session not expired (${err.message})`);
       }

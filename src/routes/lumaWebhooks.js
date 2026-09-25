@@ -5,7 +5,59 @@
  */
 
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
+
+/**
+ * Where this router is mounted in server.js. Kept here so the registration
+ * helper (routes/luma.js) and the receiver can never disagree on the URL.
+ */
+const MOUNT_PATH = '/api/luma-webhooks';
+
+/**
+ * Optional shared secret. Luma does not sign its webhooks, so without one
+ * this endpoint takes a POST from anyone on the internet and, on a matching
+ * order number, marks the order shipped and emails the customer. With
+ * LUMA_WEBHOOK_TOKEN set, the secret becomes part of the URL registered with
+ * Luma (/api/luma-webhooks/<token>) and the bare path stops answering.
+ *
+ * Unset, the bare path keeps working exactly as before, so nothing breaks
+ * until the token is set AND the webhook is re-registered with Luma via
+ * POST /api/luma/webhook/register. Do both in one sitting: setting the env
+ * var alone would silently reject Luma's real shipping events.
+ */
+function webhookToken() {
+  return String(process.env.LUMA_WEBHOOK_TOKEN || '').trim();
+}
+
+/** The path Luma should call, with the token when one is configured. */
+function webhookPath() {
+  const token = webhookToken();
+  return token ? `${MOUNT_PATH}/${encodeURIComponent(token)}` : MOUNT_PATH;
+}
+
+function tokenMatches(given) {
+  const a = Buffer.from(String(given || ''), 'utf8');
+  const b = Buffer.from(webhookToken(), 'utf8');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+/**
+ * Gate for both the GET reachability check and the POST receiver. Rejections
+ * are 404, not 401: to anyone probing, a tokenless or wrong-token URL should
+ * look like nothing is there.
+ */
+function requireToken(req, res, next) {
+  const given = req.params.token || '';
+  if (!webhookToken()) {
+    // No secret configured: only the bare path exists.
+    if (given) return res.status(404).json({ error: 'Not found' });
+    return next();
+  }
+  if (given && tokenMatches(given)) return next();
+  console.warn(`Luma webhook: rejected ${req.method} with ${given ? 'a wrong' : 'no'} token`);
+  return res.status(404).json({ error: 'Not found' });
+}
 
 /**
  * A clickable tracking link, built from the carrier when the printer sends a
@@ -16,6 +68,11 @@ const router = express.Router();
  * Unknown carrier returns '' rather than a guess: the status page and the
  * email both fall back to showing the plain number, which is honest, whereas
  * a wrong link is worse than no link.
+ *
+ * This is the ONLY source of a tracking link. A URL carried in the payload is
+ * never used: the webhook is unsigned, and a link we email is a link the
+ * customer will click, so it must be one we composed from a known carrier
+ * domain and never one a sender handed us.
  */
 function trackingUrlFor(carrier, number) {
   if (!number) return '';
@@ -28,20 +85,20 @@ function trackingUrlFor(carrier, number) {
 }
 
 /**
- * GET /api/luma-webhooks
+ * GET /api/luma-webhooks[/:token]
  * Reachability check — Luma pings the URL with a GET when registering the
  * webhook and needs a 200 before it will accept the subscription.
  */
-router.get('/', (req, res) => {
+router.get(['/', '/:token'], requireToken, (req, res) => {
   res.status(200).json({ ok: true, service: 'luma-webhook' });
 });
 
 /**
- * POST /api/luma-webhooks
+ * POST /api/luma-webhooks[/:token]
  * Receives shipping events from Luma Prints.
  * Raw body is parsed here (configured in server.js via express.raw()).
  */
-router.post('/', async (req, res) => {
+router.post(['/', '/:token'], requireToken, async (req, res) => {
   const db = req.app.locals.db;
 
   let event;
@@ -95,9 +152,8 @@ router.post('/', async (req, res) => {
       || event.trackingNumber || event.TrackingNumber || '';
     const carrier = shipment.carrier || shipment.Carrier
       || event.carrier || event.Carrier || '';
-    const trackingUrl = shipment.trackingUrl || shipment.TrackingUrl
-      || event.trackingUrl || event.TrackingUrl
-      || trackingUrlFor(carrier, trackingNumber);
+    // Composed from the carrier, never read from the payload (see trackingUrlFor).
+    const trackingUrl = trackingUrlFor(carrier, trackingNumber);
 
     if (!trackingNumber) {
       console.warn(
@@ -210,3 +266,5 @@ router.post('/', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.webhookPath = webhookPath;
+module.exports.trackingUrlFor = trackingUrlFor;

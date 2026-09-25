@@ -1,6 +1,22 @@
 /**
  * Database – SQLite via sql.js (pure JS, no native compilation needed).
  * Provides a synchronous-feeling API with auto-save to disk.
+ *
+ * sql.js holds the whole database in memory; the file on the volume is a copy
+ * we keep writing out. Three rules keep that copy trustworthy:
+ *
+ *   1. It is never written in place. Each save goes to a temp file, is forced
+ *      to disk, and is then renamed over store.db. A rename is atomic, so a
+ *      crash or a redeploy mid-save leaves the previous good file, never half
+ *      of a new one.
+ *   2. Every change reaches disk. A change that lands while a save is already
+ *      running is picked up by another pass of the same writer, not dropped
+ *      because "a save is in progress".
+ *   3. An older copy never replaces a newer one. Each write carries the
+ *      version of the data it exported, and only a newer version is renamed
+ *      into place. That matters when flushSync() (the urgent path) runs while
+ *      a slower debounced save is still in flight: the late finisher holds
+ *      older data and must throw its temp file away, not land on top.
  */
 
 const initSqlJs = require('sql.js');
@@ -9,31 +25,82 @@ const fs = require('fs');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', '..', 'data');
 const DB_PATH = path.join(DATA_DIR, 'store.db');
+// The debounced writer and flushSync() each have their own temp file, so the
+// urgent path never writes into a file the background path is halfway through.
+const SAVE_TMP_PATH = path.join(DATA_DIR, 'store.db.tmp');
+const FLUSH_TMP_PATH = path.join(DATA_DIR, 'store.db.flush.tmp');
 const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 
 let db = null;
 
-/** Save the in-memory database to disk (debounced, async) */
+// Versions: _memVersion counts changes made in memory, _diskVersion is the
+// newest of those known to be on disk. The file is current when they match.
+let _memVersion = 0;
+let _diskVersion = 0;
 let _saveTimer = null;
-let _saving = false;
+let _writerRunning = false;
 
+/** Write bytes to a temp file and force them to disk before returning. */
+async function writeDurable(file, bytes) {
+  const handle = await fs.promises.open(file, 'w');
+  try {
+    await handle.writeFile(bytes);
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+
+function writeDurableSync(file, bytes) {
+  const fd = fs.openSync(file, 'w');
+  try {
+    fs.writeFileSync(fd, bytes);
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/**
+ * The one background writer. Loops until the file is current, so changes
+ * made during a pass are written by the next pass. The slow part (writing and
+ * syncing the temp file) is async; the version check and the rename are
+ * synchronous together, so nothing can run between "is mine still the newest?"
+ * and "put it in place".
+ */
+async function runWriter() {
+  if (_writerRunning) return; // the running pass will see the new version
+  _writerRunning = true;
+  try {
+    while (db && _diskVersion < _memVersion) {
+      const version = _memVersion;
+      const bytes = Buffer.from(db.export());
+      await writeDurable(SAVE_TMP_PATH, bytes);
+      if (version > _diskVersion) {
+        fs.renameSync(SAVE_TMP_PATH, DB_PATH);
+        _diskVersion = version;
+      } else {
+        // flushSync() put newer data on disk while this pass was writing.
+        fs.rmSync(SAVE_TMP_PATH, { force: true });
+      }
+    }
+  } catch (err) {
+    // The file still holds the last good copy. The unsaved changes stay
+    // counted, so the next write (or shutdown's flushSync) retries them.
+    console.error('Database save error:', err);
+  } finally {
+    _writerRunning = false;
+  }
+}
+
+/** Note a change and save it soon (debounced: a burst costs one write). */
 function save() {
   if (!db) return;
-
-  // Debounce: coalesce rapid writes into a single disk flush
+  _memVersion++;
   if (_saveTimer) clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(async () => {
+  _saveTimer = setTimeout(() => {
     _saveTimer = null;
-    if (_saving || !db) return;
-    _saving = true;
-    try {
-      const data = db.export();
-      await fs.promises.writeFile(DB_PATH, Buffer.from(data));
-    } catch (err) {
-      console.error('Database save error:', err);
-    } finally {
-      _saving = false;
-    }
+    runWriter();
   }, 100);
 }
 
@@ -42,28 +109,30 @@ function save() {
  *
  * The debounce above is the right trade for ordinary writes: a burst of order
  * updates costs one disk write instead of twenty. But a debounce always leaves
- * a window where a fact exists only in memory, and for one class of write that
- * window is unrecoverable.
+ * a window where a fact exists only in memory, and a redeploy lands squarely
+ * in it. Railway sends SIGTERM and the process exits within 100ms of the last
+ * write, so the payment a webhook just recorded, or the approval a customer
+ * just gave, can be the write that never reaches the volume. Some facts cannot
+ * be asked for twice: Stripe considers a 200'd event delivered, and Etsy
+ * retires a refresh token the moment we spend it, so a lost write there locks
+ * the shop out until a human reconnects by hand.
  *
- * Etsy rotates its refresh token on every use. The moment we spend the old one
- * Etsy retires it, so if this process dies before the new one reaches the
- * volume (Railway sends SIGTERM for a redeploy, and 100ms is a long time), the
- * file still holds a credential Etsy will never accept again. The shop is then
- * locked out until a human reconnects by hand, and nothing in the logs says
- * why.
- *
- * So anything that spends a single-use credential calls this instead of
- * trusting the debounce, and shutdown() calls it so every other pending write
- * survives a redeploy too.
+ * So shutdown calls this before exiting, and anything that records such a
+ * fact calls it too instead of trusting the debounce. Safe to call at any
+ * time, including while a debounced save is in flight (see rule 3 above).
  */
-function flush() {
+function flushSync() {
   if (!db) return;
   if (_saveTimer) {
     clearTimeout(_saveTimer);
     _saveTimer = null;
   }
+  if (_diskVersion === _memVersion) return;
   try {
-    fs.writeFileSync(DB_PATH, Buffer.from(db.export()));
+    const version = _memVersion;
+    writeDurableSync(FLUSH_TMP_PATH, Buffer.from(db.export()));
+    fs.renameSync(FLUSH_TMP_PATH, DB_PATH);
+    _diskVersion = version;
   } catch (err) {
     console.error('Database flush error:', err);
   }
@@ -170,13 +239,17 @@ async function init() {
  * against app-level corruption and gives an off-site pull point (paired with
  * the gated download endpoint). `stamp` is passed in (callers have a clock;
  * this module must not call Date() so it stays deterministic in tests).
+ * Written through a temp file like the live copy, so a snapshot that exists
+ * is a whole one.
  */
 function backupNow(stamp, keep = 14) {
   if (!db) throw new Error('Database not initialized');
   const dir = path.join(DATA_DIR, 'backups');
   fs.mkdirSync(dir, { recursive: true });
   const dest = path.join(dir, `store-${stamp}.db`);
-  fs.writeFileSync(dest, Buffer.from(db.export()));
+  const tmp = `${dest}.tmp`;
+  writeDurableSync(tmp, Buffer.from(db.export()));
+  fs.renameSync(tmp, dest);
 
   // Prune oldest, keep the newest `keep`.
   const snaps = fs.readdirSync(dir)
@@ -188,4 +261,6 @@ function backupNow(stamp, keep = 14) {
   return dest;
 }
 
-module.exports = { init, backupNow, flush, DB_PATH };
+// The brands grew different names for the same call (SBM `flush`, KT
+// `flushSync`). Both are exported so code ported in either direction works.
+module.exports = { init, backupNow, flushSync, flush: flushSync, DB_PATH };

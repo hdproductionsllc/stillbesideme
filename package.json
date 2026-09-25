@@ -12,7 +12,7 @@
     "check-render": "node scripts/check-render-parity.js",
     "check-legibility": "node scripts/check-poem-legibility.js",
     "check-csp": "node scripts/check-analytics-csp.js",
-    "test": "node tests/order-timeline.test.js && node tests/frame-mockup.test.js && node tests/luma-webhook-tracking.test.js && node tests/customer-review.test.js",
+    "test": "node tests/order-timeline.test.js && node tests/frame-mockup.test.js && node tests/luma-webhook-tracking.test.js && node tests/customer-review.test.js && node tests/stripe-webhook-guards.test.js && node tests/route-guards.test.js && node tests/database-durability.test.js && node tests/whcc-webhook-signature.test.js",
     "build": "npm test"
   },
   "dependencies": {

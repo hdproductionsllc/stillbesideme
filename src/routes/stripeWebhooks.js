@@ -1,7 +1,12 @@
 /**
  * Stripe Webhook Handler
- * Processes checkout.session.completed and checkout.session.expired events.
- * On successful payment: saves shipping and asks David/Rebecca to review the
+ * Processes the Checkout Session lifecycle:
+ *   checkout.session.completed               paid (card), or created-but-unpaid
+ *                                            for delayed methods
+ *   checkout.session.async_payment_succeeded the delayed payment cleared
+ *   checkout.session.async_payment_failed    the delayed payment did not clear
+ *   checkout.session.expired                 customer abandoned
+ * On confirmed payment: saves shipping and asks David/Rebecca to review the
  * proof internally.
  *
  * The customer has ALREADY approved their proof, inline, before paying (see
@@ -9,15 +14,41 @@
  * to approve anything again. The proof they approved is preserved untouched:
  * it is the evidence behind the payment, so this handler will not re-render
  * over it.
+ *
+ * Money only moves an order forward when the session that paid is the session
+ * the order is waiting on, for the amount the order was priced at. See
+ * handleCheckoutCompleted for why that is not a formality.
  */
 
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 
+// Statuses a paid session can no longer move. Includes 'delivered' so a
+// duplicate checkout.session.completed after a digital order is delivered
+// can't reset it and regenerate the proof_token that the customer's download
+// link is keyed on.
+//
+// 'cancelled' is deliberately NOT here. A payment landing on a cancelled
+// order is not a duplicate, it is money taken for something we told the
+// customer was off. It falls through to the mismatch branch below, which
+// alerts a human instead of returning a quiet 200.
+const ALREADY_PAID_STATUSES = [
+  'awaiting_review', 'proof_ready', 'proof_approved', 'change_requested',
+  'in_production', 'shipped', 'delivered',
+];
+
 /**
  * POST /api/stripe-webhooks
  * Receives events from Stripe. Expects raw body for signature verification.
+ *
+ * Response codes are a contract with Stripe's retry loop:
+ *   200  handled, or deliberately skipped (an order we do not know, which on
+ *        this shared Stripe account is usually a sibling brand's, or a
+ *        duplicate). Nothing a retry could change.
+ *   400  bad signature. Never ours to retry.
+ *   500  something threw mid-way. Stripe retries for up to three days, which
+ *        is exactly what a paid order with a half-written row needs.
  */
 router.post('/', async (req, res) => {
   const db = req.app.locals.db;
@@ -35,33 +66,41 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: `Webhook Error: ${err.message}` });
   }
 
+  const session = event.data.object;
+
   try {
     switch (event.type) {
-      case 'checkout.session.completed': {
-        const session = event.data.object;
+      case 'checkout.session.completed':
+      case 'checkout.session.async_payment_succeeded':
         await handleCheckoutCompleted(session, db);
         break;
-      }
 
-      case 'checkout.session.expired': {
-        const session = event.data.object;
+      case 'checkout.session.async_payment_failed':
+        await handleAsyncPaymentFailed(session, db);
+        break;
+
+      case 'checkout.session.expired':
         await handleCheckoutExpired(session, db);
         break;
-      }
 
       default:
         console.log(`Stripe webhook: unhandled event type ${event.type}`);
     }
   } catch (err) {
     console.error('Stripe webhook processing error:', err);
-    // Still return 200 to prevent Stripe from retrying
+    return res.status(500).json({ error: 'Webhook processing failed; Stripe will retry.' });
   }
 
   res.json({ received: true });
 });
 
 /**
- * Handle successful payment.
+ * Handle a completed Checkout Session.
+ *
+ * Reached from checkout.session.completed and, for delayed payment methods
+ * (bank debits and the like), again from async_payment_succeeded once the
+ * money actually clears. The same checks run both times; only a session that
+ * is paid, current, and priced as the order expects advances anything.
  */
 async function handleCheckoutCompleted(session, db) {
   const orderId = session.metadata?.orderId;
@@ -76,12 +115,87 @@ async function handleCheckoutCompleted(session, db) {
     return;
   }
 
-  // Idempotency – don't process twice. Includes the terminal states
-  // (delivered/cancelled) so a duplicate checkout.session.completed after a
-  // digital order is delivered can't reset it and regenerate the proof_token
-  // that the customer's download link is keyed on.
-  if (['awaiting_review', 'proof_ready', 'proof_approved', 'change_requested', 'in_production', 'shipped', 'delivered', 'cancelled'].includes(order.status)) {
+  // Idempotency: don't process twice.
+  if (ALREADY_PAID_STATUSES.includes(order.status)) {
     console.log(`Stripe webhook: order ${orderId} already processed (status: ${order.status})`);
+    return;
+  }
+
+  // A completed session is not necessarily a paid one. Delayed methods
+  // complete the session first and settle later, at which point Stripe sends
+  // async_payment_succeeded (or _failed) and we come back through here. Until
+  // then the order is a promise, not a payment, and it stays pending.
+  //
+  // The test is 'unpaid' rather than 'not paid', which is Stripe's own
+  // fulfilment rule. payment_status has exactly three values: paid, unpaid,
+  // and no_payment_required. The third is what a session worth $0 reports,
+  // so a 100% promotion code (a free test order, or a friends and family
+  // code) is a real order that simply has no payment_intent behind it.
+  // Treating it as unpaid would strand it in pending_payment forever.
+  if (session.payment_status === 'unpaid') {
+    console.log(`Stripe webhook: order ${orderId} session ${session.id} completed but payment_status is "${session.payment_status}", waiting`);
+    db.run(
+      `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+      [orderId, 'payment_pending', JSON.stringify({
+        stripeSessionId: session.id,
+        paymentStatus: session.payment_status || null,
+        paymentIntentId: session.payment_intent || null,
+      })]
+    );
+    return;
+  }
+
+  // The session that paid must be the session this order is waiting on, for
+  // the amount the order was priced at. One order row lives through a whole
+  // customize, proof, edit, proof, pay journey (see findOpenSessionOrder in
+  // checkout.js), and each edit rewrites the SKU, the fields and the price
+  // under it while an earlier Stripe session for the previous version may
+  // still be open in another tab. Without this check, paying that stale
+  // session would print the edited artwork at the old price, or print a
+  // draft the customer never approved. amount_subtotal is compared rather
+  // than amount_total because promotion codes are allowed at checkout and
+  // discount the total, not the price of the thing being made.
+  const sessionMismatch = order.stripe_session_id !== session.id;
+  const amountMismatch = Number(session.amount_subtotal) !== Number(order.total_cents);
+  const statusMismatch = order.status !== 'pending_payment';
+  if (sessionMismatch || amountMismatch || statusMismatch) {
+    const reasons = [];
+    if (statusMismatch) reasons.push(`order status is "${order.status}", expected "pending_payment"`);
+    if (sessionMismatch) reasons.push(`order is waiting on session ${order.stripe_session_id || '(none)'}, paid session is ${session.id}`);
+    if (amountMismatch) reasons.push(`order total is ${order.total_cents} cents, session subtotal is ${session.amount_subtotal} cents`);
+    const details = {
+      stripeSessionId: session.id,
+      orderStripeSessionId: order.stripe_session_id || null,
+      paymentIntentId: session.payment_intent || null,
+      orderStatus: order.status,
+      orderTotalCents: order.total_cents,
+      sessionAmountSubtotal: session.amount_subtotal ?? null,
+      sessionAmountTotal: session.amount_total ?? null,
+      reasons,
+    };
+    console.error(`Stripe webhook: payment mismatch on order ${orderId}: ${reasons.join('; ')}`);
+    db.run(
+      `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+      [orderId, 'payment_mismatch', JSON.stringify(details)]
+    );
+    // This is real money against an order we refuse to advance. A human has
+    // to look, and quickly: either refund it or reconcile it by hand.
+    try {
+      const emailService = require('../services/emailService');
+      const shortId = orderId.substring(0, 8).toUpperCase();
+      await emailService.sendAdminAlert(
+        `Order ${shortId}: payment received but not applied`,
+        `A Stripe payment came in for order ${shortId} but it does not match the order, so the order was NOT moved forward.\n\n` +
+        `Order ID: ${orderId}\n` +
+        `Stripe session: ${session.id}\n` +
+        `Payment intent: ${session.payment_intent || '(none)'}\n` +
+        `Customer email: ${session.customer_details?.email || '(none)'}\n\n` +
+        `What did not match:\n  ${reasons.join('\n  ')}\n\n` +
+        `The customer has been charged. Check the order in the admin dashboard and either refund the payment in Stripe or reconcile the order by hand.`
+      );
+    } catch (alertErr) {
+      console.error(`Failed to send payment mismatch alert for order ${orderId}:`, alertErr.message);
+    }
     return;
   }
 
@@ -158,6 +272,11 @@ async function handleCheckoutCompleted(session, db) {
       amountTotal: session.amount_total,
     })]
   );
+
+  // A payment is a fact Stripe will not tell us twice: once we answer 200 the
+  // event is spent. Put it on disk now rather than trusting the debounce to
+  // outlive a redeploy that lands in the next 100ms.
+  require('../db/database').flush();
 
   // Create the Story Vault for this now-paid order. This lives here, not in
   // checkout.js, for one hard reason: checkout.js inserts a 'pending_payment'
@@ -318,6 +437,38 @@ async function handleCheckoutCompleted(session, db) {
 }
 
 /**
+ * Handle a delayed payment that did not clear.
+ *
+ * The session completed earlier with payment_status 'unpaid' (recorded as a
+ * payment_pending event) and the bank has now declined it. The order is left
+ * at pending_payment on purpose: Stripe emails the customer a link to try
+ * again, and a fresh success arrives as async_payment_succeeded. The event
+ * makes the failure visible on the order's timeline; a superseded session's
+ * failure is noted but is not this order's news.
+ */
+async function handleAsyncPaymentFailed(session, db) {
+  const orderId = session.metadata?.orderId;
+  if (!orderId) return;
+
+  const order = db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
+  if (!order) {
+    console.warn(`Stripe webhook: order ${orderId} not found for async payment failure`);
+    return;
+  }
+
+  console.log(`Stripe webhook: delayed payment failed for order ${orderId} (session ${session.id})`);
+  db.run(
+    `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
+    [orderId, 'payment_failed', JSON.stringify({
+      stripeSessionId: session.id,
+      paymentIntentId: session.payment_intent || null,
+      paymentStatus: session.payment_status || null,
+      superseded: !!(order.stripe_session_id && order.stripe_session_id !== session.id),
+    })]
+  );
+}
+
+/**
  * Handle expired checkout session (customer abandoned).
  *
  * Besides cancelling the order, this sends ONE gentle recovery email inviting
@@ -338,8 +489,12 @@ async function handleCheckoutExpired(session, db) {
   // order the customer is actively paying for on the current one — Stripe
   // expires abandoned sessions up to 24h later, and checkout.js also expires
   // the previous session itself each time it opens a new one.
-  if (order.stripe_session_id && order.stripe_session_id !== session.id) {
-    console.log(`Order ${orderId}: ignoring expiry of superseded Stripe session ${session.id}`);
+  //
+  // The row must point at THIS session to be cancelled by it. A NULL pointer
+  // means checkout.js has detached it on the way to opening a new session, so
+  // the expiry that follows is expected and cancels nothing.
+  if (order.stripe_session_id !== session.id) {
+    console.log(`Order ${orderId}: ignoring expiry of session ${session.id}, the order no longer points at it`);
     return;
   }
 

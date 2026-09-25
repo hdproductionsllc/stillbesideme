@@ -9,6 +9,19 @@ const whccEditorApi = require('../services/whccEditorApi');
 const whccCatalog = require('../services/whccCatalog');
 
 /**
+ * Operator tools only, gated exactly like /api/whcc and /api/luma: behind the
+ * admin session (ADMIN_PASSWORD + req.session.isAdmin, set by /admin/login).
+ * WHCC is the dormant fallback provider; nothing customer-facing calls this.
+ */
+router.use((req, res, next) => {
+  if (!process.env.ADMIN_PASSWORD) {
+    return res.status(503).json({ error: 'Admin access is not configured. Set ADMIN_PASSWORD in the environment.' });
+  }
+  if (req.session && req.session.isAdmin) return next();
+  res.status(401).json({ error: 'Not authorized. Sign in at /admin/login.' });
+});
+
+/**
  * GET /api/whcc-editor/health
  * Test Editor API authentication.
  */

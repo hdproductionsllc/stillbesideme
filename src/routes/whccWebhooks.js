@@ -29,12 +29,16 @@ function parseSignatureHeader(header) {
 /**
  * Verify WHCC webhook signature using HMAC-SHA256.
  * WHCC signs: "<timestamp>.<rawBody>" with consumer secret.
+ *
+ * Fails closed. With no secret there is nothing to check against, and an
+ * unchecked event can move an order to in_production, cancelled or shipped,
+ * so a missing secret refuses every event rather than trusting every one.
  */
 function verifySignature(rawBody, signatureHeader) {
   const secret = process.env.WHCC_CONSUMER_SECRET;
   if (!secret) {
-    console.warn('WHCC webhook: no consumer secret configured, skipping verification');
-    return true;
+    console.error('WHCC webhook: WHCC_CONSUMER_SECRET is not set, refusing the event');
+    return false;
   }
 
   const parsed = parseSignatureHeader(signatureHeader);

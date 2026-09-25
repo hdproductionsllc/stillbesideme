@@ -28,9 +28,9 @@ function extractTracking(event, trackingUrlFor) {
     || event.trackingNumber || event.TrackingNumber || '';
   const carrier = shipment.carrier || shipment.Carrier
     || event.carrier || event.Carrier || '';
-  const trackingUrl = shipment.trackingUrl || shipment.TrackingUrl
-    || event.trackingUrl || event.TrackingUrl
-    || trackingUrlFor(carrier, trackingNumber);
+  // Composed from the carrier, never read from the payload: a link in the
+  // webhook body would be emailed to the customer, and the endpoint is public.
+  const trackingUrl = trackingUrlFor(carrier, trackingNumber);
   return { trackingNumber, carrier, trackingUrl };
 }
 
@@ -109,6 +109,12 @@ check('reports nothing rather than guessing when tracking is absent', () => {
 
 check('an unknown carrier yields no link rather than a wrong one', () => {
   assert.strictEqual(trackingUrlFor('Royal Mail', '123'), '');
+});
+
+check('a tracking link in the payload is ignored, never emailed', () => {
+  const t = extractTracking({ orderNumber: '1', shipments: [{ trackingNumber: '1Z999', carrier: 'UPS', trackingUrl: 'https://evil.example/phish' }] }, trackingUrlFor);
+  assert.ok(t.trackingUrl.includes('ups.com'), `got "${t.trackingUrl}"`);
+  assert.ok(!t.trackingUrl.includes('evil.example'));
 });
 
 // Guard against the handler drifting away from the shape this file pins.

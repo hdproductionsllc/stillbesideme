@@ -173,12 +173,14 @@ router.get('/orders/:orderNumber/shipments', async (req, res) => {
 
 /**
  * POST /api/luma/webhook/register
- * Register our webhook callback URL with Luma.
+ * Register our webhook callback URL with Luma. The path comes from the
+ * receiver itself (lumaWebhooks.webhookPath), so when LUMA_WEBHOOK_TOKEN is
+ * set the registered URL carries the token and the two can never drift.
  */
 router.post('/webhook/register', async (req, res) => {
   const storeId = req.body.storeId || lumaOrderApi.LUMA_CONFIG.storeId;
   const baseUrl = req.body.baseUrl || process.env.BASE_URL;
-  const callbackUrl = `${baseUrl}/api/luma-webhooks`;
+  const callbackUrl = `${baseUrl}${require('./lumaWebhooks').webhookPath()}`;
 
   if (!storeId) {
     return res.status(400).json({

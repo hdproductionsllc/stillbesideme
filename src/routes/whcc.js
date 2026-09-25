@@ -10,6 +10,22 @@ const whccOrderApi = require('../services/whccOrderApi');
 const whccCatalog = require('../services/whccCatalog');
 
 /**
+ * Operator tools only, same as /api/luma: these submit orders to the lab,
+ * read its catalog and expose credential state. WHCC is the dormant fallback
+ * provider, so nothing customer-facing calls them, and the whole router sits
+ * behind the same admin session as /admin (ADMIN_PASSWORD + req.session.isAdmin,
+ * set by /admin/login). The WHCC webhook RECEIVER (whccWebhooks.js) is a
+ * different router and verifies its own signature.
+ */
+router.use((req, res, next) => {
+  if (!process.env.ADMIN_PASSWORD) {
+    return res.status(503).json({ error: 'Admin access is not configured. Set ADMIN_PASSWORD in the environment.' });
+  }
+  if (req.session && req.session.isAdmin) return next();
+  res.status(401).json({ error: 'Not authorized. Sign in at /admin/login.' });
+});
+
+/**
  * GET /api/whcc/health
  * Test WHCC Order API authentication.
  */
