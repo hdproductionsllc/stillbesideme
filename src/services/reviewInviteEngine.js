@@ -2,11 +2,15 @@
  * Customer review invitations.
  *
  * Once a day (see the REVIEW_INVITES_ENABLED-gated timer in server.js) this
- * looks for orders that shipped a while ago and asks the buyer, exactly once,
- * how the piece turned out. Ten days after the shipping event, not one: the
- * frame has to arrive, be unwrapped, and be hung somewhere before anyone can
- * honestly say whether it looks like their animal. Asking on day two would be
- * asking about a courier, not about the work.
+ * looks for orders the CARRIER has confirmed delivered and asks the buyer,
+ * exactly once, how the piece turned out. Four days after delivery, not on the
+ * day: the frame has to be unwrapped and hung somewhere before anyone can
+ * honestly say whether it looks like their animal.
+ *
+ * The clock is the carrier_delivered event written by deliveryEngine, never the
+ * shipping event. A fixed wait after shipping asked families whose parcel was
+ * late, lost or on its way back to us, which is the worst moment to ask
+ * anything. A parcel the carrier never confirms is never asked about.
  *
  * Exactly one ask, ever. There is no reminder schedule here and there must not
  * be one. A family that does not reply has said something, and chasing them for
@@ -23,8 +27,8 @@
  * ${BASE_URL}/review/:token.
  */
 
-// Days after the shipping event before the ask goes out.
-const INVITE_AFTER_DAYS = 10;
+// Days after carrier-confirmed delivery before the ask goes out.
+const INVITE_AFTER_DAYS = 4;
 
 // Upper bound on how far back this will reach. Without it, the first run after
 // this engine is switched on would email every customer in the history of the
@@ -33,8 +37,6 @@ const INVITE_AFTER_DAYS = 10;
 // older is treated as water under the bridge and skipped permanently.
 const INVITE_WITHIN_DAYS = 60;
 
-// Whichever provider fulfilled it, the shipping event is the clock start.
-const SHIPPED_EVENTS = ['luma_shipped', 'partner_shipped', 'whcc_shipped'];
 
 /** Pull the pet's name out of the order's saved fields (same keys the other engines use). */
 function petNameFor(order) {
@@ -59,26 +61,25 @@ async function checkAndSend() {
   const emailService = require('./emailService');
   const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
 
-  const placeholders = SHIPPED_EVENTS.map(() => '?').join(',');
-
-  // MIN(created_at) because a provider can re-deliver its shipping webhook; the
-  // first one is the true ship date. The window is applied in SQL at both ends.
+  // carrier_delivered's created_at IS the carrier's delivery time (see
+  // deliveryEngine). MIN() in case it is ever recorded twice. The window is
+  // applied in SQL at both ends.
   const candidates = db.all(
     `SELECT o.*,
-            s.shipped_at,
-            julianday('now') - julianday(s.shipped_at) AS days_since_shipped
+            d.delivered_at,
+            julianday('now') - julianday(d.delivered_at) AS days_since_delivered
        FROM orders o
-       JOIN (SELECT order_id, MIN(created_at) AS shipped_at
+       JOIN (SELECT order_id, MIN(created_at) AS delivered_at
                FROM order_events
-              WHERE event_type IN (${placeholders})
-              GROUP BY order_id) s
-         ON s.order_id = o.id
+              WHERE event_type = 'carrier_delivered'
+              GROUP BY order_id) d
+         ON d.order_id = o.id
       WHERE o.email IS NOT NULL AND o.email != ''
         AND o.proof_token IS NOT NULL AND o.proof_token != ''
-        AND julianday('now') - julianday(s.shipped_at) >= ?
-        AND julianday('now') - julianday(s.shipped_at) <= ?
-      ORDER BY s.shipped_at ASC`,
-    [...SHIPPED_EVENTS, INVITE_AFTER_DAYS, INVITE_WITHIN_DAYS]
+        AND julianday('now') - julianday(d.delivered_at) >= ?
+        AND julianday('now') - julianday(d.delivered_at) <= ?
+      ORDER BY d.delivered_at ASC`,
+    [INVITE_AFTER_DAYS, INVITE_WITHIN_DAYS]
   );
 
   let sent = 0, skipped = 0, failed = 0;
@@ -98,7 +99,7 @@ async function checkAndSend() {
     );
     if (reviewed) { skipped++; continue; }
 
-    const daysSince = Number(order.days_since_shipped);
+    const daysSince = Number(order.days_since_delivered);
 
     try {
       const result = await emailService.sendReviewInvite(
@@ -119,13 +120,13 @@ async function checkAndSend() {
         `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
         [order.id, 'review_invite_sent', JSON.stringify({
           afterDays: INVITE_AFTER_DAYS,
-          daysSinceShipped: Math.round(daysSince * 10) / 10,
+          daysSinceDelivered: Math.round(daysSince * 10) / 10,
           email: order.email,
           sentAt: new Date().toISOString(),
         })]
       );
       sent++;
-      console.log(`Review invite engine: asked order ${order.id} at ${order.email} (shipped ${daysSince.toFixed(1)}d ago)`);
+      console.log(`Review invite engine: asked order ${order.id} at ${order.email} (delivered ${daysSince.toFixed(1)}d ago)`);
     } catch (err) {
       // One family's send must never stop the run. Record it and keep going.
       console.error(`Review invite engine: invite failed for order ${order.id}:`, err.message);
