@@ -388,26 +388,18 @@ async function start() {
   }
 
   // Review invitations → asks a customer, once, how their piece turned out,
-  // four days after the CARRIER confirmed delivery. Same daily-timer shape as
-  // the three above, and gated OFF by default like the vault date engine: this
-  // is the only email we send that asks a family for something rather than
-  // telling them something, so it stays dormant until deliberately switched on
-  // with REVIEW_INVITES_ENABLED=true. Exactly one ask per order ever, enforced
-  // by review_invite_sent order_events, and only for orders delivered inside
+  // ten days after it shipped. Same daily-timer shape as the three above, and
+  // gated OFF by default like the vault date engine: this is the only email we
+  // send that asks a family for something rather than telling them something,
+  // so it stays dormant until deliberately switched on with
+  // REVIEW_INVITES_ENABLED=true. Exactly one ask per order ever, enforced by
+  // review_invite_sent order_events, and only for orders that shipped inside
   // the engine's 60-day window (so switching it on cannot email the entire
-  // back catalogue at once). The delivery check runs first, in the same tick,
-  // so a parcel confirmed today is counted from today. Without USPS
-  // credentials nothing is confirmed and nobody is asked.
+  // back catalogue at once).
   if (process.env.REVIEW_INVITES_ENABLED === 'true') {
-    const { checkDeliveries } = require('./src/services/deliveryEngine');
     const { checkAndSend } = require('./src/services/reviewInviteEngine');
-    const runReviewInvites = async () => {
-      try {
-        await checkDeliveries();
-      } catch (err) {
-        console.error('Delivery engine failed:', err.message);
-      }
-      await checkAndSend().catch((err) => console.error('Review invite engine failed:', err.message));
+    const runReviewInvites = () => {
+      checkAndSend().catch((err) => console.error('Review invite engine failed:', err.message));
     };
     runReviewInvites();
     setInterval(runReviewInvites, 24 * 60 * 60 * 1000).unref();

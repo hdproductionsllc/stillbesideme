@@ -4,10 +4,9 @@
  * Three things have to be true before REVIEW_INVITES_ENABLED is ever flipped
  * on in production, and this proves each of them:
  *
- *   1. The invite engine asks each family exactly once, four days after the
- *      carrier confirmed delivery (never on shipping alone), only inside the
- *      60-day window, only if we hold an email, and never logs a send that did
- *      not really happen (no-SMTP preview).
+ *   1. The invite engine asks each family exactly once, ten days after the
+ *      piece shipped, only inside the 60-day window, only if we hold an email,
+ *      and never logs a send that did not really happen (no-SMTP preview).
  *   2. The review page's submit works over the multipart contract the page now
  *      uses (photo included) AND the older JSON contract, refuses a second
  *      review per order, and never lets a customer publish anything.
@@ -38,18 +37,18 @@ const reviewInviteEngine = require('../src/services/reviewInviteEngine');
 const customerReviewRouter = require('../src/routes/customerReview');
 
 const ORDER_COLS = `(id, template_id, status, email, proof_token, fields_json)`;
-function insertOrder(db, id, { email, daysSinceShipped, daysSinceDelivered, status = 'shipped', pet = 'Rex' }) {
+function insertOrder(db, id, { email, daysSinceShipped, status = 'shipped', pet = 'Rex' }) {
   db.run(
     `INSERT INTO orders ${ORDER_COLS} VALUES (?, 'pet', ?, ?, ?, ?)`,
     [id, status, email, `tok-${id}-0123456789`, JSON.stringify({ petName: pet })]
   );
-  const event = (type, days) => db.run(
-    `INSERT INTO order_events (order_id, event_type, created_at)
-     VALUES (?, ?, datetime('now', ?))`,
-    [id, type, `-${days} days`]
-  );
-  if (daysSinceShipped != null) event('luma_shipped', daysSinceShipped);
-  if (daysSinceDelivered != null) event('carrier_delivered', daysSinceDelivered);
+  if (daysSinceShipped != null) {
+    db.run(
+      `INSERT INTO order_events (order_id, event_type, created_at)
+       VALUES (?, 'luma_shipped', datetime('now', ?))`,
+      [id, `-${daysSinceShipped} days`]
+    );
+  }
 }
 
 /** A phone-shaped photo: landscape pixels, EXIF says "rotate me", plus copyright to prove stripping. */
@@ -72,14 +71,11 @@ async function postMultipart(base, token, fields, photo) {
   const db = await database.init();
 
   // ── 1. The invite engine ─────────────────────────────────────────────
-  insertOrder(db, 'ready', { email: 'family@example.test', daysSinceShipped: 9, daysSinceDelivered: 5 });
-  insertOrder(db, 'tooSoon', { email: 'soon@example.test', daysSinceShipped: 6, daysSinceDelivered: 2 });
-  insertOrder(db, 'ancient', { email: 'old@example.test', daysSinceShipped: 95, daysSinceDelivered: 90 });
-  insertOrder(db, 'etsy', { email: null, daysSinceShipped: 9, daysSinceDelivered: 5 });
-  insertOrder(db, 'notShipped', { email: 'wait@example.test', status: 'submitted' });
-  // Shipped three weeks ago, carrier never confirmed: the old 10-days-after-
-  // shipping rule would have asked this family. It must not.
-  insertOrder(db, 'lostInPost', { email: 'lost@example.test', daysSinceShipped: 21 });
+  insertOrder(db, 'ready', { email: 'family@example.test', daysSinceShipped: 12 });
+  insertOrder(db, 'tooSoon', { email: 'soon@example.test', daysSinceShipped: 2 });
+  insertOrder(db, 'ancient', { email: 'old@example.test', daysSinceShipped: 90 });
+  insertOrder(db, 'etsy', { email: null, daysSinceShipped: 12 });
+  insertOrder(db, 'notShipped', { email: 'wait@example.test', daysSinceShipped: null, status: 'submitted' });
 
   const calls = [];
   const realSend = emailService.sendReviewInvite;

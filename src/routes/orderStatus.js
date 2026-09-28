@@ -11,7 +11,6 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const { trackingForOrder } = require('../services/orderTracking');
 const router = express.Router();
 
 const TEMPLATES_DIR = path.join(__dirname, '..', 'data', 'templates');
@@ -86,6 +85,28 @@ function frameForOrder(order) {
     return { id: chosen.id, label: chosen.label, swatch: chosen.swatch };
   } catch (e) { /* template gone or renamed: fall back to no frame */ }
   return null;
+}
+
+function trackingForOrder(db, order) {
+  // Partner-fulfilled orders carry tracking on the orders row itself
+  if (order.tracking_number) {
+    return {
+      number: order.tracking_number,
+      carrier: order.tracking_carrier || '',
+      url: order.tracking_url || '',
+    };
+  }
+
+  const luma = db.get(
+    'SELECT tracking_number, tracking_carrier, tracking_url FROM luma_orders WHERE order_id = ? ORDER BY created_at DESC LIMIT 1',
+    [order.id]
+  );
+  if (!luma || !luma.tracking_number) return null;
+  return {
+    number: luma.tracking_number,
+    carrier: luma.tracking_carrier || '',
+    url: luma.tracking_url || '',
+  };
 }
 
 /**
