@@ -1,34 +1,57 @@
 /**
  * poemGenerator.js – AI memorial poem/letter generation via Anthropic Claude API.
  *
- * Primary model: Claude Sonnet 5 (claude-sonnet-5) — near-Opus creative
- * quality at ~1/3 the price of Fable 5 and faster, which is the right tier for
- * a short poem (Fable 5 was overkill at $10/$50 per 1M + always-on thinking).
- * Falls back to Haiku 4.5 on a refusal/error (cheapest, still capable), and
- * finally to a template-based stub when no API key is configured, so the
- * customizer never breaks regardless of environment.
+ * Primary model: Claude Sonnet 5.5 (claude-sonnet-5-5). Chosen by a blind
+ * side-by-side against Sonnet 5 on these prompts (Sept 2026): the owner
+ * preferred its poem in 4 pairs of 5, at the same price and speed, about a
+ * third of a cent per poem. Falls back to Haiku 4.5 on a refusal/error
+ * (cheapest, still capable), and finally to a template-based stub when no API
+ * key is configured, so the customizer never breaks regardless of environment.
+ *
+ * Every poem is checked before anyone sees it (findProblem below). The same
+ * test caught Sonnet 5.5 writing half a poem, then "Wait, let me set that
+ * right.", then the poem again, all in the text a customer reads. A poem that
+ * fails the check is written again once, then handed to the fallback model.
  *
  * Supports pet tributes (poem OR first-person "letter from them" format)
  * and human memorials (Letter From Heaven).
  *
  * API notes (verified against the Claude API reference):
- * - Do NOT pass temperature/top_p/top_k on Sonnet 5 (non-default values = 400)
- * - Sonnet 5 runs adaptive thinking by default; `effort: 'medium'` keeps the
- *   poem quick and cheap without deep reasoning it doesn't need
+ * - Do NOT pass temperature/top_p/top_k on Sonnet 5.5 (non-default values = 400)
+ * - Thinking cannot be switched off on Sonnet 5.5 (`disabled` = 400); depth is
+ *   set by `effort`. 'medium' is the setting the blind test was judged at, so
+ *   changing it means judging the poems again
  * - A model may return stop_reason 'refusal' with empty content — must check
  *   before reading content[0]
  */
 
 const Anthropic = require('@anthropic-ai/sdk');
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = 'claude-sonnet-5-5';
 const FALLBACK_MODEL = 'claude-haiku-4-5';
-// Sonnet 5 runs adaptive thinking by default and the thinking shares this
-// budget with the poem. At 1024 the thinking alone used it up and every
+// Sonnet 5.5 thinks before it writes and the thinking shares this budget with
+// the poem. At 1024 (on Sonnet 5) the thinking alone used it up and every
 // request came back with stop_reason 'max_tokens' and no text, which pushed
 // production onto the template stub. A poem is a few hundred tokens; this
 // cap is only a ceiling.
 const MAX_TOKENS = 8192;
+
+// The most lines each prompt below asks for.
+const ASKED_MAX_LINES = { poem: 12, letter: 14 };
+// A poem may run a little long and still be a poem, and the print layout is
+// proven out to 18 lines (scripts/check-poem-legibility.js). Past half as long
+// again it is no longer a long poem, it is two drafts.
+const LENGTH_TOLERANCE = 1.5;
+// Tries per model before moving down the chain: the poem, and one rewrite.
+const TRIES_PER_MODEL = 2;
+
+// A model talking about its writing instead of writing. Kept narrow on
+// purpose: "Let me tell you about the porch" is a fine line in a letter.
+const REVISION_TALK = new RegExp([
+  "\\blet me (?:set|fix|redo|rewrite|revise|correct|try) (?:that|this|it)\\b",
+  "\\bhere(?:'s| is) (?:the|a|my|your) (?:poem|letter|revised|final)\\b",
+  "\\b(?:revised|corrected|final) (?:version|draft)\\b",
+].join('|'), 'i');
 
 const SYSTEM_PROMPT = `You are a master elegist who writes brief, luminous memorial verse and letters. Your work is printed beside their photo in a framed archival print that will hang on a family's wall for decades, so every word must earn its place.
 
@@ -142,12 +165,38 @@ function stripMarkdown(text) {
 }
 
 /**
- * Call one model and return the text, throwing on refusal or empty content.
+ * What is wrong with this text as something to print, or null if nothing is.
+ *
+ * Three signs that the model handed over its working instead of the poem:
+ * it runs far past the length asked for, its opening line comes round again
+ * before the end (it started over), or it talks about revising itself. None
+ * of them judges whether the poem is good. That stays with the customer and
+ * the review gate.
+ *
+ * @param {string} text
+ * @param {'poem'|'letter'} format
+ * @returns {string|null}
  */
+function findProblem(text, format) {
+  const lines = String(text || '').split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return 'empty';
+
+  const ceiling = Math.round((ASKED_MAX_LINES[format] || ASKED_MAX_LINES.poem) * LENGTH_TOLERANCE);
+  if (lines.length > ceiling) return `${lines.length} lines, the most allowed is ${ceiling}`;
+
+  // Closing on the opening line is a device poets use. Meeting it again with
+  // more poem still to come is a second draft.
+  const again = lines.indexOf(lines[0], 1);
+  if (again !== -1 && again !== lines.length - 1) return 'the opening line comes round again, so it started over';
+
+  if (REVISION_TALK.test(text)) return 'it talks about revising itself';
+  return null;
+}
+
 /**
  * The request for one model. Pure, so it can be inspected in tests.
  *
- * output_config.effort is a Sonnet 5 feature. Haiku 4.5 rejects it with a 400
+ * output_config.effort is a Sonnet feature. Haiku 4.5 rejects it with a 400
  * ("This model does not support the effort parameter"), which is how the
  * fallback used to fail in lockstep with the primary and land on the stub.
  */
@@ -166,13 +215,18 @@ function requestParams(model, prompt) {
   return params;
 }
 
+/**
+ * Call one model and return the text, throwing on refusal or empty content.
+ */
 async function callModel(api, model, prompt) {
   const response = await api.messages.create(requestParams(model, prompt));
 
   // One line per call so the Railway log shows fallback rate and thinking cost.
+  // A refusal names its category, so a pattern of them can be seen and acted on.
   const usage = response.usage || {};
+  const category = response.stop_details && response.stop_details.category;
   console.log(
-    `Poem generation (${model}): stop=${response.stop_reason} `
+    `Poem generation (${model}): stop=${response.stop_reason}${category ? ` category=${category}` : ''} `
     + `input=${usage.input_tokens} output=${usage.output_tokens}`
   );
 
@@ -200,12 +254,17 @@ async function callModel(api, model, prompt) {
  *   category 'pet' + format 'letter' → letter from the pet's voice
  *   else                        → pet poem
  *
- * Model chain: Sonnet 5 → Haiku 4.5 → template stub. The generationId is
- * tagged with the model that actually produced the text (ai-sonnet / ai-haiku)
- * so quality and fallback rates are observable in the session history.
+ * Model chain: Sonnet 5.5 → Haiku 4.5 → template stub. A poem that fails
+ * findProblem is written again by the same model once before the chain moves
+ * on; an error or a refusal moves on at once, since asking again would only
+ * make the customer wait for the same answer. The generationId is tagged with
+ * the model that actually produced the text (ai-sonnet / ai-haiku) so quality
+ * and fallback rates are observable in the session history.
+ *
+ * @param {object} details  the customer's answers
+ * @param {object} [api]    an Anthropic client; tests pass their own
  */
-async function generate(details) {
-  const api = getClient();
+async function generate(details, api = getClient()) {
   const isHuman = details.category === 'human';
   const isPetLetter = !isHuman && details.format === 'letter';
 
@@ -221,17 +280,27 @@ async function generate(details) {
     : isPetLetter ? buildPetLetterPrompt(details)
     : buildPrompt(details);
 
+  const format = isHuman || isPetLetter ? 'letter' : 'poem';
+
   for (const model of [MODEL, FALLBACK_MODEL]) {
-    try {
-      const text = await callModel(api, model, prompt);
-      return {
-        poem: stripMarkdown(text),
-        generationId: `ai-${model === MODEL ? 'sonnet' : 'haiku'}-${Date.now()}`,
-        stubbed: false,
-      };
-    } catch (err) {
-      console.error(`Anthropic API error (${model}):`, err.message);
-      // try the next model in the chain
+    for (let attempt = 1; attempt <= TRIES_PER_MODEL; attempt++) {
+      let poem;
+      try {
+        poem = stripMarkdown(await callModel(api, model, prompt));
+      } catch (err) {
+        console.error(`Anthropic API error (${model}):`, err.message);
+        break; // try the next model in the chain
+      }
+
+      const problem = findProblem(poem, format);
+      if (!problem) {
+        return {
+          poem,
+          generationId: `ai-${model === MODEL ? 'sonnet' : 'haiku'}-${Date.now()}`,
+          stubbed: false,
+        };
+      }
+      console.warn(`Poem rejected (${model}, try ${attempt} of ${TRIES_PER_MODEL}): ${problem}`);
     }
   }
 
@@ -365,4 +434,4 @@ still loving you, always.`;
   };
 }
 
-module.exports = { generate };
+module.exports = { generate, findProblem, requestParams, MODEL, FALLBACK_MODEL };
