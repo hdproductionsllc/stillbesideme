@@ -3793,7 +3793,9 @@
     const toggle = document.getElementById('save-design-toggle');
     const panel = document.getElementById('save-design-panel');
     if (!toggle || !panel) return;
-    if (designSaved) { toggle.closest('.save-design').hidden = true; }
+    // Stays offered on a reopened design too: someone who arrived from the
+    // abandoned-checkout email was never sent the design itself, and may
+    // want it in their own inbox. It hides only once an email has gone out.
     toggle.addEventListener('click', () => {
       if (!panel.firstChild) panel.appendChild(buildSaveForm(() => { toggle.hidden = true; }));
       const open = panel.hidden;

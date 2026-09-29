@@ -231,17 +231,22 @@ router.post('/api/designs', saveLimiter, emailLimiter, async (req, res) => {
     // nothing. A different address is a new request and gets its own email.
     let emailed = false;
     if (email && (email !== row.email || !row.saved_email_sent_at)) {
-      // Asking again is fresh consent, so it lifts an earlier "stop". It does
-      // NOT clear reminder_sent_at: one reminder per design, ever.
+      // The email says either "one reminder follows" or "we won't email you
+      // again", depending on the switch at this moment, and that promise is
+      // recorded on the row: a design saved while reminders were off never
+      // gets one, however the switch is set later. Asking again is fresh
+      // consent, so it lifts an earlier "stop". It does NOT clear
+      // reminder_sent_at: one reminder per design, ever.
+      const remindersOn = remindersEnabled();
       db.run(
-        `UPDATE saved_designs SET email = ?, reminders_off = 0, saved_email_sent_at = NULL
+        `UPDATE saved_designs SET email = ?, reminders_off = ?, saved_email_sent_at = NULL
           WHERE id = ?`,
-        [email, row.id]
+        [email, remindersOn ? 0 : 1, row.id]
       );
       const emailService = require('../services/emailService');
       const result = await emailService.sendDesignSaved(email, {
         petName: row.pet_name,
-        remindersOn: remindersEnabled(),
+        remindersOn,
         ...linksFor(row),
       });
       // A no-SMTP preview resolves without a messageId: not a send, not logged.

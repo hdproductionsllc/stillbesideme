@@ -34,7 +34,7 @@ process.env.BASE_URL = 'https://example.test';
 process.env.STRIPE_SECRET_KEY = 'sk_test_not_a_real_key';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_not_a_real_secret';
 delete process.env.SMTP_HOST;
-delete process.env.DESIGN_REMINDERS_ENABLED;
+process.env.DESIGN_REMINDERS_ENABLED = 'true';
 fs.mkdirSync(process.env.DATA_DIR, { recursive: true });
 
 const express = require('express');
@@ -179,8 +179,37 @@ function proofBody() {
     assert.strictEqual(e.d.resumeUrl, `https://example.test/customize/pet-tribute?design=${token}`);
     assert.strictEqual(e.d.photoUrl, `https://example.test/d/${token}/photo`);
     assert.strictEqual(e.d.stopUrl, `https://example.test/d/${token}/stop`);
-    assert.strictEqual(e.d.remindersOn, false, 'the email must not promise a reminder while they are switched off');
-    assert.ok(db.get('SELECT saved_email_sent_at FROM saved_designs WHERE token = ?', [token]).saved_email_sent_at);
+    assert.strictEqual(e.d.remindersOn, true, 'reminders are on, so the email says one follows');
+    const saved = db.get('SELECT saved_email_sent_at, reminders_off FROM saved_designs WHERE token = ?', [token]);
+    assert.ok(saved.saved_email_sent_at);
+    assert.strictEqual(saved.reminders_off, 0);
+  });
+
+  await check('a design saved while reminders are OFF is promised none, and keeps that promise', async () => {
+    process.env.DESIGN_REMINDERS_ENABLED = 'false';
+    try {
+      const quiet = device(base);
+      await quiet.upload(photo);
+      const r = await quiet.json('POST', '/api/designs', {
+        templateId: 'pet-tribute', state: designerState(), email: 'quiet@example.test',
+      });
+      assert.deepStrictEqual(r.body, { saved: true, emailed: true });
+      const e = sent[sent.length - 1];
+      assert.strictEqual(e.to, 'quiet@example.test');
+      assert.strictEqual(e.d.remindersOn, false, 'the email must not promise a reminder while they are switched off');
+      const row = db.get(`SELECT reminders_off FROM saved_designs WHERE email = 'quiet@example.test'`);
+      assert.strictEqual(row.reminders_off, 1, 'recorded on the row, so switching reminders on later cannot break the promise');
+      // Asking again once reminders are on is fresh consent for one.
+      process.env.DESIGN_REMINDERS_ENABLED = 'true';
+      await quiet.json('POST', '/api/designs', {
+        templateId: 'pet-tribute', state: designerState(), email: 'quiet2@example.test',
+      });
+      assert.strictEqual(db.get(`SELECT reminders_off FROM saved_designs WHERE email = 'quiet2@example.test'`).reminders_off, 0);
+      db.run(`DELETE FROM saved_designs WHERE email = 'quiet2@example.test'`);
+      sent.length = 1;
+    } finally {
+      process.env.DESIGN_REMINDERS_ENABLED = 'true';
+    }
   });
 
   await check('pressing it again with the same address sends nothing more', async () => {
