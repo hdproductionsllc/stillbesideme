@@ -300,6 +300,8 @@
     if (showReviews) loadReviews();
   };
   document.getElementById('revStatus').addEventListener('change', loadReviews);
+  // The "new review" email links here, so it opens on the queue it is about.
+  if (location.hash === '#reviews') document.getElementById('viewToggle').click();
 
   let t;
   document.getElementById('q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(loadList, 200); });

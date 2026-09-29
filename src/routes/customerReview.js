@@ -22,6 +22,7 @@ const multer = require('multer');
 const router = express.Router();
 const customerReviews = require('../services/customerReviews');
 const reviewPhotos = require('../services/reviewPhotos');
+const emailService = require('../services/emailService');
 
 // A review is invited after the piece ships, but a customer who wants to write
 // one earlier should not be turned away. What IS refused is an order that never
@@ -189,6 +190,17 @@ router.post('/review/:token', acceptPhoto, express.json(), async (req, res) => {
   );
 
   console.log(`Customer review submitted for order ${order.id}: ${rating}/5, consent=${consent === 1}, photo=${!!photoPath}`);
+
+  // Tell the shop. The review is already safe, so this is not awaited and a
+  // failed alert costs the customer nothing: the row still waits in the queue.
+  emailService.sendReviewReceived(
+    order,
+    { rating, body, authorDisplay, consentToPublish: consent === 1 },
+    reviewPhotos.absolutePath(photoPath)
+  ).catch((err) => {
+    console.error(`Review alert failed for order ${order.id}:`, err.message);
+  });
+
   res.json({ success: true, hasPhoto: !!photoPath });
 });
 

@@ -13,6 +13,12 @@
  *   3. The photo is normalised (upright, resized, metadata gone) and reachable
  *      from outside only while the review is published with consent.
  *
+ * And one that keeps the shop from missing what arrives:
+ *
+ *   4. Every stored review tells the shop by email, exactly once, addressed to
+ *      ADMIN_EMAIL and never to the customer. A refused submit tells nobody,
+ *      and an alert that fails does not cost the customer their review.
+ *
  *   node tests/customer-review.test.js
  */
 
@@ -26,6 +32,7 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'sbm-review-test-'));
 process.env.DATA_DIR = path.join(TMP, 'data');
 process.env.UPLOADS_DIR = path.join(TMP, 'uploads');
 process.env.BASE_URL = 'https://example.test';
+process.env.ADMIN_EMAIL = 'shop@example.test';
 delete process.env.SMTP_HOST;
 fs.mkdirSync(process.env.DATA_DIR, { recursive: true });
 
@@ -123,6 +130,17 @@ async function postMultipart(base, token, fields, photo) {
   const base = `http://127.0.0.1:${server.address().port}`;
   const TOKEN = 'tok-ready-0123456789';
 
+  // The shop alert is watched from here on. The route does not wait for it,
+  // but it is always called before the response leaves.
+  const alerts = [];
+  const realAlert = emailService.sendReviewReceived;
+  let alertMode = 'ok';
+  emailService.sendReviewReceived = async (order, review, photoFile) => {
+    alerts.push({ order, review, photoFile });
+    if (alertMode === 'down') throw new Error('mail provider is down');
+    return { messageId: `alert-${alerts.length}` };
+  };
+
   let r = await fetch(`${base}/api/review/${TOKEN}`).then(x => x.json());
   assert.deepStrictEqual(r, { petName: 'Rex', alreadySubmitted: false, submittedRating: null });
 
@@ -134,6 +152,7 @@ async function postMultipart(base, token, fields, photo) {
   out = await postMultipart(base, TOKEN, { rating: 5 }, { buffer: Buffer.from('not a picture'), type: 'image/jpeg', name: 'x.jpg' });
   assert.strictEqual(out.status, 400);
   assert.strictEqual(db.get('SELECT COUNT(*) AS n FROM customer_reviews').n, 0, 'nothing saved for a bad photo');
+  assert.strictEqual(alerts.length, 0, 'a refused submit tells nobody');
 
   // The real thing: five stars, words, a phone photo, consent given.
   const photo = await phonePhoto();
@@ -150,6 +169,14 @@ async function postMultipart(base, token, fields, photo) {
   const stored = path.join(process.env.UPLOADS_DIR, 'reviews', 'ready.jpg');
   assert.ok(fs.existsSync(stored), 'photo landed on the uploads volume');
 
+  // The shop hears about it, once, with everything needed to act on it.
+  assert.strictEqual(alerts.length, 1, 'one alert for one stored review');
+  assert.strictEqual(alerts[0].order.id, 'ready');
+  assert.deepStrictEqual(alerts[0].review, {
+    rating: 5, body: 'It looks exactly like him.', authorDisplay: 'Keith L.', consentToPublish: true,
+  });
+  assert.strictEqual(alerts[0].photoFile, path.resolve(stored), 'the photo rides along');
+
   const meta = await sharp(stored).metadata();
   assert.strictEqual(meta.format, 'jpeg');
   assert.strictEqual(meta.exif, undefined, 'metadata stripped');
@@ -162,6 +189,7 @@ async function postMultipart(base, token, fields, photo) {
   assert.strictEqual(out.body.alreadySubmitted, true);
   r = await fetch(`${base}/api/review/${TOKEN}`).then(x => x.json());
   assert.strictEqual(r.alreadySubmitted, true);
+  assert.strictEqual(alerts.length, 1, 'a refused second review sends no second alert');
 
   // Pending means invisible: no review, no photo.
   let pub = await fetch(`${base}/api/reviews`).then(x => x.json());
@@ -189,6 +217,8 @@ async function postMultipart(base, token, fields, photo) {
 
   // No consent: even a published status serves nothing. The older JSON shape
   // is used here to prove that contract still works.
+  // The mail provider is down for this one: the review must be kept anyway.
+  alertMode = 'down';
   const TOKEN2 = 'tok-tooSoon-0123456789';
   const jr = await fetch(`${base}/api/review/${TOKEN2}`, {
     method: 'POST',
@@ -199,9 +229,28 @@ async function postMultipart(base, token, fields, photo) {
   const row2 = db.get(`SELECT * FROM customer_reviews WHERE order_id = 'tooSoon'`);
   assert.strictEqual(row2.consent_to_publish, 0);
   assert.strictEqual(row2.photo_path, null);
+  assert.strictEqual(alerts.length, 2, 'the alert was attempted');
+  assert.strictEqual(alerts[1].review.consentToPublish, false);
+  assert.strictEqual(alerts[1].photoFile, null);
+  emailService.sendReviewReceived = realAlert;
+
   db.run(`UPDATE customer_reviews SET status = 'published', published_at = datetime('now') WHERE id = ?`, [row2.id]);
   pub = await fetch(`${base}/api/reviews`).then(x => x.json());
   assert.strictEqual(pub.newCount, 0, 'published without consent is still never shown');
+
+  // The real alert goes to the shop and only the shop, whoever wrote the review.
+  const alertLog = [];
+  console.log = (...a) => alertLog.push(a.join(' '));
+  await realAlert(
+    { id: 'tooSoon-order-id', email: 'soon@example.test', fields_json: JSON.stringify({ petName: 'Rex' }) },
+    { rating: 1, body: '<b>It arrived cracked.</b>', authorDisplay: '', consentToPublish: false },
+    null
+  );
+  console.log = origLog;
+  const alertText = alertLog.join('\n');
+  assert.ok(/to=shop@example\.test /.test(alertText), 'addressed to ADMIN_EMAIL');
+  assert.ok(!/to=[^ ]*soon@example\.test/.test(alertText), 'never addressed to the customer');
+  assert.ok(/subject="New review: 1 star for Rex \(TOOSOON-\)"/.test(alertText), alertText);
 
   // Someone who already reviewed is never invited, even if eligible.
   db.run(`DELETE FROM order_events WHERE event_type = 'review_invite_sent'`);

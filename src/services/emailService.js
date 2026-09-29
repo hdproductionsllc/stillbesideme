@@ -977,6 +977,97 @@ async function sendReviewInvite(to, orderData, reviewUrl) {
 }
 
 /**
+ * Tell the shop a customer has left a review.
+ *
+ * The third "review" email in this file, and the only one that reports rather
+ * than asks: sendReviewRequest asks the shop to approve a proof,
+ * sendReviewInvite asks a buyer how their piece turned out, and this one says
+ * the buyer has answered. It goes to ADMIN_EMAIL and nowhere else. The
+ * customer is never a recipient, so no review can cause mail to a family.
+ *
+ * A review waits as 'pending' until someone publishes or hides it, and before
+ * this existed nothing said one had arrived. That matters most for a low
+ * rating, which is a person with a problem and deserves a reply the same day.
+ *
+ * @param {object} order      the orders row the review belongs to
+ * @param {object} review     { rating, body, authorDisplay, consentToPublish }
+ * @param {string} [photoFile] absolute path of the stored photo, attached if given
+ */
+async function sendReviewReceived(order, review, photoFile) {
+  if (!ADMIN_EMAIL) {
+    console.warn(`Email: ADMIN_EMAIL not configured — a review for order ${order.id} is waiting with no notification. Set ADMIN_EMAIL.`);
+    return { skipped: true };
+  }
+
+  const esc = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  const shortId = order.id.substring(0, 8).toUpperCase();
+  let fields = {};
+  try { fields = order.fields_json ? JSON.parse(order.fields_json) : {}; } catch (err) { /* alert still goes */ }
+  const petName = String(fields.petName || fields.name || '').trim();
+
+  const rating = Number(review.rating);
+  const stars = `${rating} star${rating === 1 ? '' : 's'}`;
+  const isLow = rating <= 3;
+
+  const html = wrapHtml(`
+    <div style="background:#fff;border-radius:12px;padding:32px;">
+      <h1 style="font-family:Georgia,serif;font-size:1.4rem;font-weight:400;color:#2C2C2C;margin:0 0 4px;">
+        New review: ${stars}${petName ? ` for ${esc(petName)}` : ''}
+      </h1>
+      <p style="color:#9B9590;margin:0 0 20px;">
+        ${esc(order.email || 'No email')} &middot; Order ${shortId}
+      </p>
+
+      <p style="font-size:1.5rem;letter-spacing:3px;color:#C4A882;margin:0 0 16px;">
+        ${'&#9733;'.repeat(rating)}<span style="color:#E8E4DF;">${'&#9733;'.repeat(5 - rating)}</span>
+      </p>
+
+      ${isLow ? `
+      <p style="color:#2C2C2C;line-height:1.6;background:#FBF3EE;border-left:3px solid #B5651D;border-radius:8px;padding:12px 16px;margin:0 0 16px;">
+        This is a low rating. A personal reply to the customer comes before anything else.
+      </p>` : ''}
+
+      <div style="background:#FAF8F5;border-radius:8px;padding:16px;margin:0 0 16px;border-left:3px solid #C4A882;">
+        <div style="font-family:Georgia,serif;white-space:pre-wrap;line-height:1.6;color:#2C2C2C;">${review.body ? esc(review.body) : '<span style="color:#9B9590;">They left a rating without any words.</span>'}</div>
+      </div>
+
+      <table style="border-collapse:collapse;font-size:0.9rem;margin:0 0 20px;">
+        <tr>
+          <td style="padding:6px 12px 6px 0;color:#6b6359;font-weight:600;white-space:nowrap;">Signed as</td>
+          <td style="padding:6px 0;color:#2C2C2C;">${review.authorDisplay ? esc(review.authorDisplay) : 'No name given'}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 12px 6px 0;color:#6b6359;font-weight:600;white-space:nowrap;">May be published</td>
+          <td style="padding:6px 0;color:#2C2C2C;">${review.consentToPublish ? 'Yes, they ticked the box' : 'No. For your eyes only'}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 12px 6px 0;color:#6b6359;font-weight:600;white-space:nowrap;">Photo</td>
+          <td style="padding:6px 0;color:#2C2C2C;">${photoFile ? 'Attached to this email' : 'None sent'}</td>
+        </tr>
+      </table>
+
+      <div style="text-align:center;margin:24px 0 8px;">
+        <a href="${BASE_URL}/admin/orders#reviews"
+           style="display:inline-block;background:#8B9D83;color:#fff;text-decoration:none;padding:14px 40px;border-radius:8px;font-weight:600;font-size:1rem;">
+          Open the review queue
+        </a>
+      </div>
+      <p style="text-align:center;color:#9B9590;font-size:0.8rem;">
+        Nothing appears on the website until you publish it there.
+      </p>
+    </div>
+  `);
+
+  const extra = photoFile
+    ? { attachments: [{ filename: `review-${shortId}.jpg`, path: photoFile }] }
+    : {};
+
+  return send(ADMIN_EMAIL, `New review: ${stars}${petName ? ` for ${petName}` : ''} (${shortId})`, html, extra);
+}
+
+/**
  * Deliver the poems someone asked for by email.
  *
  * The exchange on the poem pages is the poems themselves, never a discount, so
@@ -1043,5 +1134,7 @@ module.exports = {
   // Customer-facing. sendReviewInvite is the one that asks a BUYER about their
   // piece; sendReviewRequest above asks the SHOP to approve a proof.
   sendReviewInvite,
+  // Shop-facing: the buyer answered. Never addressed to a customer.
+  sendReviewReceived,
   sendPoemPack,
 };
