@@ -2262,3 +2262,131 @@ body.pf-open { overflow: hidden; }
   .pf-spinner,
   .btn.is-preparing::before { animation-duration: 2.4s; }
 }
+
+/* ============================================================
+   Saved designs: "Not ready yet? Email me my design"
+   Quiet by design. It sits under the order button as a text link
+   and never competes with it; the dialog is desktop exit intent only.
+   ============================================================ */
+.save-design {
+  margin-top: var(--space-md);
+  text-align: center;
+}
+.save-design[hidden] { display: none; }
+.save-design-toggle {
+  background: none;
+  border: 0;
+  padding: var(--space-xs) 0;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--color-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.save-design-toggle:hover,
+.save-design-toggle[aria-expanded="true"] { color: var(--color-primary); }
+.save-design-toggle[hidden] { display: none; }
+.save-design-panel { margin-top: var(--space-sm); text-align: left; }
+.save-design-panel[hidden] { display: none; }
+
+.save-design-form { font-family: var(--font-body); }
+.save-design-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: var(--space-xs);
+  color: var(--color-primary);
+}
+.save-design-row {
+  display: flex;
+  gap: var(--space-sm);
+}
+.save-design-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 1rem;           /* 16px: iOS does not zoom the page on focus */
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+.save-design-input:focus {
+  outline: 2px solid var(--color-secondary);
+  outline-offset: 1px;
+  border-color: var(--color-secondary);
+}
+/* .cart-action stretches every .btn to full width; not this one. */
+.save-design-form .save-design-send { flex: none; width: auto; }
+.save-design-fine {
+  margin: var(--space-sm) 0 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+.save-design-status {
+  margin: var(--space-sm) 0 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--color-success);
+}
+.save-design-status.is-error { color: var(--color-error); }
+.save-design-form [hidden] { display: none; }
+
+/* Arriving from a saved-design link */
+.design-notice {
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius);
+  background: #F1F4EF;
+  border: 1px solid #DCE3D8;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--color-primary);
+}
+.design-notice.is-error {
+  background: #FBF1F1;
+  border-color: #EBD3D3;
+}
+
+/* Exit-intent dialog (desktop) */
+.save-dialog {
+  /* The base reset zeroes every margin, which is what centers a modal dialog. */
+  margin: auto;
+  width: min(440px, calc(100vw - 32px));
+  padding: var(--space-xl);
+  border: 0;
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+.save-dialog::backdrop { background: rgba(15, 13, 11, 0.55); }
+.save-dialog-title {
+  margin: 0 0 var(--space-sm);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.6rem;
+  line-height: 1.25;
+}
+.save-dialog-text {
+  margin: 0 0 var(--space-lg);
+  font-family: var(--font-body);
+  line-height: 1.6;
+  color: var(--color-muted);
+}
+.save-dialog-close {
+  display: block;
+  margin: var(--space-lg) auto 0;
+  background: none;
+  border: 0;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--color-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}

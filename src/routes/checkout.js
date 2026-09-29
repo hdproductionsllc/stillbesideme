@@ -167,8 +167,20 @@ function buildOrderDraft(req) {
     return { error: `Unknown SKU: ${sku}` };
   }
 
-  // Get photos from server-side session
-  const photos = req.session.photos || {};
+  // Get photos from server-side session. A design reopened from its saved
+  // link also sends its token: if the session lost the photo record (a
+  // session write can lose a race with the page's other requests), the saved
+  // design is the durable copy, and the session is healed from it.
+  let photos = req.session.photos || {};
+  if (Object.keys(photos).length === 0 && req.body.designToken) {
+    const fromDesign = require('./designs').photosForDesign(
+      req.app.locals.db, String(req.body.designToken), templateId
+    );
+    if (fromDesign) {
+      photos = fromDesign;
+      req.session.photos = fromDesign;
+    }
+  }
   if (Object.keys(photos).length === 0) {
     return { error: 'No photos uploaded. Please upload a photo first.' };
   }

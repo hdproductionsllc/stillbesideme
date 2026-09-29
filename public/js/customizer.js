@@ -326,12 +326,15 @@
         initFrameScrollHint();
       }
 
-      // Restore saved state
-      restoreState();
+      // Restore saved state: a design opened from its emailed link first,
+      // otherwise whatever this tab was working on.
+      const linked = await loadSavedDesign();
+      restoreState(linked);
+      showDesignNotice();
 
       // Nothing saved here yet? Then a visitor may be arriving from the free
       // poem generator with answers and a poem already written.
-      applyPoemHandoff();
+      if (!linked) applyPoemHandoff();
 
       // Set initial frame size from selected product
       const initialProduct = document.querySelector('.product-option.selected');
@@ -476,6 +479,11 @@
         <li>Free replacement if it ever arrives damaged</li>
       </ul>
       <p class="checkout-securely">Secure checkout &middot; Free US shipping &middot; Made to order in the USA</p>
+      <div class="save-design">
+        <button type="button" class="save-design-toggle" id="save-design-toggle"
+                aria-expanded="false" aria-controls="save-design-panel">Not ready yet? Email me my design</button>
+        <div class="save-design-panel" id="save-design-panel" hidden></div>
+      </div>
     `;
     formPane.appendChild(cartSection);
 
@@ -483,6 +491,7 @@
     setTimeout(() => {
       updatePurchaseButton();
       document.getElementById('purchase-btn').addEventListener('click', handlePurchase);
+      initSaveDesignInline();
     }, 0);
   }
 
@@ -688,7 +697,10 @@
   function restoreUploadedPhoto(panelId, photo) {
     if (!photo || !photo.url) return;
     const probe = new Image();
+    photoRestoresPending++;
+    probe.onerror = () => { photoRestoresPending--; };
     probe.onload = () => {
+      photoRestoresPending--;
       uploadedPhotos[panelId] = photo;
       photoUploaded[panelId] = true;
       PreviewRenderer.setPhoto(panelId, photo.url, photo.position || '50% 50%');
@@ -2689,6 +2701,9 @@
         photo: PreviewRenderer.getPhotoCrop('photo'),
         panel2: PreviewRenderer.getPhotoCrop('panel2'),
       },
+      // A reopened design names itself, so its photo is found even if this
+      // session lost the record of it.
+      ...(designToken ? { designToken } : {}),
     };
   }
 
@@ -2835,6 +2850,9 @@
       }
 
       clearProofNote();
+      // Keep this design on the server, tied to the draft order, so that if
+      // checkout is abandoned the recovery email can reopen THIS tribute.
+      quietSaveDesign({ orderId: data.orderId });
       proofOrder = {
         orderId: data.orderId,
         proofUrl: data.proofUrl,
@@ -3281,9 +3299,10 @@
 
   // ── State Persistence ──────────────────────────────────────
 
-  function saveState() {
-    try {
-      const state = {
+  // Everything needed to rebuild the designer exactly. The tab keeps it in
+  // sessionStorage; a saved design keeps the same object on the server.
+  function collectState() {
+    return {
         templateId: TEMPLATE_ID,
         fields: PreviewRenderer.getFields(),
         style: currentStyle,
@@ -3311,8 +3330,12 @@
         selectedProduct: document.querySelector('.product-option.selected .product-option-label')?.textContent,
         selectedSku: document.querySelector('.product-option.selected')?.dataset?.sku,
         timestamp: Date.now()
-      };
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(state));
+    };
+  }
+
+  function saveState() {
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(collectState()));
     } catch (e) {
       // sessionStorage may not be available
     }
@@ -3323,13 +3346,17 @@
     schedulePoemFitNote();
   }
 
-  function restoreState() {
+  // A design opened from its emailed link arrives as `fromLink` and wins over
+  // whatever this tab held: following the link is the visitor saying so.
+  function restoreState(fromLink) {
     try {
-      const raw = sessionStorage.getItem(SESSION_KEY);
-      if (!raw) return;
-
-      const state = JSON.parse(raw);
-      if (state.templateId !== TEMPLATE_ID) return;
+      let state = fromLink || null;
+      if (!state) {
+        const raw = sessionStorage.getItem(SESSION_KEY);
+        if (!raw) return;
+        state = JSON.parse(raw);
+      }
+      if (!state || state.templateId !== TEMPLATE_ID) return;
 
       // Restore fields
       if (state.fields) {
@@ -3591,6 +3618,263 @@
     saveState();
   }
 
+  // ── Saved designs ("Email me my design") ───────────────────
+  //
+  // Someone who has uploaded their pet's photo and chosen words is as close to
+  // ordering as a visitor gets, and closing the tab used to lose all of it.
+  // Now they can ask for the design by email; the link reopens it exactly, on
+  // any device (the server re-attaches the photo to the new session, so the
+  // proof and checkout work there too). See src/routes/designs.js.
+  //
+  // designSaved: this visitor asked for the link, or arrived by one. From then
+  // on the server copy follows their edits (sent as the tab is hidden), and the
+  // offer is not made again.
+  const DESIGN_PARAM = 'design';
+  const SAVE_PROMPTED_KEY = 'sbm-save-prompted';
+  const SAVE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const DESIGN_TOKEN_KEY = `sbm-design-token-${TEMPLATE_ID}`;
+  // The saved design this tab was reopened from. It travels with the proof
+  // and every save, so the server can always find the photo even if this
+  // visitor's session lost its note of it (see photosForDesign on the server).
+  let designToken = null;
+  try { designToken = sessionStorage.getItem(DESIGN_TOKEN_KEY); } catch (e) { /* none */ }
+  let designSaved = !!designToken;
+  let designNotice = null;
+  let photoRestoresPending = 0;
+
+  function trackDesign(name) {
+    try { if (typeof gtag === 'function') gtag('event', name); } catch (e) { /* never block */ }
+  }
+
+  /**
+   * If the page was opened from a saved-design link, fetch that design.
+   * Returns its state for restoreState(), or null.
+   */
+  async function loadSavedDesign() {
+    let token = null;
+    try { token = new URLSearchParams(window.location.search).get(DESIGN_PARAM); } catch (e) { /* old browser */ }
+    if (!token) return null;
+
+    const dropToken = () => {
+      // The tab holds the design from here on; a reload must not fetch it
+      // again over edits made since.
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete(DESIGN_PARAM);
+        history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+      } catch (e) { /* cosmetic */ }
+    };
+
+    try {
+      const res = await fetch(`/api/designs/${encodeURIComponent(token)}`, { credentials: 'same-origin' });
+      const data = await res.json().catch(() => ({}));
+      dropToken();
+      if (res.ok && data.state && data.state.templateId === TEMPLATE_ID) {
+        try {
+          sessionStorage.setItem(SESSION_KEY, JSON.stringify(data.state));
+          sessionStorage.setItem(DESIGN_TOKEN_KEY, token);
+        } catch (e) { /* tab-only copy */ }
+        designToken = token;
+        designSaved = true;
+        trackDesign('design_resumed');
+        designNotice = { text: 'Welcome back. Your tribute is just as you left it.', kind: 'ok' };
+        return data.state;
+      }
+      designNotice = {
+        text: (data && data.error) || 'We couldn’t open that saved design, so you’re starting fresh.',
+        kind: 'error',
+      };
+    } catch (e) {
+      // Network trouble: keep the token in the address bar so a reload retries.
+      designNotice = { text: 'We couldn’t open your saved design just now. Please reload the page to try again.', kind: 'error' };
+    }
+    return null;
+  }
+
+  function showDesignNotice() {
+    if (!designNotice) return;
+    const el = document.createElement('p');
+    el.className = `design-notice${designNotice.kind === 'error' ? ' is-error' : ''}`;
+    el.setAttribute('role', 'status');
+    el.textContent = designNotice.text;
+    formPane.insertBefore(el, formPane.firstChild);
+  }
+
+  /** Something worth saving: a photo, their name, or words. */
+  function hasSomethingToSave() {
+    const fields = PreviewRenderer.getFields() || {};
+    return Object.keys(uploadedPhotos).length > 0
+      || !!String(fields[nameFieldId()] || '').trim()
+      || !!String(fields.poemText || '').trim();
+  }
+
+  /** The body every save sends: the state, plus the design it came from. */
+  function designSaveBody(extra) {
+    return {
+      templateId: TEMPLATE_ID,
+      state: collectState(),
+      ...(designToken ? { designToken } : {}),
+      ...(extra || {}),
+    };
+  }
+
+  /** Save to the server without asking anything of the visitor. */
+  function quietSaveDesign(extra) {
+    postJson('/api/designs', designSaveBody(extra), 15000)
+      .catch(() => { /* a quiet save failing costs nothing visible */ });
+  }
+
+  let saveFormCount = 0;
+  /** The email form, used inline under the order button and in the dialog. */
+  function buildSaveForm(onSaved) {
+    const id = `save-design-email-${++saveFormCount}`;
+    const form = document.createElement('form');
+    form.className = 'save-design-form';
+    form.noValidate = true;
+    form.innerHTML = `
+      <label class="save-design-label" for="${id}">Your email</label>
+      <div class="save-design-row">
+        <input type="email" id="${id}" class="save-design-input" autocomplete="email"
+               inputmode="email" maxlength="254" placeholder="you@example.com" required>
+        <button type="submit" class="btn btn-outline btn-sm save-design-send">Send it</button>
+      </div>
+      <p class="save-design-fine">We’ll email you a link back to this design. No newsletters, and we never share your address.</p>
+      <p class="save-design-status" role="status" aria-live="polite" hidden></p>
+    `;
+    const input = form.querySelector('input');
+    const button = form.querySelector('button');
+    const status = form.querySelector('.save-design-status');
+    const say = (text, isError) => {
+      status.textContent = text;
+      status.classList.toggle('is-error', !!isError);
+      status.hidden = false;
+    };
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = input.value.trim();
+      if (!SAVE_EMAIL_RE.test(email)) {
+        say('Please check your email address.', true);
+        input.focus();
+        return;
+      }
+      if (!hasSomethingToSave()) {
+        say('Add a photo or their name first, and then we can save it for you.', true);
+        return;
+      }
+      button.disabled = true;
+      button.textContent = 'Sending…';
+      try {
+        const { ok, data } = await postJson('/api/designs', designSaveBody({ email }), 20000);
+        if (ok && data.emailed) {
+          designSaved = true;
+          trackDesign('design_saved');
+          form.querySelector('.save-design-row').hidden = true;
+          form.querySelector('.save-design-label').hidden = true;
+          form.querySelector('.save-design-fine').hidden = true;
+          say(`Sent to ${email}. Your design is saved for 90 days, and the link opens it on any device.`);
+          if (onSaved) onSaved();
+          return;
+        }
+        say((data && data.error) || (ok
+          ? 'Your design is saved, but the email didn’t go out. Please try again in a moment.'
+          : 'We couldn’t save your design just now. Please try again in a moment.'), true);
+      } catch (err) {
+        say('We couldn’t connect just now. Please check your connection and try again.', true);
+      }
+      button.disabled = false;
+      button.textContent = 'Send it';
+    });
+    return form;
+  }
+
+  /** The quiet "Not ready yet?" link under the order button. */
+  function initSaveDesignInline() {
+    const toggle = document.getElementById('save-design-toggle');
+    const panel = document.getElementById('save-design-panel');
+    if (!toggle || !panel) return;
+    if (designSaved) { toggle.closest('.save-design').hidden = true; }
+    toggle.addEventListener('click', () => {
+      if (!panel.firstChild) panel.appendChild(buildSaveForm(() => { toggle.hidden = true; }));
+      const open = panel.hidden;
+      panel.hidden = !open;
+      toggle.setAttribute('aria-expanded', String(open));
+      if (open) panel.querySelector('input').focus();
+    });
+  }
+
+  let saveDialog = null;
+  function openSaveDialog() {
+    if (!saveDialog) {
+      saveDialog = document.createElement('dialog');
+      saveDialog.className = 'save-dialog';
+      saveDialog.setAttribute('aria-labelledby', 'save-dialog-title');
+      const pet = String((PreviewRenderer.getFields() || {})[nameFieldId()] || '').trim();
+      saveDialog.innerHTML = `
+        <h2 id="save-dialog-title" class="save-dialog-title"></h2>
+        <p class="save-dialog-text">We’ll email you a link that opens it exactly as it is now, on any phone or computer. Take all the time you need.</p>
+        <div class="save-dialog-form"></div>
+        <button type="button" class="save-dialog-close">No thanks</button>
+      `;
+      saveDialog.querySelector('.save-dialog-title').textContent =
+        pet ? `Save ${pet}’s tribute for later?` : 'Save your tribute for later?';
+      const closeBtn = saveDialog.querySelector('.save-dialog-close');
+      saveDialog.querySelector('.save-dialog-form').appendChild(buildSaveForm(() => {
+        closeBtn.textContent = 'Close';
+        const inline = document.querySelector('.save-design');
+        if (inline) inline.hidden = true;
+      }));
+      closeBtn.addEventListener('click', () => saveDialog.close());
+      // A click on the backdrop (the dialog element itself) closes it.
+      saveDialog.addEventListener('click', (e) => { if (e.target === saveDialog) saveDialog.close(); });
+      document.body.appendChild(saveDialog);
+    }
+    saveDialog.showModal();
+  }
+
+  /**
+   * Desktop only, once per visit, and only once there is a photo worth
+   * keeping: when the pointer leaves toward the tab bar, offer to save. On a
+   * phone there is no such moment, so the inline link is the whole offer.
+   */
+  function initSaveExitIntent() {
+    if (typeof HTMLDialogElement !== 'function') return;
+    if (!window.matchMedia || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    document.addEventListener('mouseout', (e) => {
+      if (e.clientY > 0 || e.relatedTarget !== null) return;
+      if (designSaved || proofOpen || proofBusy) return;
+      if (!Object.keys(uploadedPhotos).length) return;
+      try {
+        if (sessionStorage.getItem(SAVE_PROMPTED_KEY)) return;
+        sessionStorage.setItem(SAVE_PROMPTED_KEY, '1');
+      } catch (err) { return; }
+      openSaveDialog();
+    });
+  }
+
+  /**
+   * Once a design is saved, the server copy follows the visitor's edits: it is
+   * refreshed as the tab is hidden (closed, switched away, phone locked), the
+   * last moment a page reliably gets. Skipped while a restored photo is still
+   * loading, so a half-restored state never overwrites the saved one.
+   */
+  function initSavedDesignSync() {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'hidden' || !designSaved || photoRestoresPending > 0) return;
+      try {
+        // keepalive lets the request outlive the page. (sendBeacon would too,
+        // but some browsers refuse it for a JSON body.)
+        fetch('/api/designs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(designSaveBody()),
+          keepalive: true,
+          credentials: 'same-origin',
+        }).catch(() => { /* best effort */ });
+      } catch (e) { /* best effort */ }
+    });
+  }
+
   // ── Preview zoom (magnifier for small tribute text) ─────────
 
   // On mobile the framed preview floats: big at the top of the flow, then it
@@ -3648,6 +3932,8 @@
   // ── Start ──────────────────────────────────────────────────
 
   init();
+  initSaveExitIntent();
+  initSavedDesignSync();
   initPreviewZoom();
   initPoemFlip();
   initMobilePreviewPin();

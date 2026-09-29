@@ -236,9 +236,9 @@ async function sendOrderConfirmation(to, orderData, statusPageUrl, giftUrl = nul
  *
  * @param {string} to
  * @param {object} orderData — { petName }
- * @param {string} resumeUrl — absolute link back to the customizer for this
- *        order's template (the customizer restores an in-progress design from
- *        the browser session, so it's an honest "pick it back up").
+ * @param {string} resumeUrl — absolute link that reopens THIS design: the saved
+ *        design's ?design= link when the proof step saved one, otherwise the
+ *        bare designer (which can only restore from the same browser tab).
  */
 async function sendAbandonedCheckoutRecovery(to, orderData, resumeUrl) {
   const esc = (s) => String(s == null ? '' : s)
@@ -252,8 +252,8 @@ async function sendAbandonedCheckoutRecovery(to, orderData, resumeUrl) {
     : `Your tribute is here whenever you're ready`;
 
   const opening = safePet
-    ? `You started a tribute for ${safePet}, and it's still here for you. There's no rush at all &mdash; take all the time you need.`
-    : `You started a tribute, and it's still here for you. There's no rush at all &mdash; take all the time you need.`;
+    ? `You started a tribute for ${safePet}, and it's still here for you. There's no rush at all. Take all the time you need.`
+    : `You started a tribute, and it's still here for you. There's no rush at all. Take all the time you need.`;
 
   const html = wrapHtml(`
     <div style="background:#fff;border-radius:12px;padding:32px;margin-bottom:24px;">
@@ -276,16 +276,7 @@ async function sendAbandonedCheckoutRecovery(to, orderData, resumeUrl) {
         </a>
       </div>
 
-      <div style="background:#FAF7F2;border:1px solid #E8E4DF;border-radius:8px;padding:20px;">
-        <p style="color:#2C2C2C;line-height:1.6;margin:0 0 8px;font-weight:600;">
-          A few things to set your mind at ease:
-        </p>
-        <ul style="color:#2C2C2C;line-height:1.7;margin:0;padding-left:20px;">
-          <li>You'll see the finished proof before you pay &mdash; nothing is printed until you've read every word and said it's right.</li>
-          <li>You can ask for a full refund any time before it goes to print &mdash; no questions asked.</li>
-          <li>Shipping within the US is always free.</li>
-        </ul>
-      </div>
+      ${reassuranceBox()}
     </div>
   `);
 
@@ -293,6 +284,121 @@ async function sendAbandonedCheckoutRecovery(to, orderData, resumeUrl) {
     ? `${petName}'s tribute is here whenever you're ready`
     : `Your tribute is here whenever you're ready`;
 
+  return send(to, subject, html);
+}
+
+/** Escape text a visitor typed (their pet's name) before it goes into HTML. */
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * The three promises every "come back to your tribute" email ends on. One
+ * copy, so the abandoned-checkout email and the saved-design emails can never
+ * drift into promising different things.
+ */
+function reassuranceBox() {
+  return `
+      <div style="background:#FAF7F2;border:1px solid #E8E4DF;border-radius:8px;padding:20px;">
+        <p style="color:#2C2C2C;line-height:1.6;margin:0 0 8px;font-weight:600;">
+          A few things to set your mind at ease:
+        </p>
+        <ul style="color:#2C2C2C;line-height:1.7;margin:0;padding-left:20px;">
+          <li>You'll see the finished proof before you pay. Nothing is printed until you've read every word and said it's right.</li>
+          <li>You can ask for a full refund any time before it goes to print, no questions asked.</li>
+          <li>Shipping within the US is always free.</li>
+        </ul>
+      </div>`;
+}
+
+/**
+ * Body shared by the two saved-design emails: their pet's photo (served from
+ * the token-gated /d/:token/photo route, because an email client carries no
+ * session cookie), the button back into the design, and the promises.
+ */
+function savedDesignHtml({ heading, paragraphs, resumeUrl, photoUrl, footnote }) {
+  const photo = photoUrl
+    ? `<div style="text-align:center;margin-bottom:24px;">
+        <img src="${photoUrl}" alt="" width="220" style="max-width:220px;width:100%;height:auto;border-radius:8px;border:1px solid #E8E4DF;">
+      </div>`
+    : '';
+  return wrapHtml(`
+    <div style="background:#fff;border-radius:12px;padding:32px;margin-bottom:24px;">
+      <h1 style="font-family:Georgia,serif;font-size:1.6rem;font-weight:400;color:#2C2C2C;text-align:center;margin:0 0 24px;">
+        ${heading}
+      </h1>
+      ${photo}
+      ${paragraphs.map(p => `<p style="color:#2C2C2C;line-height:1.6;margin-bottom:16px;">${p}</p>`).join('\n      ')}
+      <div style="text-align:center;margin:24px 0;">
+        <a href="${resumeUrl}"
+           style="display:inline-block;background:#8B9D83;color:#fff;text-decoration:none;padding:14px 40px;border-radius:8px;font-weight:600;font-size:1rem;">
+          Pick up where you left off
+        </a>
+      </div>
+      ${reassuranceBox()}
+      <p style="color:#9B9590;font-size:0.85rem;line-height:1.6;margin:20px 0 0;text-align:center;">
+        ${footnote}
+      </p>
+    </div>
+  `);
+}
+
+/**
+ * "Email me my design": sent the moment someone asks for it in the designer.
+ *
+ * They asked for this, so it is a delivery, not marketing. It says plainly
+ * that one reminder follows and offers the way to stop it up front.
+ *
+ * @param {string} to
+ * @param {object} d — { petName, resumeUrl, photoUrl, stopUrl, remindersOn }
+ */
+async function sendDesignSaved(to, d) {
+  const pet = d.petName ? String(d.petName).trim() : '';
+  const safePet = escapeHtml(pet);
+
+  const html = savedDesignHtml({
+    heading: safePet ? `${safePet}'s tribute is saved` : 'Your tribute is saved',
+    photoUrl: d.photoUrl,
+    resumeUrl: d.resumeUrl,
+    paragraphs: [
+      'Everything you made is kept just as you left it: the photo, the words and the frame.',
+      'The button below opens it on any phone or computer, and it stays saved for 90 days. Take all the time you need.',
+    ],
+    footnote: d.remindersOn
+      ? `We'll send you one reminder in a couple of days, and then leave you be. <a href="${d.stopUrl}" style="color:#9B9590;">Don't send the reminder</a>`
+      : `We won't email you about it again. It stays saved for 90 days.`,
+  });
+
+  const subject = pet ? `${pet}'s tribute is saved` : 'Your tribute is saved';
+  return send(to, subject, html);
+}
+
+/**
+ * The one reminder, about two days after a design was saved, only if nothing
+ * has been ordered since. Sent by designReminderEngine; never repeated.
+ *
+ * @param {string} to
+ * @param {object} d — { petName, resumeUrl, photoUrl, stopUrl }
+ */
+async function sendDesignReminder(to, d) {
+  const pet = d.petName ? String(d.petName).trim() : '';
+  const safePet = escapeHtml(pet);
+
+  const html = savedDesignHtml({
+    heading: safePet ? `${safePet}'s tribute is still here` : 'Your tribute is still here',
+    photoUrl: d.photoUrl,
+    resumeUrl: d.resumeUrl,
+    paragraphs: [
+      safePet
+        ? `Just a note that the tribute you started for ${safePet} is still saved, exactly as you left it.`
+        : 'Just a note that the tribute you started is still saved, exactly as you left it.',
+      'There is no rush. It will be here whenever you feel ready.',
+    ],
+    footnote: `This is the only reminder we'll send. <a href="${d.stopUrl}" style="color:#9B9590;">Stop emails about this design</a>`,
+  });
+
+  const subject = pet ? `${pet}'s tribute is still here` : 'Your tribute is still here';
   return send(to, subject, html);
 }
 
@@ -924,6 +1030,8 @@ module.exports = {
   sendAdminAlert,
   sendOrderConfirmation,
   sendAbandonedCheckoutRecovery,
+  sendDesignSaved,
+  sendDesignReminder,
   sendProofEmail,
   sendProofReminder,
   sendReviewRequest,

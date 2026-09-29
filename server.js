@@ -405,6 +405,22 @@ async function start() {
     setInterval(runReviewInvites, 24 * 60 * 60 * 1000).unref();
   }
 
+  // Saved designs ("Email me my design"). Expired designs are cleared daily no
+  // matter what. The single reminder to people who saved one and have not
+  // ordered is dormant until DESIGN_REMINDERS_ENABLED=true, and even then only
+  // reaches saves from the last 14 days, so switching it on sends no backlog.
+  {
+    const designReminders = require('./src/services/designReminderEngine');
+    const runDesignJobs = () => {
+      designReminders.purgeExpired()
+        .then(() => (process.env.DESIGN_REMINDERS_ENABLED === 'true'
+          ? designReminders.checkAndSend() : null))
+        .catch((err) => console.error('Design reminder engine failed:', err.message));
+    };
+    runDesignJobs();
+    setInterval(runDesignJobs, 24 * 60 * 60 * 1000).unref();
+  }
+
   // ── Letter From Heaven is discontinued ────────────────────────────────
   // LFH and its human-loss landing pages are permanently off sale, so they
   // return 410 Gone (not a 302). 410 tells Google to DROP these URLs and stop
@@ -869,6 +885,8 @@ async function start() {
   // Checkout & payment
   app.use('/api', require('./src/routes/checkout'));
   app.use('/api/stripe-webhooks', require('./src/routes/stripeWebhooks'));
+  // Saved designs: /api/designs (save, restore) and /d/:token (email photo, stop).
+  app.use(require('./src/routes/designs'));
 
   // Clean URL for order confirmation
   app.get('/order-confirmed', (req, res) => {

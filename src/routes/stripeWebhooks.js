@@ -540,12 +540,19 @@ async function handleCheckoutExpired(session, db) {
   // breaking the pipeline.
   try {
     const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
-    // Honest resume path: there is no persisted per-order resume token, so we
-    // link back to the customizer for this order's template (the same URL
-    // Stripe uses as its cancel_url). The customizer restores an in-progress
-    // design from the browser session when the customer returns, so this is a
-    // genuine "pick it back up" — not a saved-cart promise we can't keep.
-    const resumeUrl = `${baseUrl}/customize/${order.template_id}`;
+    // The proof step saves the design and links it to this order, so the
+    // email reopens THEIR tribute on any device. An order from before saved
+    // designs existed (or whose design has expired) falls back to the bare
+    // designer, which can still restore from the same browser tab.
+    const design = db.get(
+      `SELECT token, template_id FROM saved_designs
+        WHERE order_id = ? AND expires_at > datetime('now')
+        ORDER BY updated_at DESC LIMIT 1`,
+      [orderId]
+    );
+    const resumeUrl = design
+      ? `${baseUrl}/customize/${design.template_id}?design=${design.token}`
+      : `${baseUrl}/customize/${order.template_id}`;
 
     // Pet name is best-effort warmth only — a malformed fields_json must never
     // stop the email from going out.
