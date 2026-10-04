@@ -32,24 +32,9 @@ for (const dir of [DATA_DIR, SESSIONS_DIR, UPLOADS_DIR, OUTPUT_DIR]) {
   }
 }
 
-// --- Digital Keepsake helpers (mirror the loadTemplate pattern in
-// checkout.js / adminReview.js — fulfillment lives on the SKU's template entry,
-// which is the only trusted source of "is this a digital order").
-const TEMPLATES_DIR = path.join(__dirname, 'src', 'data', 'templates');
-const _templateCache = {};
-function loadTemplate(templateId) {
-  if (_templateCache[templateId]) return _templateCache[templateId];
-  const fp = path.join(TEMPLATES_DIR, `${templateId}.json`);
-  if (!fs.existsSync(fp)) return null;
-  _templateCache[templateId] = JSON.parse(fs.readFileSync(fp, 'utf-8'));
-  return _templateCache[templateId];
-}
-function isDigitalOrder(order) {
-  const t = loadTemplate(order.template_id);
-  if (!t || !Array.isArray(t.printProducts)) return false;
-  const p = t.printProducts.find(x => x.sku === order.product_sku);
-  return !!p && p.fulfillment === 'digital';
-}
+// --- Digital Keepsake helpers. Fulfillment lives on the SKU's template entry,
+// the only trusted source of "is this a digital order" (services/products.js).
+const { loadTemplate, isDigitalOrder } = require('./src/services/products');
 /** Build the attachment filename, e.g. "Banjo-tribute-11x14.jpg". */
 function downloadFilename(order) {
   const t = loadTemplate(order.template_id);
@@ -887,6 +872,8 @@ async function start() {
   app.use('/api/stripe-webhooks', require('./src/routes/stripeWebhooks'));
   // Saved designs: /api/designs (save, restore) and /d/:token (email photo, stop).
   app.use(require('./src/routes/designs'));
+  // Partner gift links: /gift/:slug and the designer's /api/partner-gift.
+  app.use(require('./src/routes/partnerGift'));
 
   // Clean URL for order confirmation
   app.get('/order-confirmed', (req, res) => {
@@ -998,6 +985,9 @@ async function start() {
 
   // Etsy connection + receipt pull. Same reason for the position: requireAdmin.
   app.use('/admin', require('./src/routes/adminEtsy'));
+
+  // Partners who give the tribute as a gift. Same gate, same reason.
+  app.use('/admin', require('./src/routes/adminPartners'));
 
   // Order status page (token-based deep link from email, plus lookup form)
   app.use('/api/orders', require('./src/routes/orderStatus'));

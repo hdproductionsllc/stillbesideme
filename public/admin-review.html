@@ -155,6 +155,8 @@
           <h2>Order ${esc(o.shortId)} ${badge}</h2>
           <div class="admin-row"><strong>Customer</strong><span>${esc(o.email || '—')}</span></div>
           <div class="admin-row"><strong>Product</strong><span>${esc(o.sku || o.templateId)}</span></div>
+          ${o.partner ? `
+          <div class="admin-row"><strong>${o.isGift ? 'Gift from' : 'Sent by'}</strong><span>${esc(o.partner.name)}</span></div>` : ''}
           ${o.changeRequestNotes ? `
           <div class="change-notes"><strong>Customer requested changes:</strong>\n${esc(o.changeRequestNotes)}</div>` : ''}
         `;
@@ -197,7 +199,21 @@
             o.marketplace.receiptId ? `  ·  Etsy order ${o.marketplace.receiptId}` : '';
         }
 
-        if (approval) {
+        const isDigital = !!(o.fulfillment && o.fulfillment.type === 'digital');
+
+        if (approval && isDigital) {
+          // Nothing is printed for a digital order: approving emails the file.
+          const when = String(approval.approvedAt || '').replace('T', ' ').replace('Z', '');
+          document.getElementById('approve-title').textContent = o.isGift ? 'Send the gift keepsake' : 'Deliver the keepsake';
+          document.getElementById('approve-blurb').innerHTML = o.isGift
+            ? `A free keepsake, a gift from <strong>${esc((o.partner && o.partner.name) || 'a partner')}</strong>. ` +
+              `The family approved this proof on <strong>${esc(when)}</strong>. Approving emails them the keepsake ` +
+              'at screen size (not the print file), with a link to have it framed.'
+            : `The customer approved this proof on <strong>${esc(when)}</strong>. Approving emails them the download link.`;
+          document.getElementById('approve-btn').innerHTML = 'Approve &amp; email it to them';
+          document.getElementById('approve-hint').textContent =
+            'Nothing is sent until you click approve. Nothing goes to a printer.';
+        } else if (approval) {
           const when = String(approval.approvedAt || '').replace('T', ' ').replace('Z', '');
           document.getElementById('approve-title').textContent = 'Release to production';
           document.getElementById('approve-blurb').innerHTML = approval.channel === 'etsy'

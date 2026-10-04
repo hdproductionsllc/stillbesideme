@@ -31,37 +31,15 @@
  */
 
 const express = require('express');
-const path = require('path');
-const fs = require('fs');
 const router = express.Router();
 const emailService = require('../services/emailService');
 
 const REVIEWABLE_STATUSES = ['awaiting_review', 'change_requested'];
 
-const TEMPLATES_DIR = path.join(__dirname, '..', 'data', 'templates');
-const templateCache = {};
-
-/** Load a template by ID (cached after first read) — mirrors checkout.js. */
-function loadTemplate(templateId) {
-  if (templateCache[templateId]) return templateCache[templateId];
-  const filePath = path.join(TEMPLATES_DIR, `${templateId}.json`);
-  if (!fs.existsSync(filePath)) return null;
-  templateCache[templateId] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  return templateCache[templateId];
-}
-
-/**
- * Is this order a Digital Keepsake? The fulfillment type lives on the SKU's
- * template entry (never trust anything else). Digital orders skip the customer
- * proof round entirely — the customer already approved every word in the
- * customizer, so "approve" delivers the finished file instead of a proof.
- */
-function isDigitalOrder(order) {
-  const template = loadTemplate(order.template_id);
-  if (!template || !Array.isArray(template.printProducts)) return false;
-  const product = template.printProducts.find(p => p.sku === order.product_sku);
-  return !!product && product.fulfillment === 'digital';
-}
+// Digital orders (the paid keepsake and the partner gift) skip the customer
+// proof round entirely: the customer already approved every word in the
+// customizer, so "approve" delivers the finished file instead of a proof.
+const { loadTemplate, isDigitalOrder, isGiftOrder } = require('../services/products');
 
 function findOrderByAdminToken(db, token) {
   if (!token || token.length < 8) return null;
@@ -88,6 +66,13 @@ function findOrderByAdminToken(db, token) {
  */
 function hasCustomerApproval(order) {
   return !!(order.proof_approved_url && order.proof_approved_at);
+}
+
+/** The practice that sent this order, if one did. */
+function partnerSummary(db, order) {
+  if (!order.partner_id) return null;
+  const partner = require('../services/partners').findById(db, order.partner_id);
+  return partner ? { name: partner.name, slug: partner.slug } : null;
 }
 
 /** Did this order come from a marketplace rather than our own checkout? */
@@ -119,6 +104,12 @@ function buildFulfillmentPreview(order, fields) {
   let shipping = null;
   try { shipping = order.shipping_json ? JSON.parse(order.shipping_json) : null; } catch (e) { /* ignore */ }
 
+  if (isGiftOrder(order)) {
+    return {
+      type: 'digital',
+      summary: 'Free gift keepsake from a partner. Nothing goes to a print vendor. Approving emails the family a screen-size image (not the print file) and a link to have it framed.',
+    };
+  }
   if (isDigitalOrder(order)) {
     return {
       type: 'digital',
@@ -246,6 +237,8 @@ router.get('/review/:token/data', (req, res) => {
     // Marketplace orders take their approval through the marketplace's own
     // messages, so the page shows a different gate for them.
     source: order.source || 'direct',
+    partner: partnerSummary(db, order),
+    isGift: isGiftOrder(order),
     marketplace: isMarketplaceOrder(order)
       ? { source: order.source, receiptId: order.etsy_receipt_id || null }
       : null,
@@ -573,7 +566,7 @@ async function deliverDigitalOrder(req, res, db, order) {
       }
       try {
         const promoCode = existingPromoCode(db, order.id);
-        await sendDigitalDelivery(order, baseUrl, promoCode);
+        await sendDigitalDelivery(order, baseUrl, promoCode, db);
       } catch (err) {
         console.error(`Failed to resend digital delivery for order ${order.id}:`, err.message);
         return res.status(500).json({ error: 'Could not resend the delivery email. Check SMTP settings and try again.' });
@@ -590,15 +583,23 @@ async function deliverDigitalOrder(req, res, db, order) {
     return res.status(400).json({ error: 'Order has no customer email — cannot deliver the keepsake' });
   }
 
-  // 1. Render the final print file — same pipeline as the framed 11x14.
-  //    Idempotent: overwrites output/print-ready/{orderId}.jpg on retry.
-  const printRenderer = require('../services/printRenderer');
+  // 1. Render the file the customer downloads. A paid keepsake gets the same
+  //    300 DPI print file as the framed 11x14; a partner gift gets the
+  //    screen-size keepsake, never the print file. Either way it is recorded
+  //    in print_file_url, which /download/:token serves, and either way it is
+  //    idempotent: a retry overwrites the same path.
+  const gift = isGiftOrder(order);
   try {
-    const { printRelativeUrl } = await printRenderer.generatePrintFile(order);
+    let fileUrl;
+    if (gift) {
+      ({ keepsakeRelativeUrl: fileUrl } = await require('../services/proofGenerator').generateKeepsake(order));
+    } else {
+      ({ printRelativeUrl: fileUrl } = await require('../services/printRenderer').generatePrintFile(order));
+    }
     db.run('UPDATE orders SET print_file_url = ?, updated_at = datetime(\'now\') WHERE id = ?',
-      [printRelativeUrl, order.id]);
-    order.print_file_url = printRelativeUrl;
-    console.log(`Digital keepsake rendered for order ${order.id}: ${printRelativeUrl}`);
+      [fileUrl, order.id]);
+    order.print_file_url = fileUrl;
+    console.log(`${gift ? 'Gift keepsake' : 'Digital keepsake'} rendered for order ${order.id}: ${fileUrl}`);
   } catch (err) {
     console.error(`Failed to render digital keepsake for order ${order.id}:`, err.message);
     db.run(
@@ -621,10 +622,11 @@ async function deliverDigitalOrder(req, res, db, order) {
   }
 
   // 2. Mint the one-time $19.95 upgrade credit (idempotent). Non-fatal: a
-  //    credit hiccup must not block delivery of a paid-for file.
+  //    credit hiccup must not block delivery of a paid-for file. A gift was
+  //    not paid for, so there is nothing to credit.
   let promoCode = null;
   try {
-    promoCode = await ensureUpgradeCredit(db, order);
+    if (!gift) promoCode = await ensureUpgradeCredit(db, order);
   } catch (err) {
     console.error(`Failed to create upgrade credit for order ${order.id}:`, err.message);
     db.run(
@@ -635,7 +637,7 @@ async function deliverDigitalOrder(req, res, db, order) {
 
   // 3. Send the delivery email with the tokenized download link + credit.
   try {
-    await sendDigitalDelivery(order, baseUrl, promoCode);
+    await sendDigitalDelivery(order, baseUrl, promoCode, db);
   } catch (err) {
     console.error(`Failed to send digital delivery email for order ${order.id}:`, err.message);
     return res.status(500).json({ error: 'Could not send the delivery email. Check SMTP settings and try again.' });
@@ -666,7 +668,8 @@ async function deliverDigitalOrder(req, res, db, order) {
 }
 
 /** Send (or resend) the digital delivery email for an order. */
-function sendDigitalDelivery(order, baseUrl, promoCode) {
+function sendDigitalDelivery(order, baseUrl, promoCode, db) {
+  if (isGiftOrder(order)) return sendGiftDelivery(order, baseUrl, db);
   return emailService.sendDigitalDeliveryEmail(
     order.email,
     { orderId: order.id, totalCents: order.total_cents },
@@ -674,6 +677,47 @@ function sendDigitalDelivery(order, baseUrl, promoCode) {
       downloadUrl: `${baseUrl}/download/${order.proof_token}`,
       promoCode: promoCode || null,
       upgradeUrl: `${baseUrl}/customize/${order.template_id}`,
+      statusPageUrl: order.proof_token ? `${baseUrl}/order/${order.proof_token}` : null,
+    }
+  );
+}
+
+/**
+ * The gift keepsake's delivery email. "Have it framed" reopens THEIR saved
+ * design (the proof step saved it and linked it to this order), so the family
+ * never starts over, and the framed order that follows is credited to the
+ * partner through that same link (services/partners.partnerIdForRequest).
+ */
+function sendGiftDelivery(order, baseUrl, db) {
+  const fields = order.fields_json ? JSON.parse(order.fields_json) : {};
+  const partner = order.partner_id
+    ? require('../services/partners').findById(db, order.partner_id)
+    : null;
+  const design = db.get(
+    `SELECT token, template_id FROM saved_designs
+      WHERE order_id = ? AND expires_at > datetime('now')
+      ORDER BY updated_at DESC LIMIT 1`,
+    [order.id]
+  );
+  const frameUrl = design
+    ? `${baseUrl}/customize/${design.template_id}?design=${design.token}&frame=1`
+    : `${baseUrl}/customize/${order.template_id}`;
+  const template = loadTemplate(order.template_id);
+  const framedPrices = ((template && template.printProducts) || [])
+    .filter(p => p.sku.startsWith('framed-'))
+    .map(p => p.price);
+
+  return emailService.sendGiftKeepsakeDelivery(
+    order.email,
+    {
+      orderId: order.id,
+      petName: fields.petName || '',
+      partnerName: partner ? partner.name : '',
+      framedFromCents: framedPrices.length ? Math.min(...framedPrices) : null,
+    },
+    {
+      downloadUrl: `${baseUrl}/download/${order.proof_token}`,
+      frameUrl,
       statusPageUrl: order.proof_token ? `${baseUrl}/order/${order.proof_token}` : null,
     }
   );

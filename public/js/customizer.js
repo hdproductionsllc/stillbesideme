@@ -117,6 +117,38 @@
     }
   }
 
+  /**
+   * Partner gift: set when this visitor arrived through a practice's
+   * /gift/<slug> link. The server remembers the practice on the session and
+   * says here who it is, whether the link can give a keepsake right now, and
+   * what the keepsake is. Null for everyone else, so none of this shows.
+   */
+  let partnerGift = null;
+
+  async function loadPartnerGift() {
+    try {
+      const res = await fetch('/api/partner-gift');
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data && data.partner && data.templateId === TEMPLATE_ID ? data : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function isGiftProductSku(sku) {
+    return !!(template && template.partnerGift && template.partnerGift.sku === sku);
+  }
+
+  /** A design reopened from the gift email's "Have it framed" button. */
+  function isFrameDeepLink() {
+    try {
+      return new URLSearchParams(window.location.search).get('frame') === '1';
+    } catch (e) {
+      return false;
+    }
+  }
+
   /** Whether this template offers any 3-panel layouts (second photo) */
   function hasThreePanelLayouts() {
     if (!template || !template.layouts) return false;
@@ -300,6 +332,14 @@
         orderType = 'gift';
       }
 
+      // A practice's gift link: the family is making a keepsake of their own
+      // pet, so the form opens in that state and the size chooser offers the
+      // free keepsake first.
+      if (template.partnerGift) {
+        partnerGift = await loadPartnerGift();
+        if (partnerGift) orderType = 'self';
+      }
+
       // Build the guided form
       buildGuidedForm();
 
@@ -331,6 +371,10 @@
       const linked = await loadSavedDesign();
       restoreState(linked);
       showDesignNotice();
+
+      // "Have it framed" from a gift keepsake email: their design comes back
+      // exactly, but on the framed size rather than the free keepsake.
+      if (isFrameDeepLink()) selectDefaultFramedProduct();
 
       // Nothing saved here yet? Then a visitor may be arriving from the free
       // poem generator with answers and a poem already written.
@@ -380,11 +424,35 @@
 
   // ── Guided Form Builder ──────────────────────────────────────
 
+  /**
+   * Who the gift is from, said once, at the top. Quiet on purpose: this
+   * family has just lost their pet, and the practice's name is what tells
+   * them this is a kindness and not an advert.
+   */
+  function buildPartnerGiftBanner() {
+    const wrap = document.createElement('div');
+    wrap.className = 'partner-gift-banner';
+    const from = document.createElement('p');
+    from.className = 'partner-gift-from';
+    from.textContent = 'A gift from ' + partnerGift.partner.name;
+    const body = document.createElement('p');
+    body.className = 'partner-gift-body';
+    body.textContent = partnerGift.available
+      ? 'Add a favorite photo and tell us a little about them. We will write a short poem to sit beside it, and send you the keepsake at no cost.'
+      : 'This month’s keepsakes from ' + partnerGift.partner.name + ' have all been given. You can still make the tribute here and have it framed.';
+    wrap.appendChild(from);
+    wrap.appendChild(body);
+    return wrap;
+  }
+
   function buildGuidedForm() {
     formPane.innerHTML = '';
 
-    // Order type toggle – only show when template defines giftLabels
-    if (template.giftLabels) {
+    if (partnerGift) formPane.appendChild(buildPartnerGiftBanner());
+
+    // Order type toggle – only show when template defines giftLabels. Not on a
+    // practice's gift link: that family is here for their own pet.
+    if (template.giftLabels && !partnerGift) {
       const toggleWrap = document.createElement('div');
       toggleWrap.innerHTML = `
         <div class="form-intro">Who is this for?</div>
@@ -473,12 +541,12 @@
         See your proof
       </button>
       <p class="proof-note" id="proof-note" role="status" aria-live="polite" hidden></p>
-      <ul class="checkout-reassurance">
+      <ul class="checkout-reassurance" id="checkout-reassurance">
         <li>You see the finished proof and approve it before you pay</li>
         <li>Full refund any time before it goes to print &mdash; no questions asked</li>
         <li>Free replacement if it ever arrives damaged</li>
       </ul>
-      <p class="checkout-securely">Secure checkout &middot; Free US shipping &middot; Made to order in the USA</p>
+      <p class="checkout-securely" id="checkout-securely">Secure checkout &middot; Free US shipping &middot; Made to order in the USA</p>
       <div class="save-design">
         <button type="button" class="save-design-toggle" id="save-design-toggle"
                 aria-expanded="false" aria-controls="save-design-panel">Not ready yet? Email me my design</button>
@@ -1814,6 +1882,30 @@
 
   // ── Size / Product Selector ─────────────────────────────────
 
+  function selectDefaultFramedProduct() {
+    const framed = template.printProducts.filter(p => p.sku.startsWith('framed-'));
+    const pick = framed.find(p => p.default) || framed[0];
+    const option = pick && document.querySelector(`.product-option[data-sku="${pick.sku}"]`);
+    if (option && !option.classList.contains('selected')) option.click();
+  }
+
+  /**
+   * What this visitor can choose. Everyone sees the template's products. A
+   * family on a practice's gift link sees the free keepsake first and the
+   * framed sizes after it; the paid digital file and the bare print are left
+   * out, because next to a free keepsake they only confuse. If the link can't
+   * give one right now, they see the frames alone.
+   */
+  function productsOnOffer() {
+    if (!partnerGift) return template.printProducts;
+    const framed = template.printProducts.filter(p => p.sku.startsWith('framed-'));
+    if (!partnerGift.available) return framed;
+    return [
+      Object.assign({}, partnerGift.product, { default: true }),
+      ...framed.map(p => Object.assign({}, p, { default: false })),
+    ];
+  }
+
   function createSizeSection() {
     const section = document.createElement('div');
     section.className = 'form-section';
@@ -1835,7 +1927,10 @@
       return section;
     }
 
-    section.innerHTML = '<h2 class="form-section-title">Choose your size</h2>';
+    const onOffer = productsOnOffer();
+    const giftFirst = onOffer.length > 0 && isGiftProductSku(onOffer[0].sku);
+
+    section.innerHTML = `<h2 class="form-section-title">${giftFirst ? 'Your keepsake' : 'Choose your size'}</h2>`;
 
     const grid = document.createElement('div');
     grid.className = 'product-grid';
@@ -1843,19 +1938,22 @@
     // Framed sizes render first and prominent; the unframed rungs (print-only,
     // digital) sit under a quiet divider, visually secondary — they exist for
     // the customer who can't stretch to a frame, never as the headline.
+    // On a practice's gift link it is the other way round: the free keepsake
+    // is the headline and the frames wait quietly underneath.
     let quietDividerAdded = false;
-    for (const product of template.printProducts) {
+    for (const product of onOffer) {
       const framed = product.sku.startsWith('framed-');
-      if (!framed && !quietDividerAdded) {
+      const quiet = giftFirst ? framed : !framed;
+      if (quiet && !quietDividerAdded) {
         const divider = document.createElement('div');
         divider.className = 'product-grid-divider';
-        divider.textContent = 'Without a frame';
+        divider.textContent = giftFirst ? 'Or have it framed' : 'Without a frame';
         grid.appendChild(divider);
         quietDividerAdded = true;
       }
 
       const option = document.createElement('div');
-      option.className = `product-option${product.default ? ' selected' : ''}${framed ? '' : ' product-option-quiet'}`;
+      option.className = `product-option${product.default ? ' selected' : ''}${quiet ? ' product-option-quiet' : ''}`;
       option.dataset.sku = product.sku;
       option.dataset.price = product.price;
       option.innerHTML = `
@@ -1864,7 +1962,7 @@
           ${product.badge ? `<span class="product-option-badge">${product.badge}</span>` : ''}
           ${product.sublabel ? `<span class="product-option-sublabel">${product.sublabel}</span>` : ''}
         </div>
-        <span class="product-option-price">$${(product.price / 100).toFixed(2)}</span>
+        <span class="product-option-price">${product.price === 0 ? 'Free' : `$${(product.price / 100).toFixed(2)}`}</span>
       `;
 
       option.addEventListener('click', () => {
@@ -2171,7 +2269,9 @@
     poemFitSignature = signature;
 
     const hide = () => { host.hidden = true; host.innerHTML = ''; };
-    if (!product || !poemText) return hide();
+    // A gift keepsake is read on a screen, where the reader can zoom; the
+    // printed-size note does not apply to it.
+    if (!product || !poemText || isGiftProductSku(product.sku)) return hide();
 
     const points = predictedPoemPoints(product.sku, currentLayout, poemText);
     if (points === null || points >= POEM_COMFORT_PT) return hide();
@@ -2671,8 +2771,45 @@
       const total = product.price + upcharge;
       // Named for what the click actually does: it renders the proof and opens
       // the approval dialog. Payment only happens after they approve.
-      btn.textContent = `See your proof \u2013 $${total % 100 === 0 ? total / 100 : (total / 100).toFixed(2)}`;
+      btn.textContent = total === 0
+        ? 'See your proof'
+        : `See your proof \u2013 $${total % 100 === 0 ? total / 100 : (total / 100).toFixed(2)}`;
+      updateReassurance(isGiftProductSku(product.sku));
     }
+  }
+
+  /**
+   * The promises under the button follow what is selected. Refunds, shipping
+   * and secure checkout mean nothing to a family receiving a free keepsake,
+   * and promising them would read as if we expected to charge.
+   */
+  const PAID_REASSURANCE = {
+    items: [
+      'You see the finished proof and approve it before you pay',
+      'Full refund any time before it goes to print \u2014 no questions asked',
+      'Free replacement if it ever arrives damaged',
+    ],
+    line: 'Secure checkout \u00b7 Free US shipping \u00b7 Made to order in the USA',
+  };
+  const GIFT_REASSURANCE = {
+    items: [
+      'You see the finished tribute and approve every word first',
+      'Someone here looks it over before it comes to you',
+      'There is nothing to pay for the keepsake',
+    ],
+    line: 'Sent to you by email \u00b7 Usually within a day or two',
+  };
+  function updateReassurance(gift) {
+    const list = document.getElementById('checkout-reassurance');
+    const line = document.getElementById('checkout-securely');
+    if (!list || !line) return;
+    const copy = gift ? GIFT_REASSURANCE : PAID_REASSURANCE;
+    list.replaceChildren(...copy.items.map((text) => {
+      const li = document.createElement('li');
+      li.textContent = text;
+      return li;
+    }));
+    line.textContent = copy.line;
   }
 
   /**
@@ -2980,6 +3117,10 @@
       </div>
       <div class="pf-foot">
         <div class="pf-approve">
+          <div class="pf-email" id="pf-email-wrap" hidden>
+            <label class="pf-email-label" for="pf-email">Where should we send it?</label>
+            <input type="email" id="pf-email" autocomplete="email" inputmode="email" maxlength="200" placeholder="you@example.com">
+          </div>
           <label class="pf-check" for="pf-agree">
             <input type="checkbox" id="pf-agree">
             <span class="pf-check-text" id="pf-agree-text"></span>
@@ -3011,6 +3152,9 @@
       zoom: dialog.querySelector('#pf-zoom'),
       agree: dialog.querySelector('#pf-agree'),
       agreeText: dialog.querySelector('#pf-agree-text'),
+      emailWrap: dialog.querySelector('#pf-email-wrap'),
+      email: dialog.querySelector('#pf-email'),
+      final: dialog.querySelector('#pf-final'),
       confirm: dialog.querySelector('#pf-confirm'),
       back: dialog.querySelector('#pf-back'),
       nudge: dialog.querySelector('#pf-nudge'),
@@ -3153,10 +3297,21 @@
       ? name + '’s tribute, exactly as it will print'
       : 'Your tribute, exactly as it will print';
     els.lede.textContent = 'Take your time with it. Read it the way you’d read a letter — every word, the dates, the spelling of their name. The pale watermark is only on this proof; it never appears on the piece that comes to you.';
+    // A gift keepsake is not printed and not paid for: it is checked by us and
+    // emailed to them, so the dialog asks where to send it instead.
+    const gift = isGiftProductSku(product.sku);
+    const verb = gift ? 'Send' : 'Print';
     els.agreeText.textContent = name
-      ? 'I’ve read every word of ' + name + '’s tribute. Print it exactly as it is here.'
-      : 'I’ve read every word. Print it exactly as it is here.';
-    els.confirm.textContent = 'Approve & continue – $' + total.toFixed(2);
+      ? 'I’ve read every word of ' + name + '’s tribute. ' + verb + ' it exactly as it is here.'
+      : 'I’ve read every word. ' + verb + ' it exactly as it is here.';
+    els.emailWrap.hidden = !gift;
+    if (!els.finalPaidText) els.finalPaidText = els.final.textContent;
+    els.final.textContent = gift
+      ? 'This is the final version. Once you approve it, someone here looks it over and we email it to you, usually within a day or two. If anything isn’t right, keep editing and we’ll make you a new proof.'
+      : els.finalPaidText;
+    els.confirm.textContent = gift
+      ? 'Approve & send it to me'
+      : 'Approve & continue – $' + total.toFixed(2);
     els.img.alt = name
       ? 'Watermarked proof of ' + name + '’s tribute'
       : 'Watermarked proof of your tribute';
@@ -3248,41 +3403,57 @@
     if (!els || !proofOrder || proofSubmitting) return;
     if (!els.agree.checked) return;
 
-    if (!proofOrder.analyticsFired) {
+    const gift = isGiftProductSku(proofOrder.product.sku);
+    const email = gift ? els.email.value.trim() : '';
+    if (gift && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setProofStatus('Please add the email address where you would like your keepsake sent.', 'error');
+      els.email.focus();
+      return;
+    }
+
+    // Analytics measure purchase intent; a free keepsake is not one.
+    if (!gift && !proofOrder.analyticsFired) {
       fireCheckoutAnalytics(proofOrder.product);
       proofOrder.analyticsFired = true;
     }
 
     const label = els.confirm.textContent;
+    const failure = gift
+      ? 'We couldn’t send that just now. Your approval is still here, so please try again.'
+      : 'We couldn’t reach secure payment just now. Nothing has been charged and your approval is still here — please try again.';
     proofSubmitting = true;
     els.confirm.disabled = true;
     els.confirm.setAttribute('aria-busy', 'true');
     els.confirm.classList.add('is-busy');
-    els.confirm.textContent = 'Taking you to secure payment…';
+    els.confirm.textContent = gift ? 'Sending…' : 'Taking you to secure payment…';
     els.back.disabled = true;
     els.close.disabled = true;
-    setProofStatus('Approved. Opening secure payment…');
+    setProofStatus(gift ? 'Approved. Sending it to us…' : 'Approved. Opening secure payment…');
 
     try {
       const body = Object.assign({}, proofOrder.body, {
         orderId: proofOrder.orderId,
         approved: true,
-      });
+      }, gift ? { email } : {});
       const { ok, data } = await postJson('/api/checkout', body, CHECKOUT_TIMEOUT_MS);
+      const next = data && (data.checkoutUrl || data.redirectUrl);
 
-      if (!ok || !data.checkoutUrl) {
+      if (!ok || !next) {
         restoreProofConfirm(label);
-        setProofStatus(data.error ||
-          'We couldn’t reach secure payment just now. Nothing has been charged and your approval is still here — please try again.',
-          'error');
+        setProofStatus((data && data.error) || failure, 'error');
         return;
       }
 
-      window.location.href = data.checkoutUrl;
+      // A placed gift has nothing left to restore; the next visit to the
+      // designer should start fresh rather than reopen this keepsake.
+      if (data.redirectUrl) {
+        try { sessionStorage.removeItem(SESSION_KEY); } catch (e) { /* none */ }
+      }
+      window.location.href = next;
     } catch (err) {
       console.error('Checkout error:', err);
       restoreProofConfirm(label);
-      setProofStatus('We couldn’t reach secure payment just now. Nothing has been charged and your approval is still here — please try again.', 'error');
+      setProofStatus(failure, 'error');
     }
   }
 

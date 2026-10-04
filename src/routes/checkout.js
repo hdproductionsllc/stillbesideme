@@ -22,12 +22,13 @@
  */
 
 const express = require('express');
-const path = require('path');
-const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const router = express.Router();
 
-const TEMPLATES_DIR = path.join(__dirname, '..', 'data', 'templates');
+const products = require('../services/products');
+const partners = require('../services/partners');
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Proof rendering is Sharp compositing several full-size photo layers. It is
 // normally a couple of seconds, but a pathological upload must never leave a
@@ -108,15 +109,7 @@ function sanitizeFields(raw, template) {
   return out;
 }
 
-/** Load a template by ID (cached after first read). */
-const templateCache = {};
-function loadTemplate(templateId) {
-  if (templateCache[templateId]) return templateCache[templateId];
-  const filePath = path.join(TEMPLATES_DIR, `${templateId}.json`);
-  if (!fs.existsSync(filePath)) return null;
-  templateCache[templateId] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  return templateCache[templateId];
-}
+const { loadTemplate } = products;
 
 /**
  * Validate + sanitize a customizer payload into the exact row content an order
@@ -162,9 +155,19 @@ function buildOrderDraft(req) {
     return { error: `Unknown template: ${templateId}` };
   }
 
-  const product = template.printProducts.find(p => p.sku === sku);
+  const product = products.findProduct(template, sku);
   if (!product) {
     return { error: `Unknown SKU: ${sku}` };
+  }
+
+  // The free keepsake exists only for someone who arrived through a partner's
+  // gift link. Whether that link can still give one (paused, or the month's
+  // gifts used up) is decided at checkout, where the family sees a kind answer;
+  // here it is only a question of whether they came through a link at all.
+  const partnerId = partners.partnerIdForRequest(req.app.locals.db, req);
+  const isGift = products.isGiftSku(template, sku);
+  if (isGift && !partnerId) {
+    return { error: 'This keepsake comes from a gift link. Please open the link you were given again.' };
   }
 
   // Get photos from server-side session. A design reopened from its saved
@@ -231,6 +234,8 @@ function buildOrderDraft(req) {
     sku,
     template,
     product,
+    isGift,
+    partnerId,
     totalCents: product.price + frameUpcharge,
     fieldsJson: JSON.stringify({
       ...safeFields,
@@ -323,12 +328,13 @@ router.post('/checkout/proof', async (req, res) => {
            photos_json = ?,
            poem_text = ?,
            total_cents = ?,
+           partner_id = COALESCE(?, partner_id),
            proof_approved_at = NULL,
            proof_approved_url = NULL,
            updated_at = datetime('now')
          WHERE id = ?`,
         [draft.templateId, draft.sku, draft.fieldsJson, draft.photosJson,
-          draft.poemText, draft.totalCents, orderId]
+          draft.poemText, draft.totalCents, draft.partnerId, orderId]
       );
       db.run(
         `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
@@ -339,10 +345,10 @@ router.post('/checkout/proof', async (req, res) => {
     } else {
       orderId = uuidv4();
       db.run(
-        `INSERT INTO orders (id, session_id, status, template_id, product_sku, fields_json, photos_json, poem_text, total_cents)
-         VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO orders (id, session_id, status, template_id, product_sku, fields_json, photos_json, poem_text, total_cents, partner_id)
+         VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?)`,
         [orderId, req.sessionID, draft.templateId, draft.sku, draft.fieldsJson,
-          draft.photosJson, draft.poemText, draft.totalCents]
+          draft.photosJson, draft.poemText, draft.totalCents, draft.partnerId]
       );
       db.run(
         `INSERT INTO order_events (order_id, event_type, data_json) VALUES (?, ?, ?)`,
@@ -487,6 +493,36 @@ router.post('/checkout', async (req, res) => {
       });
     }
 
+    // A partner gift: no payment, so the checks a payment would make are made
+    // here instead, before anything is recorded. Each answer is one a family
+    // can act on, and none of them blames them for the link.
+    let giftEmail = null;
+    if (draft.isGift) {
+      giftEmail = String(req.body.email || '').trim().slice(0, 200);
+      if (!EMAIL_RE.test(giftEmail)) {
+        return res.status(400).json({
+          error: 'Please add the email address where you would like your keepsake sent.',
+          code: 'email_required',
+        });
+      }
+      const partner = partners.findById(db, draft.partnerId);
+      const availability = partners.giftAvailability(db, partner, draft.sku);
+      if (!availability.available) {
+        return res.status(409).json({
+          error: availability.reason === 'cap'
+            ? `${partner.name} has given all of this month’s keepsakes. You can still have the tribute framed, or come back next month.`
+            : 'This gift link is not active right now. You can still have the tribute framed.',
+          code: 'gift_unavailable',
+        });
+      }
+      if (partners.emailAlreadyGifted(db, partner.id, draft.sku, giftEmail)) {
+        return res.status(409).json({
+          error: 'A keepsake has already been sent to this email address. Check your inbox, or reply to that email if you need it again.',
+          code: 'gift_already_sent',
+        });
+      }
+    }
+
     // ── Record the approval. This happens BEFORE Stripe, deliberately: it is
     // the evidence that the customer saw and accepted this exact artwork, and
     // an order must never be able to reach a payment page without it.
@@ -512,6 +548,21 @@ router.post('/checkout', async (req, res) => {
         userAgent: String(req.get('user-agent') || '').slice(0, 300),
       })]
     );
+
+    // The gift is placed now, through the same steps a paid order takes after
+    // Stripe confirms it (tokens, confirmation email, the shop's review). The
+    // family lands on their status page, not a payment page.
+    if (draft.isGift) {
+      const placed = db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
+      const { proofToken } = await require('../services/orderAcceptance').acceptOrder(db, placed, {
+        email: giftEmail,
+        event: {
+          type: 'gift_placed',
+          data: { partnerId: draft.partnerId, email: giftEmail },
+        },
+      });
+      return res.json({ redirectUrl: `/order/${proofToken}` });
+    }
 
     // Create Stripe Checkout Session
     const Stripe = require('stripe');

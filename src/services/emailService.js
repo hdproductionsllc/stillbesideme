@@ -537,7 +537,7 @@ async function sendProofReminder(to, orderData, proofImageUrl, approvalPageUrl, 
  * proof email runs through the /admin/review page this email links to.
  * ADMIN_EMAIL may be a comma-separated list (David + Rebecca).
  */
-async function sendReviewRequest(order, { reviewUrl, proofImageUrl }) {
+async function sendReviewRequest(order, { reviewUrl, proofImageUrl, partnerName = null, isGift = false }) {
   if (!ADMIN_EMAIL) {
     console.warn(`Email: ADMIN_EMAIL not configured — order ${order.id} is waiting in review with no notification. Set ADMIN_EMAIL.`);
     return;
@@ -579,7 +579,10 @@ async function sendReviewRequest(order, { reviewUrl, proofImageUrl }) {
         Review needed &mdash; Order ${shortId}
       </h1>
       <p style="color:#9B9590;margin:0 0 20px;">
-        ${esc(order.email || 'No email')} &middot; ${formatPrice(order.total_cents)} &middot; paid, waiting on your approval
+        ${esc(order.email || 'No email')} &middot; ${isGift
+          ? `free keepsake, a gift from ${esc(partnerName || 'a partner')}`
+          : `${formatPrice(order.total_cents)} &middot; paid`}${partnerName && !isGift
+          ? ` &middot; sent by ${esc(partnerName)}` : ''} &middot; waiting on your approval
       </p>
 
       ${proofImageUrl ? `
@@ -601,14 +604,16 @@ async function sendReviewRequest(order, { reviewUrl, proofImageUrl }) {
         </a>
       </div>
       <p style="text-align:center;color:#9B9590;font-size:0.8rem;">
-        The customer already approved this proof before paying. Nothing goes to
-        the printer until you approve it here.
+        ${isGift
+          ? 'The family approved this proof. Approving here emails them their keepsake (screen size, not the print file).'
+          : 'The customer already approved this proof before paying. Nothing goes to the printer until you approve it here.'}
       </p>
     </div>
   `);
 
   const petName = fields.petName || fields.name || '';
-  return send(ADMIN_EMAIL, `Review needed — Order ${shortId}${petName ? ` (${petName})` : ''}`, html);
+  const kind = isGift ? 'Gift keepsake' : 'Order';
+  return send(ADMIN_EMAIL, `Review needed — ${kind} ${shortId}${petName ? ` (${petName})` : ''}`, html);
 }
 
 /**
@@ -772,6 +777,119 @@ async function sendDigitalDeliveryEmail(to, orderData, links = {}) {
   `);
 
   return send(to, `Their tribute is ready – Order ${shortId}`, html);
+}
+
+/**
+ * A partner gift keepsake was placed: tell the family we have it.
+ *
+ * Nothing about money (there was none) and no order number up top: this
+ * person did not buy anything, a practice they trust gave them something. It
+ * says who, says a person reads it before it comes, and leaves room to fix a
+ * date or a spelling.
+ *
+ * @param {string} to
+ * @param {object} d — { orderId, petName, partnerName }
+ * @param {string} statusPageUrl
+ */
+async function sendGiftKeepsakeReceived(to, d, statusPageUrl) {
+  const pet = escapeHtml(d.petName || '');
+  const partner = escapeHtml(d.partnerName || '');
+  const whose = pet ? `${pet}’s tribute` : 'your tribute';
+
+  const html = wrapHtml(`
+    <div style="background:#fff;border-radius:12px;padding:32px;margin-bottom:24px;">
+      <h1 style="font-family:Georgia,serif;font-size:1.6rem;font-weight:400;color:#2C2C2C;text-align:center;margin:0 0 8px;">
+        We have ${whose}
+      </h1>
+      ${partner ? `
+      <p style="text-align:center;color:#9B9590;margin:0 0 24px;">A gift from ${partner}</p>` : ''}
+
+      <p style="color:#2C2C2C;line-height:1.6;margin-bottom:16px;">
+        ${partner ? `${partner} asked us to make this for you, and there is nothing to pay.` : 'This keepsake is a gift, and there is nothing to pay.'}
+        Before it comes to you, someone here reads every word and looks over the photo.
+        It is usually in your inbox within a day or two.
+      </p>
+
+      <p style="color:#2C2C2C;line-height:1.6;margin-bottom:24px;">
+        If you want to change anything in the meantime, a date, a spelling, a word in the poem,
+        just reply to this email.
+      </p>
+
+      <div style="text-align:center;margin-bottom:8px;">
+        <a href="${statusPageUrl}"
+           style="display:inline-block;background:#8B9D83;color:#fff;text-decoration:none;padding:14px 40px;border-radius:8px;font-weight:600;font-size:1rem;">
+          See where it is
+        </a>
+      </div>
+    </div>
+  `);
+
+  return send(to, pet ? `We have ${d.petName}’s tribute` : 'We have your tribute', html);
+}
+
+/**
+ * The partner gift keepsake is ready.
+ *
+ * The file is screen size: for a phone, a computer, or sending to family. The
+ * print-quality file only comes with a framed order, and the framed order is
+ * one tap away from their own saved design, so this is the one honest place
+ * to mention it, once, quietly, after the gift itself.
+ *
+ * @param {string} to
+ * @param {object} d — { orderId, petName, partnerName, framedFromCents }
+ * @param {object} links — { downloadUrl, frameUrl, statusPageUrl }
+ */
+async function sendGiftKeepsakeDelivery(to, d, links = {}) {
+  const pet = escapeHtml(d.petName || '');
+  const partner = escapeHtml(d.partnerName || '');
+  const { downloadUrl, frameUrl, statusPageUrl } = links;
+  const whose = pet ? `${pet}’s tribute` : 'Your tribute';
+
+  const frameBlock = frameUrl ? `
+      <div style="background:#FAF8F5;border-radius:8px;padding:20px;margin:24px 0 0;border-left:3px solid #C4A882;">
+        <p style="color:#2C2C2C;line-height:1.6;margin:0 0 12px;">
+          If you would like it on the wall, we print it on archival paper and frame it,
+          ${d.framedFromCents ? `from ${formatPrice(d.framedFromCents)}, ` : ''}with free shipping.
+          Your design is saved, so it opens just as you left it.
+        </p>
+        <a href="${frameUrl}" style="color:#8B9D83;font-weight:600;text-decoration:none;">
+          Have it framed &rarr;
+        </a>
+      </div>` : '';
+
+  const html = wrapHtml(`
+    <div style="background:#fff;border-radius:12px;padding:32px;margin-bottom:24px;">
+      <h1 style="font-family:Georgia,serif;font-size:1.6rem;font-weight:400;color:#2C2C2C;text-align:center;margin:0 0 8px;">
+        ${whose} is ready
+      </h1>
+      ${partner ? `
+      <p style="text-align:center;color:#9B9590;margin:0 0 24px;">A gift from ${partner}</p>` : ''}
+
+      <p style="color:#2C2C2C;line-height:1.6;margin-bottom:16px;">
+        Here it is. It is sized for your phone and computer, so you can keep it close
+        or send it to the people who knew ${pet || 'them'} too.
+      </p>
+
+      <div style="text-align:center;margin:24px 0 16px;">
+        <a href="${downloadUrl}"
+           style="display:inline-block;background:#8B9D83;color:#fff;text-decoration:none;padding:14px 40px;border-radius:8px;font-weight:600;font-size:1rem;">
+          Download ${pet ? `${pet}’s tribute` : 'your tribute'}
+        </a>
+      </div>
+
+      <p style="color:#9B9590;font-size:0.85rem;line-height:1.6;margin-bottom:8px;text-align:center;">
+        The download link stays active for 90 days, so save it somewhere safe.
+      </p>
+
+      ${frameBlock}
+      ${statusPageUrl ? `
+      <p style="text-align:center;color:#9B9590;font-size:0.85rem;margin-top:24px;">
+        You can <a href="${statusPageUrl}" style="color:#8B9D83;">see your keepsake</a> anytime.
+      </p>` : ''}
+    </div>
+  `);
+
+  return send(to, pet ? `${d.petName}’s tribute is ready` : 'Your tribute is ready', html);
 }
 
 /**
@@ -1129,6 +1247,8 @@ module.exports = {
   sendChangeRequestNotification,
   sendApprovalConfirmation,
   sendDigitalDeliveryEmail,
+  sendGiftKeepsakeReceived,
+  sendGiftKeepsakeDelivery,
   sendPartnerOrderEmail,
   sendShippedEmail,
   // Customer-facing. sendReviewInvite is the one that asks a BUYER about their

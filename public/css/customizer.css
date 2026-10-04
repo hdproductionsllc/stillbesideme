@@ -2390,3 +2390,50 @@ body.pf-open { overflow: hidden; }
   text-underline-offset: 3px;
   cursor: pointer;
 }
+
+/* ── Partner gift (a practice's /gift link) ───────────────────── */
+
+.partner-gift-banner {
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-warm);
+  background: var(--color-bg);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 0 0 20px;
+}
+.partner-gift-from {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  color: var(--color-primary);
+  margin: 0 0 4px;
+}
+.partner-gift-body {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.pf-email { margin: 0 0 14px; }
+.pf-email-label {
+  display: block;
+  font-size: 0.9rem;
+  color: #F2ECE3;
+  margin: 0 0 6px;
+}
+.pf-email input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 1rem;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+.pf-email input:focus {
+  outline: none;
+  border-color: var(--color-warm);
+  box-shadow: 0 0 0 2px rgba(196, 168, 130, 0.25);
+}

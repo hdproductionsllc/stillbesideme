@@ -88,6 +88,22 @@
     if (lb && typeof lb.register === 'function') lb.register(entries);
   }
 
+  /**
+   * ?piece=<slug> opens that piece straight away. Outreach emails link to one
+   * real tribute, and a practice manager reading on a phone should land on
+   * it, not on the top of the homepage with the gallery far below.
+   */
+  function openRequestedPiece() {
+    var slug = '';
+    try { slug = (new URLSearchParams(window.location.search).get('piece') || '').toLowerCase(); } catch (e) { return; }
+    if (!slug || !/^[a-z0-9-]+$/.test(slug)) return;
+    var img = document.querySelector('img[data-tribute="' + slug + '"]');
+    var lb = window.SBMTributeLightbox;
+    if (!img || !lb || typeof lb.open !== 'function') return;
+    img.scrollIntoView({ block: 'center' });
+    lb.open(slug);
+  }
+
   function start() {
     var gallery = document.querySelector(GALLERY);
     if (!gallery) return;
@@ -95,8 +111,8 @@
     fetch('/api/gallery')
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
-        if (!data || !data.pieces || !data.pieces.length) return;
-        insert(gallery, data.pieces);
+        if (data && data.pieces && data.pieces.length) insert(gallery, data.pieces);
+        openRequestedPiece();
       })
       .catch(function () { /* the gallery is fine without it */ });
   }

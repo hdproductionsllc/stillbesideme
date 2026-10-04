@@ -741,8 +741,8 @@
   }
 
   function setFrameSize(sku) {
-    // Parse "framed-11x14" / "print-11x14" / "digital-11x14" → [11, 14]
-    var match = sku && sku.match(/^(framed|print|digital)-(\d+)x(\d+)/);
+    // Parse "framed-11x14" / "print-11x14" / "digital-11x14" / "gift-11x14" → [11, 14]
+    var match = sku && sku.match(/^(framed|print|digital|gift)-(\d+)x(\d+)/);
     if (!match) { frameDims = null; return; }
     frameDims = [parseInt(match[2], 10), parseInt(match[3], 10)];
 

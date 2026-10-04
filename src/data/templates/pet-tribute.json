@@ -160,6 +160,8 @@
     { "sku": "digital-11x14", "label": "Digital Keepsake", "sublabel": "A printable high-resolution file of their tribute", "price": 1995, "fulfillment": "digital" }
   ],
 
+  "partnerGift": { "sku": "gift-11x14", "label": "Your keepsake", "sublabel": "Their tribute, sized for your phone and for sharing", "price": 0, "fulfillment": "digital", "delivery": "screen" },
+
   "frameOptions": {
     "default": "black",
     "groups": [

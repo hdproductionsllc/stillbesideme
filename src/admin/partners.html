@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Partners — Admin</title>
+<style>
+  :root { --bg:#1a1714; --panel:#26211c; --line:#3a332c; --text:#f4f1ea; --muted:#a89e90; --accent:#C4A882; --warn:#e5a3a3; --ok:#8B9D83; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:1rem; margin:0; font-weight:600; }
+  header .spacer { flex:1; }
+  header a { color:var(--accent); text-decoration:none; font-size:.85rem; }
+  .wrap { max-width:960px; margin:0 auto; padding:24px 20px 80px; }
+  .lede { color:var(--muted); font-size:.9rem; line-height:1.55; margin:0 0 24px; }
+  .lede strong { color:var(--text); font-weight:600; }
+  fieldset { border:1px solid var(--line); border-radius:10px; padding:16px 18px 20px; margin:0 0 28px; }
+  legend { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding:0 6px; }
+  label { display:block; font-size:.82rem; margin:12px 0 5px; }
+  .hint { color:var(--muted); font-size:.75rem; margin:4px 0 0; line-height:1.45; }
+  input, select, textarea { width:100%; background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:9px 10px; font-family:inherit; font-size:.88rem; }
+  .row { display:grid; grid-template-columns:2fr 1fr 1fr; gap:0 14px; }
+  @media (max-width:700px){ .row { grid-template-columns:1fr; } }
+  button { background:var(--accent); color:#1a1714; border:0; border-radius:8px; padding:10px 18px; font-size:.88rem; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); padding:6px 12px; font-size:.8rem; }
+  button:disabled { opacity:.5; cursor:default; }
+  .actions { display:flex; align-items:center; gap:14px; margin-top:14px; }
+  .msg { font-size:.85rem; line-height:1.5; }
+  .msg.err { color:var(--warn); }
+  .msg.ok { color:var(--ok); }
+  .card { border:1px solid var(--line); border-radius:10px; padding:16px 18px; margin:0 0 14px; background:var(--panel); }
+  .card.paused { opacity:.6; }
+  .card-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .card-head h2 { font-size:1rem; margin:0; }
+  .tag { font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:2px 8px; }
+  .tag.off { color:var(--warn); border-color:var(--warn); }
+  .link { font-family:ui-monospace, monospace; font-size:.82rem; color:var(--accent); word-break:break-all; margin:8px 0; }
+  .stats { display:flex; gap:22px; flex-wrap:wrap; font-size:.82rem; color:var(--muted); margin:10px 0 12px; }
+  .stats strong { color:var(--text); font-size:1rem; display:block; }
+  .tools { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .tools a { color:var(--accent); font-size:.82rem; }
+  .tools input { width:80px; padding:6px 8px; }
+  .empty { color:var(--muted); font-size:.9rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Partners</h1>
+  <div class="spacer"></div>
+  <a href="/admin/orders">All orders</a>
+</header>
+
+<div class="wrap">
+  <p class="lede">
+    Practices that give families a free keepsake from us. Add one <strong>after
+    they say yes</strong>: that creates their link and their printable card.
+    A family who uses the link gets a screen-size keepsake marked as a gift from
+    them, and every order that follows, framed ones included, is counted here.
+  </p>
+
+  <fieldset>
+    <legend>Add a partner</legend>
+    <form id="add">
+      <div class="row">
+        <div>
+          <label for="name">Practice name</label>
+          <input id="name" name="name" required maxlength="120" placeholder="At Peace Pets">
+        </div>
+        <div>
+          <label for="kind">Kind</label>
+          <select id="kind" name="kind">
+            <option value="home-euthanasia">Home euthanasia</option>
+            <option value="clinic">Clinic</option>
+            <option value="crematorium">Crematorium</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label for="cap">Keepsakes a month</label>
+          <input id="cap" name="monthlyCap" type="number" min="1" max="1000" value="30">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="email">Contact email</label>
+          <input id="email" name="contactEmail" type="email" placeholder="practice@example.com">
+        </div>
+        <div style="grid-column: span 2">
+          <label for="slug">Link name (optional)</label>
+          <input id="slug" name="slug" placeholder="made from the name">
+          <p class="hint">Their link will be stillbesideme.com/gift/<span id="slug-preview">…</span></p>
+        </div>
+      </div>
+      <label for="notes">Notes</label>
+      <input id="notes" name="notes" maxlength="2000" placeholder="Who we spoke to, anything to remember">
+      <div class="actions">
+        <button type="submit" id="add-btn">Add partner</button>
+        <span class="msg" id="add-msg" role="status"></span>
+      </div>
+    </form>
+  </fieldset>
+
+  <div id="list"><p class="empty">Loading…</p></div>
+</div>
+
+<script>
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const money = (c) => '$' + (Number(c || 0) / 100).toFixed(2);
+  const KIND_LABEL = { 'home-euthanasia': 'Home euthanasia', clinic: 'Clinic', crematorium: 'Crematorium', other: 'Other' };
+
+  function slugify(s) {
+    return String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
+      .replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60).replace(/-+$/g, '');
+  }
+  function updateSlugPreview() {
+    $('#slug-preview').textContent = ($('#slug').value.trim() || slugify($('#name').value)) || '…';
+  }
+  $('#name').addEventListener('input', updateSlugPreview);
+  $('#slug').addEventListener('input', updateSlugPreview);
+
+  async function api(url, body) {
+    const res = await fetch(url, body ? {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    } : {});
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+    return data;
+  }
+
+  function render(list) {
+    if (!list.length) {
+      $('#list').innerHTML = '<p class="empty">No partners yet. When a practice says yes, add them above.</p>';
+      return;
+    }
+    $('#list').innerHTML = list.map((p) => `
+      <div class="card${p.active ? '' : ' paused'}" data-id="${p.id}">
+        <div class="card-head">
+          <h2>${esc(p.name)}</h2>
+          <span class="tag">${esc(KIND_LABEL[p.kind] || p.kind)}</span>
+          ${p.active ? '' : '<span class="tag off">Paused</span>'}
+        </div>
+        <div class="link">${esc(p.link)}</div>
+        <div class="stats">
+          <div><strong>${p.giftsThisMonth} / ${p.monthlyCap}</strong>keepsakes this month</div>
+          <div><strong>${p.giftsGiven}</strong>keepsakes in all</div>
+          <div><strong>${p.paidOrders}</strong>paid orders</div>
+          <div><strong>${money(p.paidCents)}</strong>from paid orders</div>
+        </div>
+        <div class="tools">
+          <a href="/admin/api/partners/${p.id}/card.png" target="_blank">See card</a>
+          <a href="/admin/api/partners/${p.id}/card.png?download=1">Download card</a>
+          <button class="ghost" data-act="copy">Copy link</button>
+          <button class="ghost" data-act="toggle">${p.active ? 'Pause link' : 'Resume link'}</button>
+          <input type="number" min="1" max="1000" value="${p.monthlyCap}" aria-label="Keepsakes a month">
+          <button class="ghost" data-act="cap">Set monthly limit</button>
+          <span class="msg" role="status"></span>
+        </div>
+        ${p.contactEmail || p.notes ? `<p class="hint">${esc([p.contactEmail, p.notes].filter(Boolean).join(' · '))}</p>` : ''}
+      </div>`).join('');
+  }
+
+  let partners = [];
+  async function load() {
+    try {
+      partners = (await api('/admin/api/partners')).partners;
+      render(partners);
+    } catch (err) {
+      $('#list').innerHTML = `<p class="msg err">${esc(err.message)}</p>`;
+    }
+  }
+
+  $('#add').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = $('#add-msg');
+    const btn = $('#add-btn');
+    btn.disabled = true; msg.className = 'msg'; msg.textContent = '';
+    const body = Object.fromEntries(new FormData(e.target).entries());
+    try {
+      const { partner } = await api('/admin/api/partners', body);
+      e.target.reset(); updateSlugPreview();
+      msg.className = 'msg ok';
+      msg.textContent = `Added. Their link is ${partner.link}`;
+      await load();
+    } catch (err) {
+      msg.className = 'msg err'; msg.textContent = err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  $('#list').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const card = btn.closest('.card');
+    const p = partners.find((x) => String(x.id) === card.dataset.id);
+    const msg = card.querySelector('.msg');
+    msg.className = 'msg'; msg.textContent = '';
+    try {
+      if (btn.dataset.act === 'copy') {
+        await navigator.clipboard.writeText(p.link);
+        msg.className = 'msg ok'; msg.textContent = 'Copied.';
+        return;
+      }
+      const body = btn.dataset.act === 'toggle'
+        ? { active: !p.active }
+        : { monthlyCap: card.querySelector('input[type=number]').value };
+      await api(`/admin/api/partners/${p.id}`, body);
+      await load();
+    } catch (err) {
+      msg.className = 'msg err'; msg.textContent = err.message;
+    }
+  });
+
+  updateSlugPreview();
+  load();
+})();
+</script>
+</body>
+</html>

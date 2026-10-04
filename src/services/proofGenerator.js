@@ -4,6 +4,11 @@
  * Composites: customer photo + tribute text panel + optional second photo
  * (from shared tributeRenderer) with a "PROOF" watermark overlay.
  * Output is a JPEG saved to output/proofs/.
+ *
+ * The same render, unwatermarked and a little larger, is the partner gift
+ * keepsake (generateKeepsake): a picture for a phone or a computer. It is
+ * deliberately not the 300 DPI print file, which only comes with a framed
+ * order.
  */
 
 const sharp = require('sharp');
@@ -16,6 +21,12 @@ const {
 const { calculatePrintDimensions } = require('./printRenderer');
 
 const PROOFS_SUBDIR = 'proofs';
+const KEEPSAKES_SUBDIR = 'keepsakes';
+
+// Long edge of a proof is 1600px (landscape) or 1000px wide (portrait). A
+// keepsake is 1.25x that: sharp on a phone held either way, still well short
+// of anything that would print at size.
+const KEEPSAKE_SCALE = 1.25;
 
 /**
  * Build a "PROOF" watermark overlay as SVG.
@@ -44,6 +55,23 @@ const renderPhoto = (photoPath, region, cropPosition, quality, crop) =>
  * @returns {{ proofPath: string, proofRelativeUrl: string }}
  */
 async function generateProof(order) {
+  return render(order, { watermark: true, scale: 1, subdir: PROOFS_SUBDIR, quality: 85, label: 'Proof' });
+}
+
+/**
+ * The partner gift keepsake: the approved proof without its watermark.
+ *
+ * @param {object} order — Full order row from DB
+ * @returns {{ keepsakePath: string, keepsakeRelativeUrl: string }}
+ */
+async function generateKeepsake(order) {
+  const { proofPath, proofRelativeUrl } = await render(order, {
+    watermark: false, scale: KEEPSAKE_SCALE, subdir: KEEPSAKES_SUBDIR, quality: 90, label: 'Keepsake',
+  });
+  return { keepsakePath: proofPath, keepsakeRelativeUrl: proofRelativeUrl };
+}
+
+async function render(order, opts) {
   const data = resolveOrderData(order);
   const { layout, tributeColors, tributeData, photoPath, poemLabel } = data;
 
@@ -60,7 +88,7 @@ async function generateProof(order) {
   const printDimsForScale = calculatePrintDimensions(order.product_sku, layout);
   if (data.hasPrintedMat) {
     const printDims = printDimsForScale;
-    totalW = isLandscapeLayout(layout) ? 1600 : 1000;
+    totalW = Math.round((isLandscapeLayout(layout) ? 1600 : 1000) * opts.scale);
     totalH = Math.round(totalW * (printDims.height / printDims.width));
     const dpiScale = totalW / printDims.width;
     panels = calculateMatLayout(layout, totalW, totalH, data.printSpec, dpiScale);
@@ -70,7 +98,7 @@ async function generateProof(order) {
     // same panel proportions, same footer spacing. A hardcoded ratio made the
     // emailed proof (1.6) disagree with the 14/11 print the customer receives.
     const printDims = printDimsForScale;
-    totalW = isLandscapeLayout(layout) ? 1600 : 1000;
+    totalW = Math.round((isLandscapeLayout(layout) ? 1600 : 1000) * opts.scale);
     totalH = Math.round(totalW * (printDims.height / printDims.width));
     panels = calculateLayout(layout, totalW, totalH, data.customRatios);
   }
@@ -127,9 +155,11 @@ async function generateProof(order) {
     layers.push({ input: matOverlay, left: 0, top: 0 });
   }
 
-  // Watermark overlay
-  const watermarkSvg = buildWatermarkSvg(totalW, totalH);
-  layers.push({ input: watermarkSvg, left: 0, top: 0 });
+  // Watermark overlay (proofs only)
+  if (opts.watermark) {
+    const watermarkSvg = buildWatermarkSvg(totalW, totalH);
+    layers.push({ input: watermarkSvg, left: 0, top: 0 });
+  }
 
   // Composite everything
   const background = (data.hasPrintedMat && tributeColors.mat) || tributeColors.background || '#1a1a1a';
@@ -137,15 +167,15 @@ async function generateProof(order) {
     create: { width: totalW, height: totalH, channels: 3, background },
   })
     .composite(layers)
-    .jpeg({ quality: 85 })
+    .jpeg({ quality: opts.quality })
     .toBuffer();
 
   // Save
   const { absPath: proofPath, relativeUrl: proofRelativeUrl } =
-    emitToOutput(PROOFS_SUBDIR, `${order.id}.jpg`, proofBuffer);
-  console.log(`Proof generated: ${proofRelativeUrl} (${totalW}x${totalH})`);
+    emitToOutput(opts.subdir, `${order.id}.jpg`, proofBuffer);
+  console.log(`${opts.label} generated: ${proofRelativeUrl} (${totalW}x${totalH})`);
 
   return { proofPath, proofRelativeUrl };
 }
 
-module.exports = { generateProof };
+module.exports = { generateProof, generateKeepsake };

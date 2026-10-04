@@ -9,33 +9,12 @@
  */
 
 const express = require('express');
-const path = require('path');
-const fs = require('fs');
 const router = express.Router();
 
-const TEMPLATES_DIR = path.join(__dirname, '..', 'data', 'templates');
-const templateCache = {};
-
-/** Load a template by ID (cached) — mirrors checkout.js / adminReview.js. */
-function loadTemplate(templateId) {
-  if (templateCache[templateId]) return templateCache[templateId];
-  const filePath = path.join(TEMPLATES_DIR, `${templateId}.json`);
-  if (!fs.existsSync(filePath)) return null;
-  templateCache[templateId] = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-  return templateCache[templateId];
-}
-
-/**
- * Is this a Digital Keepsake order? Fulfillment lives on the SKU's template
- * entry — the only trusted source. Digital orders show a digital timeline
- * (confirmed → reviewed → delivered) and surface a download link when delivered.
- */
-function isDigitalOrder(order) {
-  const template = loadTemplate(order.template_id);
-  if (!template || !Array.isArray(template.printProducts)) return false;
-  const product = template.printProducts.find(p => p.sku === order.product_sku);
-  return !!product && product.fulfillment === 'digital';
-}
+// Digital orders show a digital timeline (confirmed, reviewed, delivered) and
+// surface a download link when delivered. services/products.js is the one
+// trusted answer to "is this digital", partner gift keepsakes included.
+const { loadTemplate, isDigitalOrder, isGiftOrder } = require('../services/products');
 
 function shortId(orderId) {
   return orderId.substring(0, 8).toUpperCase();
@@ -353,7 +332,9 @@ function buildDigitalTimeline(order, events) {
       key: 'delivered',
       label: 'Ready in your inbox',
       detail: isDelivered
-        ? 'Your high-resolution file is ready to download below. We also emailed you the link.'
+        ? (isGiftOrder(order)
+          ? 'Your keepsake is ready to download below, sized for your phone and computer. We also emailed you the link.'
+          : 'Your high-resolution file is ready to download below. We also emailed you the link.')
         : 'We\'ll email your download link as soon as your tribute is ready.',
       at: isDelivered ? deliveredAt : null,
       state: isDelivered ? 'done' : 'pending',
@@ -490,6 +471,8 @@ function formatSku(sku) {
   if (m) return `Framed ${m[1]}×${m[2]}"`;
   // digital-11x14 → Digital Keepsake
   if (/^digital-/.test(sku)) return 'Digital Keepsake';
+  // gift-11x14 → the free keepsake a partner practice gave them
+  if (/^gift-/.test(sku)) return 'Keepsake (a gift)';
   // print-11x14 → Print only 11×14"
   const p = sku.match(/print-(\d+)x(\d+)/);
   if (p) return `Print only ${p[1]}×${p[2]}"`;
