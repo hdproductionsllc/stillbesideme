@@ -68,11 +68,15 @@ const LUMA_CONFIG = {
   // subcategory needs is the print bleed.
   printOnly: {
     subcategoryId: 103001,
-    // Bleed Size: 0.25in. The border art is printed full-bleed into the image
-    // (same 300 DPI file the framed pipeline uses), so 0.25in keeps the safe
-    // margins the render already assumes.
+    // Bleed Size: No Bleed, the image goes to the edge of the paper. On fine
+    // art paper Luma's "0.25in Bleed" is a 0.25in WHITE BORDER on each side,
+    // so it wants a 10.5x13.5 image (7:9) and refuses our 11x14 file with a
+    // 406 aspect-ratio error. That is what stopped the first real print-only
+    // order (2A47ADF9, Oct 5 2026). Our render already carries its own cream
+    // margin and is made at exactly the ordered size, the same as the framed
+    // pipeline, and the customer frames it in a standard frame of that size.
     options: [
-      36,   // Bleed Size: 0.25in
+      39,   // Bleed Size: No Bleed (image goes to edge of paper)
     ],
   },
 };

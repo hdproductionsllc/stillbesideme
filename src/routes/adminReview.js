@@ -92,6 +92,7 @@ const LUMA_OPTION_LABELS = {
   95: 'Kraft paper backing',
   148: 'Dry mounted to foam core',
   36: '0.25in bleed',
+  39: 'No bleed: printed edge to edge at the exact size',
 };
 
 /**
