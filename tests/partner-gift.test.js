@@ -178,6 +178,16 @@ async function placeGift(b, email) {
     assert.strictEqual(info.product.price, 0);
   });
 
+  await check('a practice can download its own card by link, and only a real one', async () => {
+    const r = await fetch(`${base}/gift/at-peace-pets/card.png`);
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(r.headers.get('content-type'), 'image/png');
+    assert.ok(/attachment; filename="at-peace-pets-gift-card.png"/.test(r.headers.get('content-disposition')));
+    const png = Buffer.from(await r.arrayBuffer());
+    assert.strictEqual(png.subarray(1, 4).toString(), 'PNG');
+    assert.strictEqual((await fetch(`${base}/gift/nobody-here/card.png`)).status, 404);
+  });
+
   await check('a visitor without a link is not in gift mode', async () => {
     const info = (await browser(base).get('/api/partner-gift')).json;
     assert.strictEqual(info.partner, null);

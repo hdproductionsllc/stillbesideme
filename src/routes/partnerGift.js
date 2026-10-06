@@ -4,6 +4,11 @@
  *   GET /gift/:slug        a practice's link, from their card or their email.
  *                          Remembers the partner on this visitor's session and
  *                          opens the designer.
+ *   GET /gift/:slug/card.png
+ *                          the practice's printable 4x6 card, as a download.
+ *                          Public on purpose: it is the link we send a practice
+ *                          when they say yes, so they can print it themselves,
+ *                          and it shows nothing the card itself does not.
  *   GET /api/partner-gift  what the designer needs to show gift mode: who it is
  *                          from, whether the link can give a keepsake right now,
  *                          and the keepsake product itself.
@@ -44,6 +49,23 @@ router.get('/gift/:slug', (req, res) => {
 
   req.session.partnerId = partner.id;
   req.session.save(() => res.redirect(302, `/customize/${GIFT_TEMPLATE_ID}?from=${partner.slug}`));
+});
+
+router.get('/gift/:slug/card.png', async (req, res) => {
+  const partner = partners.findBySlug(req.app.locals.db, String(req.params.slug || '').toLowerCase());
+  if (!partner) return notFoundPage(res);
+
+  try {
+    const { renderPartnerCard } = require('../services/partnerCard');
+    const png = await renderPartnerCard(partner);
+    res.type('png');
+    res.attachment(`${partner.slug}-gift-card.png`);
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(png);
+  } catch (err) {
+    console.error(`Partner card failed for ${partner.slug}:`, err.message);
+    res.status(500).send('The card could not be made just now.');
+  }
 });
 
 router.get('/api/partner-gift', (req, res) => {
