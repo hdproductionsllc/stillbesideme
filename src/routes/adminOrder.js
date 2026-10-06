@@ -101,7 +101,7 @@ router.post('/order/:token/ship', async (req, res) => {
     try {
       const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
       const statusPageUrl = order.proof_token ? `${baseUrl}/order/${order.proof_token}` : null;
-      await emailService.sendShippedEmail(order.email, { orderId: order.id }, {
+      await emailService.sendShippedEmail(order.email, { orderId: order.id, sku: order.product_sku }, {
         number: trackingNumber,
         carrier: trackingCarrier,
         url: trackingUrl,

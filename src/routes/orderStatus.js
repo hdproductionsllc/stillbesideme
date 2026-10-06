@@ -167,6 +167,9 @@ function buildTimeline(order, events) {
  */
 function inlineMilestones(order, at) {
   const s = order.status;
+  // A print-only order ships bare paper for the customer's own frame, so no
+  // step may claim we framed it.
+  const framed = !require('../services/lumaOrderApi').isPrintOnlySku(order.product_sku);
   const paid = s !== 'draft' && s !== 'pending_payment';
   const inReview = s === 'awaiting_review' || s === 'change_requested';
   const withPrinter = s === 'proof_approved' || s === 'in_production';
@@ -201,16 +204,18 @@ function inlineMilestones(order, at) {
       // Naming this step "Printing and framing" while a person is still
       // checking the file would claim work that has not started. The label
       // follows the order rather than the other way round.
-      label: inReview ? 'Final check by our team' : 'Printing and framing',
+      label: inReview ? 'Final check by our team' : framed ? 'Printing and framing' : 'Printing',
       detail: inReview
         ? 'A real person is going over your design by hand before it goes to print.'
         : withPrinter
           // Our status flips when the file reaches the printer, which is not
           // the same as ink being on paper: it can sit in their queue first.
           // "With our printer" is true either way. "Being printed" is not.
-          ? 'Your tribute is with our printer now, to be printed on archival paper and framed.'
+          ? (framed
+            ? 'Your tribute is with our printer now, to be printed on archival paper and framed.'
+            : 'Your tribute is with our printer now, to be printed on archival fine art paper.')
           : shipped
-            ? 'Printed on archival paper and framed by hand.'
+            ? (framed ? 'Printed on archival paper and framed by hand.' : 'Printed on archival fine art paper.')
             : 'Printing starts once the final check is done.',
       at: at.sentToPrinter,
       state: stateOf(shipped, inReview || withPrinter),

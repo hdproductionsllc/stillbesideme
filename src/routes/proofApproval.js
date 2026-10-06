@@ -219,6 +219,7 @@ router.post('/:token/approve', async (req, res) => {
         orderId: order.id,
         totalCents: order.total_cents,
         templateName: order.template_id,
+        sku: order.product_sku,
       }, statusPageUrl);
     }
   } catch (err) {

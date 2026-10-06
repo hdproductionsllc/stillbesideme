@@ -478,5 +478,6 @@ module.exports = {
   buildImageUrl,
   placeOrder,
   resolveFrameSubcategory,
+  isPrintOnlySku,
   LUMA_CONFIG,
 };

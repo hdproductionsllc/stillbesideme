@@ -423,7 +423,7 @@ async function sendProofEmail(to, orderData, proofImageUrl, approvalPageUrl, sta
       </div>
       <p style="color:#2C2C2C;line-height:1.6;margin-bottom:24px;">
         We've created your personalized ${templateName || 'tribute'}. Please review the design carefully — once approved,
-        it will be printed on archival paper and professionally framed.
+        it will be ${describePiece(sku).making}.
       </p>
 
       <div style="text-align:center;margin-bottom:16px;">
@@ -659,21 +659,36 @@ async function sendChangeRequestNotification(orderData, notes, reviewUrl) {
 }
 
 /**
+ * How a customer email names the physical piece. Every one of these emails was
+ * written when the only thing we shipped was a framed tribute, and the first
+ * print-only customer (2A47ADF9) was told their "framed tribute" had shipped
+ * when we sent them bare paper for their own frame. The SKU decides the words,
+ * by the same rule Luma ordering uses, so the email and the parcel agree.
+ */
+function describePiece(sku) {
+  const { isPrintOnlySku } = require('./lumaOrderApi');
+  return isPrintOnlySku(sku)
+    ? { noun: 'tribute print', boxed: 'print', making: 'printed on archival fine art paper, ready for a frame of your choosing' }
+    : { noun: 'framed tribute', boxed: 'frame', making: 'printed on archival paper and professionally framed' };
+}
+
+/**
  * Send confirmation to customer that their proof was approved and order is printing.
  * When noteCardUrl is given (framed orders — the insert card rendered at release),
  * the email shows the exact note that will be tucked in the box, so the buyer
  * knows what the recipient will find alongside the frame.
  */
 async function sendApprovalConfirmation(to, orderData, statusPageUrl, noteCardUrl = null) {
-  const { orderId, totalCents } = orderData;
+  const { orderId, totalCents, sku } = orderData;
   const shortId = orderId.substring(0, 8).toUpperCase();
+  const piece = describePiece(sku);
 
   const noteCardBlock = noteCardUrl ? `
       <div style="margin-top:28px;text-align:left;">
         <p style="color:#2C2C2C;line-height:1.6;margin:0 0 12px;">
-          Tucked in the box with the frame is this note, printed on cream paper:
+          Tucked in the box with the ${piece.boxed} is this note, printed on cream paper:
         </p>
-        <img src="${noteCardUrl}" alt="The note enclosed with your framed tribute"
+        <img src="${noteCardUrl}" alt="The note enclosed with your ${piece.noun}"
              style="display:block;width:100%;max-width:420px;margin:0 auto;border:1px solid #E8E4DF;border-radius:8px;">
       </div>
   ` : '';
@@ -688,8 +703,8 @@ async function sendApprovalConfirmation(to, orderData, statusPageUrl, noteCardUr
         Order ${shortId} &middot; ${formatPrice(totalCents)}
       </p>
       <p style="color:#2C2C2C;line-height:1.6;text-align:left;">
-        The design you approved has passed its final review and is now being printed on archival
-        paper and professionally framed. You'll receive tracking information by email once it ships.
+        The design you approved has passed its final review and is now being ${piece.making}.
+        You'll receive tracking information by email once it ships.
       </p>
       ${noteCardBlock}
       <p style="color:#9B9590;font-size:0.9rem;margin-top:24px;">
@@ -705,7 +720,7 @@ async function sendApprovalConfirmation(to, orderData, statusPageUrl, noteCardUr
     </div>
   `);
 
-  return send(to, `Your tribute is printing — Order ${shortId}`, html);
+  return send(to, `Your tribute is printing: Order ${shortId}`, html);
 }
 
 /**
@@ -975,8 +990,9 @@ async function sendPartnerOrderEmail(order, { printFileUrl, printFilePath, admin
  * Notify the customer their tribute has shipped, with tracking.
  */
 async function sendShippedEmail(to, orderData, tracking, statusPageUrl) {
-  const { orderId } = orderData;
+  const { orderId, sku } = orderData;
   const sid = orderId.substring(0, 8).toUpperCase();
+  const piece = describePiece(sku);
   const trackingLine = tracking && tracking.number
     ? `<p style="color:#2C2C2C;line-height:1.6;text-align:center;margin:16px 0;">
          <strong>Tracking:</strong> ${tracking.url
@@ -993,7 +1009,7 @@ async function sendShippedEmail(to, orderData, tracking, statusPageUrl) {
       </h1>
       <p style="color:#9B9590;margin:0 0 24px;">Order ${sid}</p>
       <p style="color:#2C2C2C;line-height:1.6;">
-        Your framed tribute has shipped. We hope it brings you comfort every time you see it.
+        Your ${piece.noun} has shipped. We hope it brings you comfort every time you see it.
       </p>
       ${trackingLine}
       ${statusPageUrl ? `
@@ -1006,7 +1022,7 @@ async function sendShippedEmail(to, orderData, tracking, statusPageUrl) {
     </div>
   `);
 
-  return send(to, `Your tribute has shipped — Order ${sid}`, html);
+  return send(to, `Your tribute has shipped: Order ${sid}`, html);
 }
 
 /**
@@ -1251,6 +1267,7 @@ module.exports = {
   sendGiftKeepsakeDelivery,
   sendPartnerOrderEmail,
   sendShippedEmail,
+  describePiece,
   // Customer-facing. sendReviewInvite is the one that asks a BUYER about their
   // piece; sendReviewRequest above asks the SHOP to approve a proof.
   sendReviewInvite,
