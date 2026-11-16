@@ -78,10 +78,10 @@ function device(base) {
         method, ...init, headers: { ...(init.headers || {}), ...(cookie ? { cookie } : {}) },
       }));
     },
-    async upload(buffer) {
+    async upload(buffer, filename = 'rex.jpg', mime = 'image/jpeg') {
       const form = new FormData();
       form.append('slotId', 'main');
-      form.append('photo', new Blob([buffer], { type: 'image/jpeg' }), 'rex.jpg');
+      form.append('photo', new Blob([buffer], { type: mime }), filename);
       const r = remember(await fetch(`${base}/api/images/upload`, {
         method: 'POST', body: form, headers: cookie ? { cookie } : {},
       }));
@@ -430,6 +430,42 @@ function proofBody() {
     assert.strictEqual(e.resumeUrl, 'https://example.test/customize/pet-tribute');
   });
 
+  // Real upload -> session -> rendered proof for each supported encoding.
+  const formats = [
+    ['jpg', 'image/jpeg', photo],
+    ['png', 'image/png', await sharp(photo).png().toBuffer()],
+    ['webp', 'image/webp', await sharp(photo).webp().toBuffer()],
+  ];
+  if (process.env.SBM_TEST_HEIC) {
+    const heic = fs.readFileSync(process.env.SBM_TEST_HEIC);
+    formats.push(['heic', 'image/heic', heic], ['heif', 'image/heif', heic]);
+  } else console.log('HEIC fixture not provided; run with SBM_TEST_HEIC for HEIC/HEIF coverage.');
+  for (const [ext, mime, buffer] of formats) {
+    await check(ext + ' upload and real rendered proof', async () => {
+      const browser = device(base);
+      const up = await browser.upload(buffer, 'fixture.' + ext, mime);
+      assert.strictEqual(up.status, 200, JSON.stringify(up.body));
+      assert.ok(up.body.dimensions.width > 0);
+      const proof = await browser.json('POST', '/api/checkout/proof', proofBody());
+      assert.strictEqual(proof.status, 200, JSON.stringify(proof.body));
+      assert.ok(JSON.stringify(proof.body).includes('/output/proofs/'));
+    });
+  }
+  await check('malformed image is rejected without taking down the server', async () => {
+    const browser = device(base);
+    const up = await browser.upload(Buffer.from('not an image'));
+    assert.notStrictEqual(up.status, 200);
+    const health = await fetch(base + '/api/health');
+    assert.strictEqual(health.status, 200);
+  });
+
+  await check('compressed request parsing stays healthy after trailing data', async () => {
+    const zlib = require('zlib');
+    const body = Buffer.concat([zlib.gzipSync(Buffer.from('{}')), Buffer.from('invalid-trailer')]);
+    await fetch(base + '/api/health', {method:'POST', headers:{'content-type':'application/json','content-encoding':'gzip'}, body});
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.strictEqual((await fetch(base + '/api/health')).status, 200);
+  });
   server.close();
   fs.rmSync(TMP, { recursive: true, force: true });
   if (failures) {
