@@ -462,7 +462,7 @@ async function start() {
   // ".html -> strip extension" rule: /404.html and the token-served admin pages
   // have no clean-URL equivalent and would redirect into a 404.
   const CLEAN_URL_PAGES = [
-    'index', 'the-writing', 'pet-memorial-gifts', 'sympathy-gifts', 'memorial-gifts',
+    'index', 'christmas-pet-memorial-gifts', 'the-writing', 'pet-memorial-gifts', 'sympathy-gifts', 'memorial-gifts',
     'dog-memorial-gifts', 'cat-memorial-gifts', 'horse-memorial-gifts', 'sympathy-message-helper',
     'pet-memorial-poem-generator', 'rainbow-bridge-poem-for-dogs', 'rainbow-bridge-poem-for-cats',
     'privacy-policy', 'terms', 'refund-policy', 'shipping-policy', 'contact', 'about',
@@ -555,6 +555,9 @@ async function start() {
   });
   app.get('/the-writing', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'the-writing.html'));
+  });
+  app.get('/christmas-pet-memorial-gifts', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'christmas-pet-memorial-gifts.html'));
   });
   app.get('/sympathy-gifts', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'sympathy-gifts.html'));
@@ -725,6 +728,11 @@ async function start() {
     res.set('Content-Type', 'application/xml');
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${baseUrl}/christmas-pet-memorial-gifts</loc>${lastmod('christmas-pet-memorial-gifts.html')}
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
   <url>
     <loc>${baseUrl}/</loc>${lastmod('index.html')}
     <changefreq>weekly</changefreq>
